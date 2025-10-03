@@ -1,40 +1,46 @@
 const { randomUUID } = require('crypto');
 
+const ORG_ID = 'org1';
+
 const store = {
   properties: [
     {
       id: randomUUID(),
+      orgId: ORG_ID,
       name: 'Marina Heights',
       type: 'Residential Tower',
       city: 'Dubai',
       country: 'UAE',
       tags: ['Premium'],
       units: [
-        { id: randomUUID(), name: 'Unit 1201', floor: '12', area: 145 },
-        { id: randomUUID(), name: 'Unit 2305', floor: '23', area: 162 },
+        { id: randomUUID(), propertyId: null, name: 'Unit 1201', floor: '12', area: 145 },
+        { id: randomUUID(), propertyId: null, name: 'Unit 2305', floor: '23', area: 162 },
       ],
     },
     {
       id: randomUUID(),
+      orgId: ORG_ID,
       name: 'Al Qasr Business Centre',
       type: 'Commercial',
       city: 'Abu Dhabi',
       country: 'UAE',
       tags: ['FM Contract'],
       units: [
-        { id: randomUUID(), name: 'Suite 4B', floor: '4', area: 98 },
+        { id: randomUUID(), propertyId: null, name: 'Suite 4B', floor: '4', area: 98 },
       ],
     },
   ],
   plans: [
     {
       id: randomUUID(),
+      orgId: ORG_ID,
       name: 'Essential FM Package',
       frequency: 'Monthly',
       description: 'Core HVAC, MEP and cleaning visits every 30 days.',
     },
     {
       id: randomUUID(),
+      orgId: ORG_ID,
       name: 'Premium Facilities Plan',
       frequency: 'Quarterly',
       description: 'Deep inspections, facade cleaning and 24/7 helpdesk.',
@@ -50,6 +56,14 @@ const store = {
   },
 };
 
+store.properties.forEach((property) => {
+  property.units.forEach((unit) => {
+    if (!unit.propertyId) {
+      unit.propertyId = property.id;
+    }
+  });
+});
+
 function touchMetrics() {
   store.metrics.updatedAt = new Date().toISOString();
 }
@@ -61,6 +75,7 @@ function listProperties() {
 function addProperty({ name, type, city, country }) {
   const property = {
     id: randomUUID(),
+    orgId: ORG_ID,
     name,
     type,
     city,
@@ -82,6 +97,7 @@ function addUnit(propertyId, { name, floor, area }) {
   if (!property) return null;
   const unit = {
     id: randomUUID(),
+    propertyId,
     name,
     floor,
     area: Number.isFinite(Number(area)) ? Number(area) : area,
@@ -98,6 +114,7 @@ function listPlans() {
 function addPlan({ name, frequency, description }) {
   const plan = {
     id: randomUUID(),
+    orgId: ORG_ID,
     name,
     frequency,
     description: description || '',
