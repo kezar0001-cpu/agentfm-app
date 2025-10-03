@@ -1,89 +1,70 @@
-# AgentFM Backend
+# AgentFM Frontend
 
-This package contains the backend API for the **AgentFM** Facilities Management and Services Marketplace app.  It is implemented with **Node.js**, **Express**, **Prisma**, **Zod** and **PostgreSQL**.  The API is multi‑tenant via an `orgId` field on every table.
+This package contains the React frontend for the **AgentFM** Facilities Management and Services Marketplace app.  It is built with **Vite**, **React** (18), **React Router**, **TanStack Query**, **MUI**, **react‑hook‑form**, **Zod** and **i18next**.  The frontend communicates with the AgentFM backend API to manage properties, units, inspections, recommendations, jobs, plans and subscriptions.
 
 ## Prerequisites
 
 * **Node.js** 18 or later
-* **PostgreSQL** database (local or hosted)
-* npm
+* **npm**
+* The AgentFM backend running locally or accessible via network (see the backend `README.md` for setup)
 
 ## Setup
 
-1. **Clone this repository** (or copy these files into your project).
-2. Install dependencies:
-
-   ```sh
-   cd agentfm-backend
+1. **Install dependencies**:
+   ```bash
+   cd agentfm-frontend
    npm install
    ```
 
-3. **Configure environment variables**.  Create a `.env` file in the root of `agentfm-backend` with the following contents:
+2. **Configure environment** (optional):
+   If your backend runs on a different host/port than the default `http://localhost:3000`, create a `.env` file in the project root and set `VITE_API_BASE_URL`:
 
    ```env
-   DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-   PORT=3000
+   VITE_API_BASE_URL="http://localhost:3000"
    ```
 
-   Replace the PostgreSQL connection string with your own credentials.  The `PORT` variable controls which port the API listens on.
-
-4. **Generate the Prisma client and run migrations**.  Prisma uses a declarative schema defined in `prisma/schema.prisma`.  To create the database tables and generate the client run:
-
-   ```sh
-   npx prisma generate
-   npx prisma migrate dev --name init
-   ```
-
-   The first command generates the type‑safe Prisma client in `node_modules/@prisma/client`.  The second command creates a new migration named `init` and applies it to your PostgreSQL database.  You only need to run migrations when the schema changes.
-
-5. **Start the development server**:
-
-   ```sh
+3. **Start the development server**:
+   ```bash
    npm run dev
    ```
+   The frontend will be available at `http://localhost:5173` by default.  It will proxy API calls directly to the URL specified in `VITE_API_BASE_URL`.
 
-   By default the server will listen on `http://localhost:3000`.  You can change the port by setting the `PORT` environment variable.
+4. **Build for production**:
+   ```bash
+   npm run build
+   ```
+   This will output a static build to `dist/` which can be served by any static web server.  Make sure to configure your backend or reverse proxy to route API requests to the backend server.
 
-## API overview
+## Highlights
 
-The API follows a RESTful structure.  All requests and responses are JSON.  The routes are namespaced as follows:
+* **Internationalisation (i18n)**: Language switching between English and Arabic is supported via the `react‑i18next` library.  Use the language toggle button in the navigation bar to switch.  All translatable text keys are defined in `src/i18n.js`.
+* **State management**: Data fetching and caching is handled by **@tanstack/react‑query**.  Each page component uses `useQuery` to fetch data from the backend API and automatically keeps it in sync.
+* **Forms & validation**: Forms use **react‑hook‑form** with **Zod** schemas for validation and error messages.  This ensures consistent validation rules across the frontend and backend.
+* **Material UI (MUI)**: The UI uses Material UI components for a consistent look and responsive layout.  Feel free to customise the theme or add your own components.
+* **Routing**: Client‑side navigation is handled by **react‑router‑dom**.  See `src/App.jsx` for the list of routes.
 
-| Route | Methods | Description |
-|------|---------|-------------|
-| `/properties` | GET, POST | List or create properties |
-| `/properties/:id` | GET, PATCH, DELETE | Retrieve, update or delete a property |
-| `/properties/:propertyId/units` | GET, POST | List or create units under a property |
-| `/units/:unitId` | GET, PATCH, DELETE | Retrieve, update or delete a unit |
-| `/inspections` | GET, POST | List or schedule inspections |
-| `/inspections/:id` | GET | Retrieve a specific inspection and its findings |
-| `/inspections/:id/findings` | POST | Add findings to an inspection |
-| `/inspections/:id/complete` | POST | Complete an inspection, compute PCI and generate recommendations |
-| `/recommendations` | GET | List recommendations |
-| `/recommendations/:id/convert` | POST | Convert a recommendation into a job |
-| `/jobs` | GET, POST | List or create jobs |
-| `/jobs/:id` | PATCH | Update job status, schedule or vendor assignment |
-| `/plans` | GET, POST | List or create maintenance plans (owner/manager only) |
-| `/subscriptions` | GET, POST | List or create subscriptions |
-| `/subscriptions/:id` | PATCH | Update subscription status |
-| `/dashboard` | GET | Retrieve aggregate metrics for the organisation |
-| `/reports/owner` | POST | Request an owner report (stub) |
-| `/reports/:id.pdf` | GET | Retrieve a generated report (stub) |
+## Pages
 
-Authentication is stubbed for now; every request assumes a user with `orgId` of `demo‑org` and role `owner`.  Integrate your own auth provider (e.g. Clerk or Auth0) by populating `req.user` in `src/index.js`.
+The following pages are included in the MVP scaffold:
 
-## Development notes
+| Path | Component | Description |
+|------|-----------|-------------|
+| `/` | Dashboard | Shows KPI cards for open jobs, overdue jobs, completed jobs (30d), average PCI and pending recommendations. |
+| `/properties` | Properties | Lists properties and allows creation of new properties. |
+| `/properties/:id` | PropertyDetail | Shows a single property with its units and allows adding units. |
+| `/plans` | Plans | Lists maintenance plans and allows creation of new plans (owner/manager only). |
+| `/inspections` | Inspections | Lists inspections and schedules new inspections. |
+| `/jobs` | Jobs | Lists jobs and allows updating their status. |
+| `/recommendations` | Recommendations | Lists recommendations and allows conversion into jobs. |
+| `/subscriptions` | Subscriptions | Lists subscriptions, allows creation of new subscriptions and updating their status. |
+| `/reports` | Reports | Allows requesting owner reports for a property over a date range (stubbed backend). |
 
-* This scaffold focuses on the **MVP** features: properties, units, inspections, recommendations, jobs, maintenance plans, subscriptions and a basic dashboard.
-* Use **Prisma** for all database access.  The schema is defined in `prisma/schema.prisma` and should be extended carefully when adding new features.
-* **Zod** is used for request validation.  If a request body fails validation, the API responds with a 400 status and validation errors.
-* Multi‑tenancy is enforced by filtering on `orgId` in every query.
-* The recommendation rule engine is defined in `src/config/rules.json` and used by `applyRules` in `src/utils/pci.js`.  Adjust the rules or severity scores to suit your business logic.
-* The report endpoints (`/reports/owner` and `/reports/:id.pdf`) are currently stubs.  To implement PDF generation use **Puppeteer** to render a server‑side React template or static HTML into PDF and send via email.
+Each page is built to communicate with the corresponding backend endpoint.  When the backend API is extended, you can adjust the queries and mutations accordingly.
 
 ## Next steps
 
-1. **Authentication**: Replace the hard‑coded user in `src/index.js` with a real auth provider.  Ensure that `req.user` contains the user’s `id`, `orgId` and `role` for use by the route guards.
-2. **File uploads**: Implement S3 (or compatible) pre‑signed uploads for inspection photo storage.
-3. **Notifications**: Integrate Resend or SendGrid for email notifications and a WhatsApp Business API for WhatsApp messages.
-4. **Admin UI**: Build out the front‑end (see `agentfm-frontend` folder) to consume this API.
-5. **Report generation**: Use Puppeteer to generate owner reports as PDFs and email them to owners.  Build an HTML template that summarises KPIs, jobs and recommendations for the selected period.
+1. **Authentication**: Integrate a real authentication provider (e.g. Clerk or Auth0) and protect routes based on user roles.  Currently the frontend assumes the user is already authenticated.
+2. **Enhanced error handling**: Provide user‑friendly feedback when API calls fail (snackbars, alert banners).
+3. **Optimistic updates**: For job status changes and form submissions, use optimistic UI patterns to improve perceived performance.
+4. **Styling**: Customise the MUI theme to match your branding and add more responsive layouts.
+5. **Report viewing**: Implement a page to view generated PDF reports.  Once the backend supports PDF generation, you can embed or download the PDF via `/reports/:id.pdf`.
