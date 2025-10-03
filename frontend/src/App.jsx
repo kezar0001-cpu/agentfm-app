@@ -7,6 +7,7 @@ import PropertyDetailPage from './pages/PropertyDetailPage.jsx';
 import PlansPage from './pages/PlansPage.jsx';
 import InspectionsPage from './pages/InspectionsPage.jsx';
 import JobsPage from './pages/JobsPage.jsx';
+import ServiceRequestsPage from './pages/ServiceRequestsPage.jsx';
 import RecommendationsPage from './pages/RecommendationsPage.jsx';
 import SubscriptionsPage from './pages/SubscriptionsPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
@@ -21,6 +22,7 @@ export default function App() {
     { to: '/plans', label: t('navigation.plans') },
     { to: '/inspections', label: t('navigation.inspections') },
     { to: '/jobs', label: t('navigation.jobs') },
+    { to: '/service-requests', label: t('navigation.serviceRequests') },
     { to: '/recommendations', label: t('navigation.recommendations') },
     { to: '/subscriptions', label: t('navigation.subscriptions') },
     { to: '/reports', label: t('navigation.reports') },
@@ -35,6 +37,7 @@ export default function App() {
         <Route path="plans" element={<PlansPage />} />
         <Route path="inspections" element={<InspectionsPage />} />
         <Route path="jobs" element={<JobsPage />} />
+        <Route path="service-requests" element={<ServiceRequestsPage />} />
         <Route path="recommendations" element={<RecommendationsPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
         <Route path="reports" element={<ReportsPage />} />

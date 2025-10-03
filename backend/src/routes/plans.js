@@ -13,8 +13,8 @@ const planSchema = z.object({
   description: z.string().optional(),
 });
 
-router.get('/', (_req, res) => {
-  res.json(listPlans());
+router.get('/', (req, res) => {
+  res.json(listPlans(req.user.orgId));
 });
 
 router.post('/', (req, res) => {
@@ -23,7 +23,7 @@ router.post('/', (req, res) => {
     const issue = parsed.error.issues[0];
     return res.status(400).json({ error: issue?.message || 'Invalid request' });
   }
-  const plan = addPlan(parsed.data);
+  const plan = addPlan(req.user.orgId, parsed.data);
   res.status(201).json(plan);
 });
 

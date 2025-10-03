@@ -15,6 +15,7 @@ const plansRouter = require('./routes/plans');
 const subscriptionsRouter = require('./routes/subscriptions');
 const dashboardRouter = require('./routes/dashboard');
 const reportsRouter = require('./routes/reports');
+const serviceRequestsRouter = require('./routes/serviceRequests');
 const uploadsRouter = require('./routes/uploads');
 
 const app = express();
@@ -76,6 +77,7 @@ app.use('/api/plans', plansRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/service-requests', serviceRequestsRouter);
 
 // Uploads API + static files
 app.use('/api/uploads', uploadsRouter);

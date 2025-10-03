@@ -10,11 +10,14 @@ router.use(requireAuth);
 const unitSchema = z.object({
   name: z.string().min(1, 'Unit name is required'),
   floor: z.string().min(1, 'Floor is required'),
-  area: z.coerce.number({ invalid_type_error: 'Area must be a number' }).positive('Area must be positive'),
+  area: z
+    .coerce
+    .number({ invalid_type_error: 'Area must be a number' })
+    .positive('Area must be positive'),
 });
 
 router.get('/', (req, res) => {
-  const property = findProperty(req.params.propertyId);
+  const property = findProperty(req.user.orgId, req.params.propertyId);
   if (!property) {
     return res.status(404).json({ error: 'Property not found' });
   }
@@ -27,8 +30,8 @@ router.post('/', (req, res) => {
     const issue = parsed.error.issues[0];
     return res.status(400).json({ error: issue?.message || 'Invalid request' });
   }
-  const unit = addUnit(req.params.propertyId, parsed.data);
-  if (!unit) {
+  const unit = addUnit(req.user.orgId, req.params.propertyId, parsed.data);
+  if (!unit || unit instanceof Error) {
     return res.status(404).json({ error: 'Property not found' });
   }
   res.status(201).json(unit);

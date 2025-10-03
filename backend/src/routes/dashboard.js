@@ -6,8 +6,8 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-router.get('/summary', (_req, res) => {
-  res.json(getDashboardSummary());
+router.get('/summary', (req, res) => {
+  res.json(getDashboardSummary(req.user.orgId));
 });
 
 module.exports = router;
