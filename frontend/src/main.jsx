@@ -5,13 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import App from './App.jsx';
 import './i18n.js';
-import './index.css';
+import './index.css';  // Tailwind entry point
 
-
+// ✅ Query Client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 mins
       refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
         if (error?.response?.status === 404) {
@@ -23,6 +23,7 @@ const queryClient = new QueryClient({
   },
 });
 
+// ✅ MUI Theme
 const theme = createTheme({
   palette: {
     mode: 'light',

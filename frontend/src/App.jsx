@@ -34,8 +34,11 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        {/* 🔹 Public route: no AppLayout */}
+        <Route path="login" element={<LoginPage />} />
+
+        {/* 🔹 Private routes: wrapped in AppLayout */}
         <Route element={<AppLayout navigation={navigation} />}>
-          <Route path="login" element={<LoginPage />} />
           <Route index element={<RequireAuth><DashboardPage /></RequireAuth>} />
           <Route path="properties" element={<RequireAuth><PropertiesPage /></RequireAuth>} />
           <Route path="properties/:id" element={<RequireAuth><PropertyDetailPage /></RequireAuth>} />
