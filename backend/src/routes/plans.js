@@ -1,47 +1,30 @@
 const express = require('express');
-const prisma = require('../prisma');
 const { z } = require('zod');
-const validate = require('../middleware/validate');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
+const { listPlans, addPlan } = require('../data/memoryStore');
 
 const router = express.Router();
 
-// Schema for creating a plan.  Only owners/managers should create plans.
+router.use(requireAuth);
+
 const planSchema = z.object({
-  name: z.string().min(1),
-  cadence: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'BIMONTHLY']),
-  includes: z.array(z.string()).nonempty(),
-  slaHours: z.number().int().optional(),
-  priceAED: z.number().positive()
+  name: z.string().min(1, 'Plan name is required'),
+  frequency: z.string().min(1, 'Frequency is required'),
+  description: z.string().optional(),
 });
 
-// GET /plans - list plans for the org
-router.get('/', requireAuth, async (req, res, next) => {
-  try {
-    const plans = await prisma.plan.findMany({ where: { orgId: req.user.orgId } });
-    res.json(plans);
-  } catch (err) {
-    next(err);
-  }
+router.get('/', (_req, res) => {
+  res.json(listPlans());
 });
 
-// POST /plans - create a new plan (owner/manager only)
-router.post('/', requireAuth, requireRole(['owner', 'manager']), validate(planSchema), async (req, res, next) => {
-  try {
-    const plan = await prisma.plan.create({
-      data: {
-        orgId: req.user.orgId,
-        name: req.body.name,
-        cadence: req.body.cadence,
-        includes: req.body.includes,
-        slaHours: req.body.slaHours,
-        priceAED: req.body.priceAED
-      }
-    });
-    res.status(201).json(plan);
-  } catch (err) {
-    next(err);
+router.post('/', (req, res) => {
+  const parsed = planSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return res.status(400).json({ error: issue?.message || 'Invalid request' });
   }
+  const plan = addPlan(parsed.data);
+  res.status(201).json(plan);
 });
 
 module.exports = router;
