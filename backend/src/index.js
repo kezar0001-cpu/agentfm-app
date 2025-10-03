@@ -21,9 +21,7 @@ const uploadsRouter = require('./routes/uploads');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ---------------- CORS (dev-safe) ----------------
-   Allows Codespaces preview URLs (*.github.dev) and localhost.
-   Blocks anything else. Preflight handled globally. */
+// ========================= CORS (dev-safe) =========================
 const allowedOrigins = [
   /^https:\/\/.*\.github\.dev$/, // Codespaces/GitHub
   'http://localhost:5173',
@@ -35,9 +33,7 @@ const allowedOrigins = [
 app.use(cors({
   origin(origin, cb) {
     if (!origin) return cb(null, true); // curl / server-side
-    const ok = allowedOrigins.some(r =>
-      r instanceof RegExp ? r.test(origin) : r === origin
-    );
+    const ok = allowedOrigins.some(r => r instanceof RegExp ? r.test(origin) : r === origin);
     return cb(ok ? null : new Error(`CORS blocked: ${origin}`), ok);
   },
   credentials: true,
@@ -46,20 +42,11 @@ app.use(cors({
   maxAge: 86400,
 }));
 app.options('*', cors());
-/* ------------------------------------------------- */
+// ==================================================================
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// Dev auth stub (swap for real auth later)
-if (process.env.DEV_AUTO_LOGIN === 'true') {
-  app.use((req, _res, next) => {
-    req.user = { id: 'demo-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
-    next();
-  });
-}
-
 
 // Request logging (before routes/404)
 app.use((req, _res, next) => {
@@ -67,8 +54,49 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Health check
+// Health check (unprotected)
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// ========================= DEV AUTH ===============================
+// A simple dev token. Set DEV_TOKEN in .env to override.
+const DEV_TOKEN = process.env.DEV_TOKEN || 'devtoken';
+
+// Optional legacy auto-login (set DEV_AUTO_LOGIN=true in backend/.env)
+const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === 'true';
+
+// Login -> returns token + basic user
+app.post('/api/auth/login', (req, res) => {
+  const email = req.body?.email || 'demo@example.com';
+  return res.json({ token: DEV_TOKEN, user: { email } });
+});
+
+// Who am I -> valid only if Authorization header has our token
+app.get('/api/auth/me', (req, res) => {
+  const ok = req.headers.authorization === `Bearer ${DEV_TOKEN}`;
+  return ok
+    ? res.json({ user: { email: 'demo@example.com' } })
+    : res.status(401).json({ error: 'unauthorized' });
+});
+
+// Guard: protect ALL /api/* except /api/health and /api/auth/*
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) return next(); // not an API route
+  if (req.path === '/api/health' || req.path.startsWith('/api/auth')) return next();
+
+  // In dev you can bypass auth entirely if you want:
+  if (DEV_AUTO_LOGIN) {
+    req.user = { id: 'dev-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
+    return next();
+  }
+
+  const auth = req.headers.authorization || '';
+  if (auth === `Bearer ${DEV_TOKEN}`) {
+    req.user = { id: 'dev-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
+    return next();
+  }
+  return res.status(401).json({ error: 'unauthorized' });
+});
+// ==================================================================
 
 // ---- Mount ALL APIs under /api ----
 app.use('/api/properties', propertiesRouter);
