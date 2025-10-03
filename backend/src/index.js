@@ -1,14 +1,11 @@
-// src/index.js
+// backend/src/index.js
 require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-// Prisma (if you need it in middlewares later)
-// const prisma = require('./prisma');
-
-// --- Routers (keep your existing ones) ---
+// ---- Routers ----
 const propertiesRouter = require('./routes/properties');
 const unitsRouter = require('./routes/units');
 const inspectionsRouter = require('./routes/inspections');
@@ -18,63 +15,78 @@ const plansRouter = require('./routes/plans');
 const subscriptionsRouter = require('./routes/subscriptions');
 const dashboardRouter = require('./routes/dashboard');
 const reportsRouter = require('./routes/reports');
-
-// NEW: uploads router
 const uploadsRouter = require('./routes/uploads');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Helpful log (optional)
-// console.log('CWD:', process.cwd());
+/* ---------------- CORS (dev-safe) ----------------
+   Allows Codespaces preview URLs (*.github.dev) and localhost.
+   Blocks anything else. Preflight handled globally. */
+const allowedOrigins = [
+  /^https:\/\/.*\.github\.dev$/, // Codespaces/GitHub
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+];
 
-// CORS
-app.use(
-  cors({
-    origin: [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:5174',
-      'http://127.0.0.1:5174',
-    ],
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    maxAge: 86400,
-  })
-);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // curl / server-side
+    const ok = allowedOrigins.some(r =>
+      r instanceof RegExp ? r.test(origin) : r === origin
+    );
+    return cb(ok ? null : new Error(`CORS blocked: ${origin}`), ok);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
+}));
 app.options('*', cors());
+/* ------------------------------------------------- */
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// DEV auth stub (replace with real auth later)
+// Dev auth stub (swap for real auth later)
 app.use((req, _res, next) => {
   req.user = { id: 'demo-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
   next();
 });
 
-// --- API routes ---
-app.use('/properties', propertiesRouter);
-app.use('/properties/:propertyId/units', unitsRouter);
-app.use('/inspections', inspectionsRouter);
-app.use('/recommendations', recommendationsRouter);
-app.use('/jobs', jobsRouter);
-app.use('/plans', plansRouter);
-app.use('/subscriptions', subscriptionsRouter);
-app.use('/dashboard', dashboardRouter);
-app.use('/reports', reportsRouter);
+// Request logging (before routes/404)
+app.use((req, _res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 
-// NEW: Uploads API + static files
-// Router first (POST /uploads/single, GET /uploads/ping)
-app.use('/uploads', uploadsRouter);
-// Then serve the actual files saved to ./uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// Health check
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// Health
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// ---- Mount ALL APIs under /api ----
+app.use('/api/properties', propertiesRouter);
+app.use('/api/properties/:propertyId/units', unitsRouter);
+app.use('/api/inspections', inspectionsRouter);
+app.use('/api/recommendations', recommendationsRouter);
+app.use('/api/jobs', jobsRouter);
+app.use('/api/plans', plansRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/reports', reportsRouter);
 
-// 404
+// Uploads API + static files
+app.use('/api/uploads', uploadsRouter);
+app.use('/api/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Friendly root (not API)
+app.get('/', (_req, res) =>
+  res.type('text').send('AgentFM API is running. Try GET /api/health')
+);
+
+// 404 LAST
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Error handler
@@ -85,13 +97,7 @@ app.use((err, _req, res, _next) => {
 
 // Start server when run directly
 if (require.main === module) {
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => console.log(`AgentFM backend listening on port ${port}`));
+  app.listen(PORT, () => console.log(`AgentFM backend listening on port ${PORT}`));
 }
 
 module.exports = app;
-
-// === DEV LOGGING & HEALTH (added by Kezar) ===
-app.use((req, _res, next) => { console.log(req.method, req.url); next(); });
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
-// === END DEV ADDITIONS ===
