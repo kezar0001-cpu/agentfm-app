@@ -1,3 +1,4 @@
+// base URL forced to /api in dev via Vite proxy
 import axios from 'axios';
 import { buildApiError } from '../utils/error.js';
 
