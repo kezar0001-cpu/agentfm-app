@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../api/client.js';
+import { api } from '../api.js';
 
 export default function useApiMutation({ url, method = 'post', invalidateKeys = [], onSuccess }) {
   const queryClient = useQueryClient();

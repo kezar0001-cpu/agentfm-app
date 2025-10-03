@@ -4,14 +4,23 @@
   "description": "Backend for AgentFM Facilities Management and Services Marketplace app",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node src/index.js",
-    "start": "node src/index.js"
+    "dev": "nodemon src/index.js",
+    "prisma:migrate": "prisma migrate deploy",
+    "start": "npm run prisma:migrate && node src/index.js"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.3",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^6.16.3"
   }
 }

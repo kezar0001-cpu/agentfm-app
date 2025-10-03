@@ -1,7 +1,7 @@
 const express = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth } = require('../auth');
 const {
   listServiceRequests,
   createServiceRequest,
