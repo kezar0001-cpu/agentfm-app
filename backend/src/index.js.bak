@@ -90,8 +90,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-
-// === DEV LOGGING & HEALTH (added by Kezar) ===
-app.use((req, _res, next) => { console.log(req.method, req.url); next(); });
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
-// === END DEV ADDITIONS ===
