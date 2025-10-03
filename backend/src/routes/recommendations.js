@@ -10,20 +10,7 @@ router.get('/', requireAuth, async (req, res, next) => {
   try {
     const recommendations = await prisma.recommendation.findMany({
       where: { orgId: req.user.orgId },
-      include: {
-        job: {
-          select: { id: true, status: true, scheduledFor: true },
-        },
-        finding: {
-          include: {
-            inspection: {
-              select: { id: true, propertyId: true, unitId: true, scheduledAt: true },
-            },
-          },
-        },
-        property: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      include: { job: true, finding: { include: { inspection: true } } }
     });
     res.json(recommendations);
   } catch (err) {
@@ -36,14 +23,7 @@ router.post('/:id/convert', requireAuth, async (req, res, next) => {
   try {
     const rec = await prisma.recommendation.findFirst({
       where: { id: req.params.id, orgId: req.user.orgId },
-      include: {
-        job: true,
-        finding: {
-          include: {
-            inspection: true,
-          },
-        },
-      },
+      include: { job: true, finding: { include: { inspection: true } } }
     });
     if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
     if (rec.jobId) return res.status(400).json({ error: 'Recommendation already converted to job' });
@@ -59,12 +39,11 @@ router.post('/:id/convert', requireAuth, async (req, res, next) => {
         source: 'RECOMMENDATION',
         title: rec.summary,
         description: rec.summary,
-        status: 'OPEN',
-        priority: rec.priority === 'CRITICAL' ? 'URGENT' : rec.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+        status: 'PLANNED',
         scheduledFor: null,
         vendorId: null,
-        slaHours: null,
-      },
+        slaHours: null
+      }
     });
     // update recommendation to point at new job
     await prisma.recommendation.update({ where: { id: rec.id }, data: { jobId: job.id } });

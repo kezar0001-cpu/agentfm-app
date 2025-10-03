@@ -19,16 +19,12 @@ import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
 
-const STATUSES = ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const STATUSES = ['open', 'in_progress', 'scheduled', 'completed'];
 
 export default function JobsPage() {
   const { t } = useTranslation();
   const query = useApiQuery({ queryKey: ['jobs'], url: '/jobs' });
-  const mutation = useApiMutation({
-    url: '/jobs/:id',
-    method: 'patch',
-    invalidateKeys: [['jobs'], ['dashboard', 'overview']],
-  });
+  const mutation = useApiMutation({ url: '/jobs/:id', method: 'patch', invalidateKeys: [['jobs']] });
 
   const jobs = normaliseArray(query.data);
 
@@ -75,7 +71,7 @@ export default function JobsPage() {
               {jobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell>{job.id}</TableCell>
-                  <TableCell>{job.property?.name || job.propertyName || job.propertyId}</TableCell>
+                  <TableCell>{job.propertyName || job.propertyId}</TableCell>
                   <TableCell>{job.assignee?.name || job.assignedTo}</TableCell>
                   <TableCell>
                     <Select
@@ -92,13 +88,7 @@ export default function JobsPage() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    {job.priority && (
-                      <Chip
-                        size="small"
-                        label={job.priority}
-                        color={job.priority === 'URGENT' || job.priority === 'HIGH' ? 'error' : 'default'}
-                      />
-                    )}
+                    {job.priority && <Chip size="small" label={job.priority} color={job.priority === 'high' ? 'error' : 'default'} />}
                   </TableCell>
                 </TableRow>
               ))}

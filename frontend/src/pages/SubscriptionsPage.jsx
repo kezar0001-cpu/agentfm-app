@@ -18,7 +18,7 @@ import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
 
-const STATUSES = ['ACTIVE', 'PENDING', 'SUSPENDED', 'CANCELLED'];
+const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
@@ -76,7 +76,7 @@ export default function SubscriptionsPage() {
                     >
                       {STATUSES.map((status) => (
                         <MenuItem key={status} value={status}>
-                          {status.replace('_', ' ')}
+                          {status}
                         </MenuItem>
                       ))}
                     </Select>

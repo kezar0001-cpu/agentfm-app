@@ -7,18 +7,15 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 // Schema for creating a subscription
-const SUBSCRIPTION_STATUSES = ['PENDING', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
-
 const subscriptionSchema = z.object({
   propertyId: z.string(),
   unitId: z.string().optional(),
-  planId: z.string(),
-  status: z.enum(SUBSCRIPTION_STATUSES).optional(),
+  planId: z.string()
 });
 
 // Schema for updating a subscription
 const subscriptionUpdateSchema = z.object({
-  status: z.enum(SUBSCRIPTION_STATUSES).optional(),
+  status: z.enum(['ACTIVE', 'PAUSED', 'CANCELED']).optional()
 });
 
 // GET /subscriptions - list subscriptions
@@ -50,10 +47,10 @@ router.post('/', requireAuth, validate(subscriptionSchema), async (req, res, nex
       data: {
         orgId: req.user.orgId,
         propertyId: req.body.propertyId,
-        unitId: req.body.unitId || null,
+        unitId: req.body.unitId,
         planId: req.body.planId,
-        status: req.body.status || 'ACTIVE',
-      },
+        status: 'ACTIVE'
+      }
     });
     res.status(201).json(sub);
   } catch (err) {
@@ -69,8 +66,8 @@ router.patch('/:id', requireAuth, validate(subscriptionUpdateSchema), async (req
     const updated = await prisma.subscription.update({
       where: { id: sub.id },
       data: {
-        status: req.body.status || sub.status,
-      },
+        status: req.body.status || sub.status
+      }
     });
     res.json(updated);
   } catch (err) {

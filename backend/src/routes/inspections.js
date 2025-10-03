@@ -16,10 +16,9 @@ const router = express.Router();
 const inspectionSchema = z.object({
   propertyId: z.string(),
   unitId: z.string().optional(),
-  inspector: z.string().min(1),
-  scheduledAt: z.string().refine((d) => !Number.isNaN(Date.parse(d)), {
-    message: 'scheduledAt must be a valid ISO date string',
-  }),
+  scheduledAt: z.string().refine((d) => !isNaN(Date.parse(d)), {
+    message: 'scheduledAt must be a valid ISO date string'
+  })
 });
 
 // Schema for creating findings
@@ -27,7 +26,7 @@ const findingSchema = z.object({
   system: z.string().min(1),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   note: z.string().min(1),
-  photos: z.any().optional(),
+  photos: z.any().optional()
 });
 
 // GET /inspections - list inspections for the org.  Supports optional
@@ -44,12 +43,7 @@ router.get('/', requireAuth, async (req, res, next) => {
     }
     const inspections = await prisma.inspection.findMany({
       where,
-      include: {
-        findings: true,
-        property: { select: { id: true, name: true } },
-        unit: { select: { id: true, label: true } },
-      },
-      orderBy: { scheduledAt: 'desc' },
+      include: { findings: true, property: true, unit: true }
     });
     res.json(inspections);
   } catch (err) {
@@ -73,8 +67,7 @@ router.post('/', requireAuth, validate(inspectionSchema), async (req, res, next)
         orgId: req.user.orgId,
         propertyId: req.body.propertyId,
         unitId: req.body.unitId,
-        scheduledAt: new Date(req.body.scheduledAt),
-        inspectorName: req.body.inspector,
+        scheduledAt: new Date(req.body.scheduledAt)
       }
     });
     res.status(201).json(inspection);
@@ -88,11 +81,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const inspection = await prisma.inspection.findFirst({
       where: { id: req.params.id, orgId: req.user.orgId },
-      include: {
-        findings: true,
-        property: { select: { id: true, name: true } },
-        unit: { select: { id: true, label: true } },
-      },
+      include: { findings: true, property: true, unit: true }
     });
     if (!inspection) return res.status(404).json({ error: 'Inspection not found' });
     res.json(inspection);
@@ -126,8 +115,8 @@ router.post('/:id/findings', requireAuth, async (req, res, next) => {
         system: f.system,
         severity: f.severity,
         note: f.note,
-        photos: f.photos || null,
-      })),
+        photos: f.photos || null
+      }))
     });
     res.status(201).json({ count: created.count });
   } catch (err) {
@@ -160,21 +149,16 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
         const created = await tx.recommendation.create({
           data: {
             orgId: req.user.orgId,
-            findingId: rec.findingId || inspection.findings[0]?.id,
-            propertyId: inspection.propertyId,
+            findingId: inspection.findings[0]?.id, // simplistic: link to first finding; you could map recs to specific findings
             summary: rec.summary,
             estHours: rec.estHours,
             estCostAED: rec.estCostAED,
             priority: rec.priority,
-            suggestedWithinDays: rec.suggestedWithinDays,
+            suggestedWithinDays: rec.suggestedWithinDays
           }
         });
         createdRecs.push(created);
       }
-      await tx.property.update({
-        where: { id: inspection.propertyId },
-        data: { healthScore: pci },
-      });
       return { updated, createdRecs };
     });
     res.json({ inspection: result.updated, recommendations: result.createdRecs });
