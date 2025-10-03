@@ -12,7 +12,6 @@ import RecommendationsPage from './pages/RecommendationsPage.jsx';
 import SubscriptionsPage from './pages/SubscriptionsPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
-import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
   const { t } = useTranslation();
@@ -32,7 +31,6 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppLayout navigation={navigation} />}>
-        <Route path="login" element={<LoginPage />} />
         <Route index element={<DashboardPage />} />
         <Route path="properties" element={<PropertiesPage />} />
         <Route path="properties/:id" element={<PropertyDetailPage />} />
