@@ -1,0 +1,32 @@
+[
+  {
+    "if": { "system": "hvac", "severity": "medium", "noteContains": "filter" },
+    "then": {
+      "summary": "Replace HVAC filter (MERV 8–11)",
+      "estHours": 0.5,
+      "estCostAED": 60,
+      "priority": "P2",
+      "suggestedWithinDays": 14
+    }
+  },
+  {
+    "if": { "system": "plumbing", "noteContains": "leak" },
+    "then": {
+      "summary": "Fix leak (tighten fittings / replace gasket)",
+      "estHours": 1.0,
+      "estCostAED": 120,
+      "priority": "P1",
+      "suggestedWithinDays": 7
+    }
+  },
+  {
+    "if": { "system": "electrical", "severity": "high", "noteContains": "gfci" },
+    "then": {
+      "summary": "Replace faulty GFCI outlet",
+      "estHours": 0.75,
+      "estCostAED": 150,
+      "priority": "P1",
+      "suggestedWithinDays": 7
+    }
+  }
+]
