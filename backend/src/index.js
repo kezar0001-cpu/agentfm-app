@@ -53,10 +53,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Dev auth stub (swap for real auth later)
-app.use((req, _res, next) => {
-  req.user = { id: 'demo-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
-  next();
-});
+if (process.env.DEV_AUTO_LOGIN === 'true') {
+  app.use((req, _res, next) => {
+    req.user = { id: 'demo-user', orgId: 'org1', role: 'owner', email: 'demo@example.com' };
+    next();
+  });
+}
+
 
 // Request logging (before routes/404)
 app.use((req, _res, next) => {
