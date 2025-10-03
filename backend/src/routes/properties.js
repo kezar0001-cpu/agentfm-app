@@ -7,181 +7,270 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All property routes require an authenticated user so we can scope
-// queries to the caller's organisation. Without this guard, hitting any
-// endpoint without `req.user` would previously throw when attempting to
-// read `req.user.orgId`, resulting in a 500 error instead of a 401.
 router.use(requireAuth);
 
-/** Accept relative or absolute URLs (just a non-empty string). */
 const relOrAbsString = z.string().min(1);
+const imageValueSchema = z.union([relOrAbsString, z.object({ url: relOrAbsString })]);
 
-/** Accept either a direct URL string or an object with a url property. */
-const imageValueSchema = z.union([
-  relOrAbsString,
-  z.object({ url: relOrAbsString })
-]);
+const ACTIVE_JOB_STATUSES = ['OPEN', 'SCHEDULED', 'IN_PROGRESS'];
+const ACTIVE_REQUEST_STATUSES = ['NEW', 'TRIAGED', 'SCHEDULED', 'IN_PROGRESS'];
 
-/** Validation schema for incoming JSON */
+const numericOptional = (schema) =>
+  z.preprocess((value) => {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? value : parsed;
+    }
+    return value;
+  }, schema);
+
 const propertySchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  address: z.string().min(1, 'Address is required'),
-  city: z.string().optional().nullable(),
-  state: z.string().optional().nullable(),
-  zipCode: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
+  type: z.string().min(1, 'Type is required'),
+  city: z.string().min(1, 'City is required'),
+  country: z.string().min(1, 'Country is required'),
+  addressLine1: z.string().optional().nullable(),
+  addressLine2: z.string().optional().nullable(),
+  postalCode: z.string().optional().nullable(),
+  portfolioValue: numericOptional(z.number().nonnegative().nullable().optional()),
+  occupancyRate: numericOptional(z.number().min(0).max(1).nullable().optional()),
+  healthScore: numericOptional(z.number().min(0).max(100).nullable().optional()),
+  tags: z.array(z.string().min(1)).optional(),
   coverImage: imageValueSchema.optional().nullable(),
-  images: z.array(imageValueSchema).optional().nullable(), // optional array of strings
+  images: z.array(imageValueSchema).optional().nullable(),
 });
 
-/** Helper: respond with readable Zod error (400) */
 function sendZodError(res, err) {
   const first = err?.issues?.[0];
   if (first?.message) return res.status(400).json({ error: first.message });
   return res.status(400).json({ error: 'Invalid request' });
 }
 
-/** Helper: strip undefined keys (so Prisma ignores them) */
 function clean(obj) {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));
 }
 
-/** Normalize a single image value into a URL string/null/undefined. */
 function normaliseSingleImage(value, { defaultToNull = false } = {}) {
   if (value === undefined) return defaultToNull ? null : undefined;
   if (value === null) return null;
   return typeof value === 'string' ? value : value.url;
 }
 
-/** Normalize an array of image values into an array of URL strings/null/undefined. */
 function normaliseImageList(value) {
   if (value === undefined) return undefined;
   if (value === null) return null;
   return value.map((item) => (typeof item === 'string' ? item : item.url));
 }
 
-/** GET /properties (all for org) */
+function serialiseNumber(value) {
+  if (value === null || value === undefined) return value ?? null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  if (typeof value === 'object' && typeof value.toNumber === 'function') return value.toNumber();
+  return Number(value);
+}
+
+function shapeSummary(property) {
+  const latestInspection = property.inspections?.[0] ?? null;
+  const nextInspection = latestInspection && !latestInspection.completedAt ? latestInspection : null;
+
+  return {
+    id: property.id,
+    name: property.name,
+    type: property.type,
+    city: property.city,
+    country: property.country,
+    addressLine1: property.addressLine1,
+    tags: property.tags ?? [],
+    portfolioValue: serialiseNumber(property.portfolioValue ?? null),
+    occupancyRate: property.occupancyRate ?? null,
+    healthScore: property.healthScore ?? latestInspection?.overallPCI ?? null,
+    coverImage: property.coverImage ?? null,
+    createdAt: property.createdAt,
+    updatedAt: property.updatedAt,
+    metrics: {
+      unitCount: property.units?.length ?? 0,
+      openJobs: property.jobs?.length ?? 0,
+      activeRequests: property.serviceRequests?.length ?? 0,
+      nextInspection,
+    },
+  };
+}
+
 router.get('/', async (req, res, next) => {
   try {
-    const rows = await prisma.property.findMany({
+    const properties = await prisma.property.findMany({
       where: { orgId: req.user.orgId },
+      include: {
+        units: { select: { id: true } },
+        jobs: {
+          where: { status: { in: ACTIVE_JOB_STATUSES } },
+          select: { id: true },
+        },
+        serviceRequests: {
+          where: { status: { in: ACTIVE_REQUEST_STATUSES } },
+          select: { id: true },
+        },
+        inspections: {
+          orderBy: { scheduledAt: 'desc' },
+          take: 1,
+          select: { scheduledAt: true, completedAt: true, overallPCI: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(rows);
-  } catch (err) { next(err); }
+
+    res.json(properties.map(shapeSummary));
+  } catch (error) {
+    next(error);
+  }
 });
 
-/** POST /properties (create) */
 router.post('/', async (req, res, next) => {
   try {
-    const parsed = propertySchema
-      .partial({ city: true, state: true, zipCode: true, country: true })
-      .safeParse(req.body);
+    const parsed = propertySchema.safeParse(req.body);
     if (!parsed.success) return sendZodError(res, parsed.error);
     const data = parsed.data;
 
     const coverImage = normaliseSingleImage(data.coverImage, { defaultToNull: true });
     const images = normaliseImageList(data.images);
 
-    // First attempt: include images if present
-    const common = {
+    const payload = clean({
       orgId: req.user.orgId,
       name: data.name,
-      address: data.address,
-      city: data.city ?? null,
-      state: data.state ?? null,
-      zipCode: data.zipCode ?? null,
-      country: data.country ?? null,
+      type: data.type,
+      city: data.city,
+      country: data.country,
+      addressLine1: data.addressLine1 ?? null,
+      addressLine2: data.addressLine2 ?? null,
+      postalCode: data.postalCode ?? null,
+      portfolioValue: data.portfolioValue ?? null,
+      occupancyRate: data.occupancyRate ?? null,
+      healthScore: data.healthScore ?? null,
+      tags: data.tags ?? [],
       coverImage,
-    };
-
-    const withImages = clean({
-      ...common,
-      images, // ONLY send if provided
+      images,
     });
 
-    try {
-      const created = await prisma.property.create({ data: withImages });
-      return res.status(201).json(created);
-    } catch (e) {
-      // If DB doesn't have "images" column, Prisma throws.
-      const msg = String(e?.message || '');
-      const looksLikeMissingImagesColumn =
-        msg.includes('Unknown arg `images`') ||
-        msg.includes('column "images" does not exist') ||
-        msg.includes('no such column: images');
-
-      if (!looksLikeMissingImagesColumn) throw e;
-
-      // Retry WITHOUT images
-      const created = await prisma.property.create({ data: common });
-      return res.status(201).json(created);
-    }
-  } catch (err) { next(err); }
+    const created = await prisma.property.create({ data: payload });
+    res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
 });
 
-/** GET /properties/:id */
 router.get('/:id', async (req, res, next) => {
   try {
-    const row = await prisma.property.findFirst({
+    const property = await prisma.property.findFirst({
       where: { id: req.params.id, orgId: req.user.orgId },
+      include: {
+        units: {
+          orderBy: { label: 'asc' },
+        },
+        inspections: {
+          orderBy: { scheduledAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            scheduledAt: true,
+            completedAt: true,
+            inspectorName: true,
+            overallPCI: true,
+          },
+        },
+        jobs: {
+          where: { status: { in: ACTIVE_JOB_STATUSES } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            scheduledFor: true,
+            createdAt: true,
+          },
+        },
+        serviceRequests: {
+          where: { status: { in: ACTIVE_REQUEST_STATUSES } },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            dueAt: true,
+            createdAt: true,
+          },
+        },
+      },
     });
-    if (!row) return res.status(404).json({ error: 'Property not found' });
-    res.json(row);
-  } catch (err) { next(err); }
+
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    const summary = shapeSummary(property);
+
+    res.json({
+      ...summary,
+      addressLine2: property.addressLine2,
+      postalCode: property.postalCode,
+      images: property.images ?? [],
+      units: property.units.map((unit) => ({
+        id: unit.id,
+        name: unit.label,
+        floor: unit.floor ?? null,
+        area: unit.area ?? null,
+        usageType: unit.usageType ?? null,
+        occupancyStatus: unit.occupancyStatus ?? null,
+      })),
+      recentInspections: property.inspections,
+      recentJobs: property.jobs,
+      serviceRequests: property.serviceRequests,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-/** PATCH /properties/:id */
 router.patch('/:id', async (req, res, next) => {
   try {
     const parsed = propertySchema.partial().safeParse(req.body);
     if (!parsed.success) return sendZodError(res, parsed.error);
     const data = parsed.data;
 
-    const coverImage = normaliseSingleImage(data.coverImage);
-    const images = normaliseImageList(data.images);
-
-    const updateData = clean({
+    const payload = clean({
       name: data.name,
-      address: data.address,
+      type: data.type,
       city: data.city,
-      state: data.state,
-      zipCode: data.zipCode,
       country: data.country,
-      coverImage,
-      images, // only if provided
+      addressLine1: data.addressLine1,
+      addressLine2: data.addressLine2,
+      postalCode: data.postalCode,
+      portfolioValue: data.portfolioValue,
+      occupancyRate: data.occupancyRate,
+      healthScore: data.healthScore,
+      tags: data.tags,
+      coverImage: normaliseSingleImage(data.coverImage),
+      images: normaliseImageList(data.images),
     });
 
-    try {
-      const result = await prisma.property.updateMany({
-        where: { id: req.params.id, orgId: req.user.orgId },
-        data: updateData,
-      });
-      if (result.count === 0) return res.status(404).json({ error: 'Property not found' });
-    } catch (e) {
-      // If images column doesn't exist, retry without it
-      const msg = String(e?.message || '');
-      const looksLikeMissingImagesColumn =
-        msg.includes('Unknown arg `images`') ||
-        msg.includes('column "images" does not exist') ||
-        msg.includes('no such column: images');
+    const result = await prisma.property.updateMany({
+      where: { id: req.params.id, orgId: req.user.orgId },
+      data: payload,
+    });
 
-      if (!looksLikeMissingImagesColumn) throw e;
+    if (result.count === 0) return res.status(404).json({ error: 'Property not found' });
 
-      const { images, ...withoutImages } = updateData;
-      const result = await prisma.property.updateMany({
-        where: { id: req.params.id, orgId: req.user.orgId },
-        data: withoutImages,
-      });
-      if (result.count === 0) return res.status(404).json({ error: 'Property not found' });
-    }
-
-    const fresh = await prisma.property.findUnique({ where: { id: req.params.id } });
-    res.json(fresh);
-  } catch (err) { next(err); }
+    const updated = await prisma.property.findUnique({ where: { id: req.params.id } });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
 });
 
-/** DELETE /properties/:id */
 router.delete('/:id', async (req, res, next) => {
   try {
     const result = await prisma.property.deleteMany({
@@ -189,7 +278,9 @@ router.delete('/:id', async (req, res, next) => {
     });
     if (result.count === 0) return res.status(404).json({ error: 'Property not found' });
     res.json({ status: 'deleted' });
-  } catch (err) { next(err); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
@@ -199,4 +290,5 @@ module.exports._test = {
   propertySchema,
   normaliseSingleImage,
   normaliseImageList,
+  numericOptional,
 };

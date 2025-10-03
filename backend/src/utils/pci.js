@@ -43,6 +43,19 @@ function computePCI(findings) {
  * @param {Array<{ system: string, severity: string, note: string }>} findings
  * @param {Array<{ if: object, then: object }>} rules
  */
+function normalisePriority(priority) {
+  if (!priority) return 'MEDIUM';
+  const value = String(priority).toUpperCase();
+  if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(value)) {
+    return value;
+  }
+  if (value === 'P1') return 'CRITICAL';
+  if (value === 'P2') return 'HIGH';
+  if (value === 'P3') return 'MEDIUM';
+  if (value === 'P4') return 'LOW';
+  return 'MEDIUM';
+}
+
 function applyRules(findings, rules) {
   const recommendations = [];
   for (const f of findings) {
@@ -66,12 +79,14 @@ function applyRules(findings, rules) {
         }
       }
       if (match) {
-        // Clone the then object so modifications don't mutate the rule
-        recommendations.push({ ...r.then });
+        const output = { ...r.then };
+        output.priority = normalisePriority(output.priority);
+        output.findingId = f.id;
+        recommendations.push(output);
       }
     }
   }
   return recommendations;
 }
 
-module.exports = { computePCI, applyRules };
+module.exports = { computePCI, applyRules, normalisePriority };
