@@ -1,0 +1,47 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Org {
+  id         String     @id @default(cuid())
+  name       String
+  users      User[]
+  properties Property[]
+}
+
+model User {
+  id    String @id @default(cuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id])
+  name  String
+  email String
+  role  String
+}
+
+model Property {
+  id    String @id @default(cuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id])
+
+  name    String
+  address String
+  city    String?
+  state   String?
+  zipCode String?
+  country String? @default("Australia")
+
+  coverImage String? // main image URL (relative or absolute)
+  images     Json? // array of additional image URLs (strings)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([createdAt])
+}

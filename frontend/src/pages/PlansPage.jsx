@@ -1,0 +1,131 @@
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Stack,
+  TextField,
+  Button,
+  Alert,
+} from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import useApiQuery from '../hooks/useApiQuery.js';
+import useApiMutation from '../hooks/useApiMutation.js';
+import DataState from '../components/DataState.jsx';
+import { normaliseArray } from '../utils/error.js';
+
+const schema = z.object({
+  name: z.string().min(1, 'forms.required'),
+  frequency: z.string().min(1, 'forms.required'),
+  description: z.string().optional(),
+});
+
+export default function PlansPage() {
+  const { t } = useTranslation();
+  const query = useApiQuery({ queryKey: ['plans'], url: '/plans' });
+  const mutation = useApiMutation({ url: '/plans', method: 'post', invalidateKeys: [['plans']] });
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', frequency: '', description: '' },
+  });
+
+  const plans = normaliseArray(query.data);
+
+  const onSubmit = handleSubmit(async (values) => {
+    try {
+      await mutation.mutateAsync({ data: values });
+      reset();
+    } catch (error) {
+      // The error is surfaced via mutation state.
+    }
+  });
+
+  return (
+    <Stack spacing={4}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          {t('plans.title')}
+        </Typography>
+      </Box>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {t('actions.create')} {t('plans.title')}
+        </Typography>
+        <form onSubmit={onSubmit} noValidate>
+          <Stack spacing={2}>
+            <TextField
+              label={t('plans.name')}
+              fullWidth
+              {...register('name')}
+              error={Boolean(errors.name)}
+              helperText={errors.name && t(errors.name.message)}
+            />
+            <TextField
+              label={t('plans.frequency')}
+              fullWidth
+              {...register('frequency')}
+              error={Boolean(errors.frequency)}
+              helperText={errors.frequency && t(errors.frequency.message)}
+            />
+            <TextField
+              label="Description"
+              multiline
+              minRows={3}
+              fullWidth
+              {...register('description')}
+            />
+            {mutation.isError && <Alert severity="error">{mutation.error.message}</Alert>}
+            <Stack direction="row" justifyContent="flex-end">
+              <Button type="submit" variant="contained" disabled={isSubmitting || mutation.isPending}>
+                {t('actions.save')}
+              </Button>
+            </Stack>
+          </Stack>
+        </form>
+      </Paper>
+
+      <Paper>
+        <DataState
+          isLoading={query.isLoading}
+          isError={query.isError}
+          error={query.error}
+          isEmpty={!query.isLoading && !query.isError && plans.length === 0}
+          onRetry={query.refetch}
+        >
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>{t('plans.name')}</TableCell>
+                <TableCell>{t('plans.frequency')}</TableCell>
+                <TableCell>Description</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {plans.map((plan) => (
+                <TableRow key={plan.id || plan.name}>
+                  <TableCell>{plan.name}</TableCell>
+                  <TableCell>{plan.frequency}</TableCell>
+                  <TableCell>{plan.description}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DataState>
+      </Paper>
+    </Stack>
+  );
+}
