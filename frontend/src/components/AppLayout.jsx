@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, Link as RouterLink, useLocation } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Container, Box, Stack, Divider } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Container, Box, Stack } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import WorkspaceToggle from './WorkspaceToggle.jsx';
 
 const ACTIVE_VARIANT = {
   variant: 'contained',
@@ -18,7 +17,7 @@ function Navigation({ items }) {
   const location = useLocation();
 
   return (
-    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+    <Stack direction="row" spacing={1} sx={{ mr: 2, flexWrap: 'wrap' }}>
       {items.map((item) => {
         const isRoot = item.to === '/';
         const isActive = isRoot
@@ -42,7 +41,7 @@ function Navigation({ items }) {
   );
 }
 
-export default function AppLayout({ navigation, workspace }) {
+export default function AppLayout({ navigation }) {
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
@@ -56,16 +55,12 @@ export default function AppLayout({ navigation, workspace }) {
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: (theme) => theme.palette.background.default }}>
-      <AppBar position="sticky" color="default" elevation={1} sx={{ mb: 4, backdropFilter: 'blur(12px)' }}>
-        <Toolbar sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+      <AppBar position="sticky" color="default" elevation={1} sx={{ mb: 4 }}>
+        <Toolbar sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
             {t('brand')}
           </Typography>
-          <WorkspaceToggle activeWorkspace={workspace} />
-          <Divider flexItem orientation="vertical" sx={{ mx: 1, display: { xs: 'none', md: 'block' } }} />
-          <Box sx={{ flexGrow: 1 }}>
-            <Navigation items={navigation} />
-          </Box>
+          <Navigation items={navigation} />
           <Button variant="outlined" color="secondary" onClick={handleToggleLanguage} sx={{ textTransform: 'none' }}>
             {i18n.language === 'en' ? 'العربية' : 'English'}
           </Button>

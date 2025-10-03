@@ -35,11 +35,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 export default function InspectionsPage() {
   const { t } = useTranslation();
   const query = useApiQuery({ queryKey: ['inspections'], url: '/inspections' });
-  const mutation = useApiMutation({
-    url: '/inspections',
-    method: 'post',
-    invalidateKeys: [['inspections'], ['dashboard', 'overview']],
-  });
+  const mutation = useApiMutation({ url: '/inspections', method: 'post', invalidateKeys: [['inspections']] });
 
   const {
     register,
@@ -124,24 +120,20 @@ export default function InspectionsPage() {
                 <TableCell>{t('reports.property')}</TableCell>
                 <TableCell>{t('inspections.inspector')}</TableCell>
                 <TableCell>{t('inspections.scheduledOn')}</TableCell>
-                <TableCell>{t('inspections.status')}</TableCell>
+                <TableCell>Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {inspections.map((inspection) => (
                 <TableRow key={inspection.id || inspection.scheduledAt}>
-                  <TableCell>{inspection.property?.name || inspection.propertyName || inspection.propertyId}</TableCell>
-                  <TableCell>{inspection.inspectorName || inspection.inspector}</TableCell>
+                  <TableCell>{inspection.propertyName || inspection.propertyId}</TableCell>
+                  <TableCell>{inspection.inspector}</TableCell>
                   <TableCell>
                     {inspection.scheduledAt
                       ? DATE_FORMATTER.format(new Date(inspection.scheduledAt))
                       : '—'}
                   </TableCell>
-                  <TableCell>
-                    {inspection.completedAt
-                      ? t('inspections.completed')
-                      : t('inspections.scheduled')}
-                  </TableCell>
+                  <TableCell>{inspection.status || 'Scheduled'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

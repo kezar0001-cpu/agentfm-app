@@ -1,13 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { z } = require('zod');
 const propertiesRouter = require('../src/routes/properties');
 const {
   propertySchema,
   normaliseSingleImage,
   normaliseImageList,
-  numericOptional,
 } = propertiesRouter._test;
 
 test('properties router enforces authentication middleware', () => {
@@ -20,17 +18,12 @@ test('properties router enforces authentication middleware', () => {
 test('property schema accepts image objects and normalises them to URLs', () => {
   const input = {
     name: 'Sunset Plaza',
-    type: 'Residential',
-    city: 'Dubai',
-    country: 'UAE',
+    address: '123 Market St',
     coverImage: { url: '/uploads/cover.png' },
     images: [
       { url: '/uploads/one.png' },
       '/uploads/two.png',
     ],
-    tags: ['premium'],
-    portfolioValue: '1250000',
-    occupancyRate: '0.95',
   };
 
   const result = propertySchema.safeParse(input);
@@ -40,8 +33,6 @@ test('property schema accepts image objects and normalises them to URLs', () => 
 
   assert.equal(cover, '/uploads/cover.png');
   assert.deepEqual(gallery, ['/uploads/one.png', '/uploads/two.png']);
-  assert.equal(result.data.portfolioValue, 1250000);
-  assert.equal(result.data.occupancyRate, 0.95);
 });
 
 test('normaliseSingleImage respects undefined/null handling', () => {
@@ -64,12 +55,4 @@ test('normaliseImageList handles undefined, null and arrays', () => {
     ]),
     ['/uploads/a.png', '/uploads/b.png'],
   );
-});
-
-test('numericOptional helper converts numeric-like values', () => {
-  const schema = numericOptional(z.number().min(0));
-  const parsed = schema.parse('42.5');
-  assert.equal(parsed, 42.5);
-  const nullValue = schema.parse('');
-  assert.equal(nullValue, null);
 });

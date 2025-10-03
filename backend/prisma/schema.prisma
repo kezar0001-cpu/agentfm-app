@@ -13,10 +13,6 @@ model Org {
   name       String
   users      User[]
   properties Property[]
-  plans      Plan[]
-  jobs       Job[]
-  subscriptions Subscription[]
-  serviceRequests ServiceRequest[]
 }
 
 model User {
@@ -26,7 +22,6 @@ model User {
   name  String
   email String
   role  String
-  jobs  Job[]    @relation("JobAssignee")
 }
 
 model Property {
@@ -34,240 +29,19 @@ model Property {
   orgId String
   org   Org    @relation(fields: [orgId], references: [id])
 
-  name          String
-  type          String
-  city          String
-  country       String
-  addressLine1  String?
-  addressLine2  String?
-  postalCode    String?
-  portfolioValue Float?
-  occupancyRate  Float?
-  healthScore    Float?
-  tags           String[]
-  coverImage     String?
-  images         String[]
+  name    String
+  address String
+  city    String?
+  state   String?
+  zipCode String?
+  country String? @default("Australia")
+
+  coverImage String? // main image URL (relative or absolute)
+  images     Json? // array of additional image URLs (strings)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  units           Unit[]
-  inspections     Inspection[]
-  jobs            Job[]
-  subscriptions   Subscription[]
-  recommendations Recommendation[] @relation("PropertyRecommendations")
-  serviceRequests ServiceRequest[]
-
-  @@index([orgId, name])
-  @@index([orgId, createdAt])
-}
-
-model Unit {
-  id         String   @id @default(cuid())
-  orgId      String
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id])
-  label      String
-  floor      String?
-  area       Float?
-  usageType  String?
-  occupancyStatus String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  inspections   Inspection[]
-  jobs          Job[]
-  subscriptions Subscription[]
-  serviceRequests ServiceRequest[]
-
-  @@index([propertyId, label])
-}
-
-model Inspection {
-  id         String   @id @default(cuid())
-  orgId      String
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id])
-  unitId     String?
-  unit       Unit?    @relation(fields: [unitId], references: [id])
-  scheduledAt DateTime
-  completedAt DateTime?
-  inspectorName String?
-  overallPCI  Float?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  findings        Finding[]
-
-  @@index([orgId, propertyId])
-  @@index([orgId, scheduledAt])
-}
-
-model Finding {
-  id           String      @id @default(cuid())
-  inspectionId String
-  inspection   Inspection  @relation(fields: [inspectionId], references: [id])
-  system       String
-  severity     SeverityLevel
-  note         String
-  photos       Json?
-  createdAt    DateTime @default(now())
-}
-
-model Recommendation {
-  id        String   @id @default(cuid())
-  orgId     String
-  findingId String
-  finding   Finding  @relation(fields: [findingId], references: [id])
-  property   Property? @relation("PropertyRecommendations", fields: [propertyId], references: [id])
-  propertyId String?
-  summary    String
-  estHours   Float?
-  estCostAED Float?
-  priority   RecommendationPriority
-  suggestedWithinDays Int?
-  status     RecommendationStatus @default(PENDING)
-  job        Job?      @relation("RecommendationJob", fields: [jobId], references: [id])
-  jobId      String?
-  createdAt  DateTime @default(now())
-}
-
-model Job {
-  id           String   @id @default(cuid())
-  orgId        String
-  propertyId   String
-  property     Property @relation(fields: [propertyId], references: [id])
-  unitId       String?
-  unit         Unit?    @relation(fields: [unitId], references: [id])
-  serviceRequestId String?
-  serviceRequest   ServiceRequest? @relation("ServiceRequestJob", fields: [serviceRequestId], references: [id])
-  recommendation   Recommendation? @relation("RecommendationJob")
-  source       JobSource
-  title        String
-  description  String
-  status       JobStatus
-  scheduledFor DateTime?
-  vendorId     String?
-  priority     PriorityLevel?
-  slaHours     Int?
-  assigneeId   String?
-  assignee     User?    @relation("JobAssignee", fields: [assigneeId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-}
-
-model Plan {
-  id       String @id @default(cuid())
-  orgId    String
-  org      Org    @relation(fields: [orgId], references: [id])
-  name     String
-  cadence  PlanCadence
-  includes String[]
-  slaHours Int?
-  priceAED Float
-  createdAt DateTime @default(now())
-
-  subscriptions Subscription[]
-}
-
-model Subscription {
-  id         String   @id @default(cuid())
-  orgId      String
-  org        Org      @relation(fields: [orgId], references: [id])
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id])
-  unitId     String?
-  unit       Unit?    @relation(fields: [unitId], references: [id])
-  planId     String
-  plan       Plan     @relation(fields: [planId], references: [id])
-  status     SubscriptionStatus @default(PENDING)
-  startedAt  DateTime @default(now())
-  renewalDate DateTime?
-  canceledAt DateTime?
-}
-
-model ServiceRequest {
-  id         String   @id @default(cuid())
-  orgId      String
-  org        Org      @relation(fields: [orgId], references: [id])
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id])
-  unitId     String?
-  unit       Unit?    @relation(fields: [unitId], references: [id])
-  title      String
-  description String
-  status     ServiceRequestStatus @default(NEW)
-  priority   PriorityLevel @default(MEDIUM)
-  raisedBy   String?
-  dueAt      DateTime?
-  job        Job?      @relation("ServiceRequestJob")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-enum SeverityLevel {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum RecommendationPriority {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum RecommendationStatus {
-  PENDING
-  IN_PROGRESS
-  CLOSED
-}
-
-enum JobStatus {
-  OPEN
-  SCHEDULED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum JobSource {
-  ONE_OFF
-  PLAN
-  RECOMMENDATION
-  SERVICE_REQUEST
-}
-
-enum PlanCadence {
-  MONTHLY
-  QUARTERLY
-  SEMI_ANNUAL
-  ANNUAL
-}
-
-enum SubscriptionStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  CANCELLED
-}
-
-enum ServiceRequestStatus {
-  NEW
-  TRIAGED
-  SCHEDULED
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum PriorityLevel {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
+  @@index([name])
+  @@index([createdAt])
 }

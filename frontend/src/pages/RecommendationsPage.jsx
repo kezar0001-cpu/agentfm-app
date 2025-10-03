@@ -24,7 +24,7 @@ export default function RecommendationsPage() {
   const mutation = useApiMutation({
     url: '/recommendations/:id/convert',
     method: 'post',
-    invalidateKeys: [['recommendations'], ['jobs'], ['dashboard', 'overview']],
+    invalidateKeys: [['recommendations'], ['jobs']],
   });
 
   const recommendations = normaliseArray(query.data);
@@ -72,17 +72,17 @@ export default function RecommendationsPage() {
               {recommendations.map((recommendation) => (
                 <TableRow key={recommendation.id}>
                   <TableCell>{recommendation.id}</TableCell>
-                  <TableCell>{recommendation.property?.name || recommendation.propertyName || recommendation.propertyId}</TableCell>
+                  <TableCell>{recommendation.propertyName || recommendation.propertyId}</TableCell>
                   <TableCell>
                     {recommendation.priority && (
                       <Chip
                         size="small"
                         label={recommendation.priority}
-                        color={recommendation.priority === 'CRITICAL' || recommendation.priority === 'HIGH' ? 'error' : 'default'}
+                        color={recommendation.priority === 'high' ? 'error' : 'default'}
                       />
                     )}
                   </TableCell>
-                  <TableCell>{recommendation.summary}</TableCell>
+                  <TableCell>{recommendation.description}</TableCell>
                   <TableCell align="right">
                     <Button
                       variant="contained"

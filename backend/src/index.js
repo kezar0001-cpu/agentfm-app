@@ -18,7 +18,6 @@ const plansRouter = require('./routes/plans');
 const subscriptionsRouter = require('./routes/subscriptions');
 const dashboardRouter = require('./routes/dashboard');
 const reportsRouter = require('./routes/reports');
-const serviceRequestsRouter = require('./routes/serviceRequests');
 
 // NEW: uploads router
 const uploadsRouter = require('./routes/uploads');
@@ -65,7 +64,6 @@ app.use('/plans', plansRouter);
 app.use('/subscriptions', subscriptionsRouter);
 app.use('/dashboard', dashboardRouter);
 app.use('/reports', reportsRouter);
-app.use('/service-requests', serviceRequestsRouter);
 
 // NEW: Uploads API + static files
 // Router first (POST /uploads/single, GET /uploads/ping)
