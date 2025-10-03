@@ -22,11 +22,14 @@ const propertySchema = z.object({
 const unitSchema = z.object({
   name: z.string().min(1, 'Unit name is required'),
   floor: z.string().min(1, 'Floor is required'),
-  area: z.coerce.number({ invalid_type_error: 'Area must be a number' }).positive('Area must be positive'),
+  area: z
+    .coerce
+    .number({ invalid_type_error: 'Area must be a number' })
+    .positive('Area must be positive'),
 });
 
-router.get('/', (_req, res) => {
-  res.json(listProperties());
+router.get('/', (req, res) => {
+  res.json(listProperties(req.user.orgId));
 });
 
 router.post('/', (req, res) => {
@@ -35,12 +38,12 @@ router.post('/', (req, res) => {
     const issue = result.error.issues[0];
     return res.status(400).json({ error: issue?.message || 'Invalid request' });
   }
-  const created = addProperty(result.data);
+  const created = addProperty(req.user.orgId, result.data);
   return res.status(201).json(created);
 });
 
 router.get('/:id', (req, res) => {
-  const property = findProperty(req.params.id);
+  const property = findProperty(req.user.orgId, req.params.id);
   if (!property) {
     return res.status(404).json({ error: 'Property not found' });
   }
@@ -53,8 +56,8 @@ router.post('/:id/units', (req, res) => {
     const issue = parsed.error.issues[0];
     return res.status(400).json({ error: issue?.message || 'Invalid request' });
   }
-  const unit = addUnit(req.params.id, parsed.data);
-  if (!unit) {
+  const unit = addUnit(req.user.orgId, req.params.id, parsed.data);
+  if (unit instanceof Error || !unit) {
     return res.status(404).json({ error: 'Property not found' });
   }
   res.status(201).json(unit);
