@@ -34,7 +34,11 @@ const propertySchema = z.object({
 export default function PropertiesPage() {
   const { t } = useTranslation();
   const query = useApiQuery({ queryKey: ['properties'], url: '/properties' });
-  const mutation = useApiMutation({ url: '/properties', method: 'post', invalidateKeys: [['properties']] });
+  const mutation = useApiMutation({
+    url: '/properties',
+    method: 'post',
+    invalidateKeys: [['properties'], ['dashboard', 'overview']],
+  });
 
   const {
     register,
@@ -130,26 +134,39 @@ export default function PropertiesPage() {
             <TableHead>
               <TableRow>
                 <TableCell>{t('properties.name')}</TableCell>
-                <TableCell>{t('properties.type')}</TableCell>
                 <TableCell>{t('properties.city')}</TableCell>
                 <TableCell>{t('properties.country')}</TableCell>
+                <TableCell>{t('properties.units')}</TableCell>
+                <TableCell>{t('properties.openJobs')}</TableCell>
+                <TableCell>{t('properties.healthScore')}</TableCell>
+                <TableCell>{t('properties.nextInspection')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {properties.map((property) => (
-                <TableRow
-                  key={property.id || property.name}
-                  hover
-                  component={RouterLink}
-                  to={`/properties/${property.id || property.slug || property.name}`}
-                  sx={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  <TableCell>{property.name}</TableCell>
-                  <TableCell>{property.type}</TableCell>
-                  <TableCell>{property.city}</TableCell>
-                  <TableCell>{property.country}</TableCell>
-                </TableRow>
-              ))}
+              {properties.map((property) => {
+                const nextInspection = property.metrics?.nextInspection;
+                return (
+                  <TableRow
+                    key={property.id || property.name}
+                    hover
+                    component={RouterLink}
+                    to={`/client/properties/${property.id || property.slug || property.name}`}
+                    sx={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <TableCell>{property.name}</TableCell>
+                    <TableCell>{property.city}</TableCell>
+                    <TableCell>{property.country}</TableCell>
+                    <TableCell>{property.metrics?.unitCount ?? '—'}</TableCell>
+                    <TableCell>{property.metrics?.openJobs ?? '—'}</TableCell>
+                    <TableCell>{property.healthScore ?? '—'}</TableCell>
+                    <TableCell>
+                      {nextInspection?.scheduledAt
+                        ? new Date(nextInspection.scheduledAt).toLocaleDateString()
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </DataState>

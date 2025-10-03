@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AppLayout from './components/AppLayout.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
+import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
+import ClientDashboardPage from './pages/ClientDashboardPage.jsx';
+import ServiceRequestsPage from './pages/ServiceRequestsPage.jsx';
 import PropertiesPage from './pages/PropertiesPage.jsx';
 import PropertyDetailPage from './pages/PropertyDetailPage.jsx';
 import PlansPage from './pages/PlansPage.jsx';
@@ -15,32 +17,45 @@ import NotFoundPage from './pages/NotFoundPage.jsx';
 export default function App() {
   const { t } = useTranslation();
 
-  const navigation = [
-    { to: '/', label: t('navigation.dashboard') },
-    { to: '/properties', label: t('navigation.properties') },
-    { to: '/plans', label: t('navigation.plans') },
-    { to: '/inspections', label: t('navigation.inspections') },
-    { to: '/jobs', label: t('navigation.jobs') },
-    { to: '/recommendations', label: t('navigation.recommendations') },
-    { to: '/subscriptions', label: t('navigation.subscriptions') },
-    { to: '/reports', label: t('navigation.reports') },
+  const adminNavigation = [
+    { to: '/admin/dashboard', label: t('navigation.adminDashboard') },
+    { to: '/admin/service-requests', label: t('navigation.serviceRequests') },
+    { to: '/admin/jobs', label: t('navigation.jobs') },
+    { to: '/admin/plans', label: t('navigation.plans') },
+    { to: '/admin/subscriptions', label: t('navigation.subscriptions') },
+  ];
+
+  const clientNavigation = [
+    { to: '/client/dashboard', label: t('navigation.clientDashboard') },
+    { to: '/client/properties', label: t('navigation.properties') },
+    { to: '/client/inspections', label: t('navigation.inspections') },
+    { to: '/client/recommendations', label: t('navigation.recommendations') },
+    { to: '/client/reports', label: t('navigation.reports') },
   ];
 
   return (
     <Routes>
-      <Route element={<AppLayout navigation={navigation} />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="properties" element={<PropertiesPage />} />
-        <Route path="properties/:id" element={<PropertyDetailPage />} />
-        <Route path="plans" element={<PlansPage />} />
-        <Route path="inspections" element={<InspectionsPage />} />
-        <Route path="jobs" element={<JobsPage />} />
-        <Route path="recommendations" element={<RecommendationsPage />} />
-        <Route path="subscriptions" element={<SubscriptionsPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="/404" element={<NotFoundPage />} />
-        <Route path="*" element={<Navigate to="/404" replace />} />
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+
+      <Route element={<AppLayout workspace="admin" navigation={adminNavigation} />}>
+        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+        <Route path="/admin/service-requests" element={<ServiceRequestsPage />} />
+        <Route path="/admin/jobs" element={<JobsPage />} />
+        <Route path="/admin/plans" element={<PlansPage />} />
+        <Route path="/admin/subscriptions" element={<SubscriptionsPage />} />
       </Route>
+
+      <Route element={<AppLayout workspace="client" navigation={clientNavigation} />}>
+        <Route path="/client/dashboard" element={<ClientDashboardPage />} />
+        <Route path="/client/properties" element={<PropertiesPage />} />
+        <Route path="/client/properties/:id" element={<PropertyDetailPage />} />
+        <Route path="/client/inspections" element={<InspectionsPage />} />
+        <Route path="/client/recommendations" element={<RecommendationsPage />} />
+        <Route path="/client/reports" element={<ReportsPage />} />
+      </Route>
+
+      <Route path="/404" element={<NotFoundPage />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   );
 }
