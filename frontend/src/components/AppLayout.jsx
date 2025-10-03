@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, Link as RouterLink, useLocation } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, Button, Container, Box, Stack } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../hooks/useAuth';
 
 const ACTIVE_VARIANT = {
   variant: 'contained',
@@ -53,6 +54,10 @@ export default function AppLayout({ navigation }) {
     i18n.changeLanguage(next);
   };
 
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => logout();
+
   // ...existing code...
 
   return (
@@ -63,9 +68,18 @@ export default function AppLayout({ navigation }) {
             {t('brand')}
           </Typography>
           <Navigation items={navigation} />
-          <Button variant="outlined" color="secondary" onClick={handleToggleLanguage} sx={{ textTransform: 'none' }}>
+          <Button variant="outlined" color="secondary" onClick={handleToggleLanguage} sx={{ textTransform: 'none', mr: 1 }}>
             {i18n.language === 'en' ? 'العربية' : 'English'}
           </Button>
+          {user ? (
+            <Button variant="outlined" onClick={handleLogout} sx={{ textTransform: 'none' }}>
+              {user.email}
+            </Button>
+          ) : (
+            <Button variant="contained" component={RouterLink} to="/login" sx={{ textTransform: 'none' }}>
+              Sign in
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
       <Container maxWidth="lg" sx={{ pb: 6 }}>

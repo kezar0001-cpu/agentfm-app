@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import api from '../api/client.js';
+import { api } from '../api.js';
 
 export default function useApiQuery({ queryKey, url, method = 'get', data, params, enabled = true, select, placeholderData }) {
   return useQuery({

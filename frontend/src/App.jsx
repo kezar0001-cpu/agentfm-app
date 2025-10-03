@@ -12,6 +12,9 @@ import RecommendationsPage from './pages/RecommendationsPage.jsx';
 import SubscriptionsPage from './pages/SubscriptionsPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
+import LoginPage from './pages/SignIn.jsx';
+import { AuthProvider } from './hooks/useAuth';
+import RequireAuth from './components/RequireAuth.jsx';
 
 export default function App() {
   const { t } = useTranslation();
@@ -29,21 +32,24 @@ export default function App() {
   ];
 
   return (
-    <Routes>
-      <Route element={<AppLayout navigation={navigation} />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="properties" element={<PropertiesPage />} />
-        <Route path="properties/:id" element={<PropertyDetailPage />} />
-        <Route path="plans" element={<PlansPage />} />
-        <Route path="inspections" element={<InspectionsPage />} />
-        <Route path="jobs" element={<JobsPage />} />
-        <Route path="service-requests" element={<ServiceRequestsPage />} />
-        <Route path="recommendations" element={<RecommendationsPage />} />
-        <Route path="subscriptions" element={<SubscriptionsPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="/404" element={<NotFoundPage />} />
-        <Route path="*" element={<Navigate to="/404" replace />} />
-      </Route>
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route element={<AppLayout navigation={navigation} />}>
+          <Route path="login" element={<LoginPage />} />
+          <Route index element={<RequireAuth><DashboardPage /></RequireAuth>} />
+          <Route path="properties" element={<RequireAuth><PropertiesPage /></RequireAuth>} />
+          <Route path="properties/:id" element={<RequireAuth><PropertyDetailPage /></RequireAuth>} />
+          <Route path="plans" element={<RequireAuth><PlansPage /></RequireAuth>} />
+          <Route path="inspections" element={<RequireAuth><InspectionsPage /></RequireAuth>} />
+          <Route path="jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
+          <Route path="service-requests" element={<RequireAuth><ServiceRequestsPage /></RequireAuth>} />
+          <Route path="recommendations" element={<RequireAuth><RecommendationsPage /></RequireAuth>} />
+          <Route path="subscriptions" element={<RequireAuth><SubscriptionsPage /></RequireAuth>} />
+          <Route path="reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
   );
 }

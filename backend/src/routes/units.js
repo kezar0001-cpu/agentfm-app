@@ -1,6 +1,6 @@
 const express = require('express');
 const { z } = require('zod');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth } = require('../auth');
 const { findProperty, addUnit } = require('../data/memoryStore');
 
 const router = express.Router({ mergeParams: true });
