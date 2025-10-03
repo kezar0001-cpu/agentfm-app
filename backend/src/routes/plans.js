@@ -9,10 +9,10 @@ const router = express.Router();
 // Schema for creating a plan.  Only owners/managers should create plans.
 const planSchema = z.object({
   name: z.string().min(1),
-  cadence: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'BIMONTHLY']),
+  cadence: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL']),
   includes: z.array(z.string()).nonempty(),
   slaHours: z.number().int().optional(),
-  priceAED: z.number().positive()
+  priceAED: z.number().positive(),
 });
 
 // GET /plans - list plans for the org
