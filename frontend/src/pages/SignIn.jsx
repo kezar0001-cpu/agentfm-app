@@ -1,6 +1,7 @@
 // src/pages/SignIn.jsx
 import { useState } from 'react';
 import { api } from '../api.js'; // <-- ensure this file exists at src/api.js
+import { useAuth } from '../hooks/useAuth.js';
 
 export default function SignIn() {
   // NOTE: if your backend mounts under /api/auth, change this to '/api/auth/login'
@@ -10,13 +11,17 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErr('');
     setLoading(true);
     try {
-      await api(LOGIN_PATH, { method: 'POST', body: { email, password } });
+      const res = await api(LOGIN_PATH, { method: 'POST', body: { email, password } });
+      if (res?.user) {
+        login(res.user);
+      }
       // cookies set -> reload app so guards pick up the session
       window.location.href = '/';
     } catch (e) {
