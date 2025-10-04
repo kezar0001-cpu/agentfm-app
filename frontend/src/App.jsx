@@ -15,6 +15,7 @@ import NotFoundPage from './pages/NotFoundPage.jsx';
 import LoginPage from './pages/SignIn.jsx';
 import { AuthProvider } from './hooks/useAuth';
 import RequireAuth from './components/RequireAuth.jsx';
+import SignUp from './pages/SignUp.jsx';
 
 export default function App() {
   const { t } = useTranslation();
@@ -36,6 +37,7 @@ export default function App() {
       <Routes>
         {/* 🔹 Public route: no AppLayout */}
         <Route path="login" element={<LoginPage />} />
+        <Route path="signup" element={<SignUp />} />
 
         {/* 🔹 Private routes: wrapped in AppLayout */}
         <Route element={<AppLayout navigation={navigation} />}>

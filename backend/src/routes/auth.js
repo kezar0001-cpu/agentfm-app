@@ -37,7 +37,7 @@ function authRequired(req, res, next) {
 
 // --- routes ---
 
-// Signup
+// Signup (atomic: org + user)
 router.post('/signup', async (req, res) => {
   try {
     const { name, email, password, orgName } = req.body || {};
@@ -46,11 +46,15 @@ router.post('/signup', async (req, res) => {
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) return res.status(409).json({ error: 'Email already in use' });
 
-    const org = await prisma.org.create({ data: { name: orgName || 'My Org' } });
     const passwordHash = await bcrypt.hash(password, 12);
+    const defaultOrgName = orgName || `${email.split('@')[0]}'s org`;
 
-    const user = await prisma.user.create({
-      data: { email, name: name || '', passwordHash, role: 'owner', orgId: org.id }
+    const { user } = await prisma.$transaction(async (tx) => {
+      const org = await tx.org.create({ data: { name: defaultOrgName } });
+      const user = await tx.user.create({
+        data: { email, name: name || '', passwordHash, role: 'owner', orgId: org.id }
+      });
+      return { user };
     });
 
     const { access, refresh } = signTokens(user);
@@ -64,6 +68,7 @@ router.post('/signup', async (req, res) => {
     res.status(500).json({ error: 'Signup failed' });
   }
 });
+
 
 // Login
 router.post('/login', async (req, res) => {
