@@ -10,10 +10,12 @@ const prisma = new PrismaClient();
 const app = express();
 
 app.use(express.json());
-app.use(cors({
-  origin: 'https://special-eureka-v6jp4x6pq6qr3w97r-5173.app.github.dev',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: 'https://special-eureka-v6jp4x6pq6qr3w97r-5173.app.github.dev',
+    credentials: true
+  })
+);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
