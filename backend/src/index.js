@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: 'https://special-eureka-v6jp4x6pq6qr3w97r-5173.app.github.dev',
+    origin: 'https://agentfm-app.vercel.app',
     credentials: true
   })
 );
