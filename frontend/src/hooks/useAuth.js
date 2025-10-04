@@ -6,41 +6,41 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  // On mount, try to restore token -> /api/auth/me
   useEffect(() => {
-    const restore = async () => {
+    let active = true;
+
+    const restoreSession = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        // set header for this request
-        const res = await api.request({ url: '/auth/me', method: 'get', headers: { Authorization: `Bearer ${token}` } });
-        if (res?.data?.user) setUser(res.data.user);
-      } catch (e) {
-        // token invalid -> cleanup
-        localStorage.removeItem('token');
-        setUser(null);
+        const res = await api('/auth/me');
+        if (!active) return;
+        if (res?.user) {
+          setUser(res.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        if (active) setUser(null);
       }
     };
-    restore();
+
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const login = (userObj, token) => {
-    setUser(userObj);
-    try {
-      if (token) localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userObj));
-    } catch (e) {
-      // ignore
-    }
+  const login = (userObj) => {
+    setUser(userObj ?? null);
   };
 
-  const logout = () => {
-    setUser(null);
+  const logout = async () => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    } catch (e) {
-      // ignore
+      await api('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to log out', error);
+    } finally {
+      setUser(null);
     }
   };
 
