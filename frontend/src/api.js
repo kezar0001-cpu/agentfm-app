@@ -1,65 +1,50 @@
-// src/api.js
-// Robust API helper that safely joins the base URL + path,
-// always sends/receives cookies, and surfaces useful errors.
+// Use relative path for production
+const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
 
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL || '';
-const BASE = RAW_BASE.replace(/\/+$/, ''); // strip trailing slash(es)
-
-if (!BASE) {
-  console.error(
-    'VITE_API_BASE_URL is not set. Create frontend/.env with:\n' +
-    'VITE_API_BASE_URL=https://<your-backend>-3000.app.github.dev'
-  );
-} else {
-  console.log('API BASE ->', BASE);
-}
-
-/**
- * Call your backend API.
- * @param {string} path - e.g. '/auth/login'
- * @param {object} [opts]
- * @param {'GET'|'POST'|'PUT'|'PATCH'|'DELETE'} [opts.method='GET']
- * @param {object} [opts.body] - JSON body
- * @param {object} [opts.headers] - extra headers
- * @returns {Promise<any>} parsed JSON (or {} if no body)
- * @throws {Error} on non-2xx with best-guess message
- */
-export async function api(path, { method = 'GET', body, headers } = {}) {
-  // ensure path has exactly one leading slash
-  const p = path.startsWith('/') ? path : `/${path}`;
-  const url = `${BASE}${p}`;
-
-  const res = await fetch(url, {
-    method,
+async function apiCall(url, options = {}) {
+  const token = localStorage.getItem('token');
+  
+  const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
-      ...(headers || {}),
+      ...(token && { 'Authorization': `Bearer ${token}` }),
     },
-    credentials: 'include', // send/receive HttpOnly cookies
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  };
 
-  // Try to parse JSON, but don't explode if there's no body
-  let data = null;
   try {
-    data = await res.json();
-  } catch {
-    // ignore parse errors (e.g., 204 No Content)
-  }
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
+        ...options.headers,
+      },
+    });
 
-  if (!res.ok) {
-    // Prefer server-provided message, else status
-    const msg =
-      (data && (data.error || data.message)) ||
-      `Request failed: ${res.status} ${res.statusText}` ||
-      'Request failed';
-    throw new Error(msg);
-  }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  return data ?? {};
+    return response.json();
+  } catch (error) {
+    console.error('API call failed:', error);
+    throw error;
+  }
 }
 
-// (Optional) Convenience helpers, if you like:
-// export const get  = (p, opts) => api(p, { ...opts, method: 'GET' });
-// export const post = (p, body, opts) => api(p, { ...opts, method: 'POST', body });
-// export const del  = (p, opts) => api(p, { ...opts, method: 'DELETE' });
+export const api = {
+  get: (url) => apiCall(url),
+  post: (url, data) => apiCall(url, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  put: (url, data) => apiCall(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  delete: (url) => apiCall(url, {
+    method: 'DELETE',
+  }),
+};
+
+export default api;
