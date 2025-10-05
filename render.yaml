@@ -2,13 +2,13 @@ services:
   - type: web
     name: agentfm-backend
     env: node
-    rootDirectory: backend    # ← This points to backend/ folder
+    rootDirectory: backend
     buildCommand: npm install
     startCommand: npm start
 
   - type: web
     name: agentfm-frontend
     env: static
-    rootDirectory: frontend   # ← This points to frontend/ folder
+    rootDirectory: frontend
     buildCommand: npm run build
     staticPublishPath: dist
