@@ -1,42 +1,45 @@
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const express = require('express');
-const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
+dotenv.config();
 
-const { authRouter, authRequired } = require('./routes/auth');
-
-const prisma = new PrismaClient();
 const app = express();
+const PORT = process.env.PORT || 3000;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(
-  cors({
-    origin: 'https://agentfm-app.vercel.app',
-    credentials: true
-  })
-);
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// Serve static files from React build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+}
 
-app.use('/auth', authRouter);
-
-app.get('/properties', authRequired, async (req, res) => {
-  try {
-    const properties = await prisma.property.findMany({
-      where: { orgId: req.user.orgId }
-    });
-
-    return res.json({ items: properties });
-  } catch (error) {
-    console.error('Failed to fetch properties:', error);
-    return res.status(500).json({ error: 'Unable to fetch properties.' });
-  }
+// API Routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'AgentFM API is running' });
 });
 
-app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+// Auth routes (add your actual auth routes here)
+app.post('/api/auth/signin', (req, res) => {
+  // Your signin logic here
+  res.json({ token: 'mock-token', user: { id: 1, email: req.body.email, name: 'Test User', role: 'client' } });
+});
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ AgentFM backend listening on port ${PORT}`);
+// Serve React app for all other routes in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

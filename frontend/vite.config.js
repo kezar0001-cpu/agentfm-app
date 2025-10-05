@@ -1,18 +1,22 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-const backendTarget = process.env.VITE_DEV_SERVER_PROXY_TARGET ?? 'http://localhost:3000';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
-    port: 5173,
+    port: 3000,
     proxy: {
       '/api': {
-        target: backendTarget,
-        changeOrigin: true,
-      },
-    },
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
   },
-});
+  build: {
+    outDir: 'dist',
+  },
+  // Fix for process.env
+  define: {
+    'process.env': process.env
+  }
+})

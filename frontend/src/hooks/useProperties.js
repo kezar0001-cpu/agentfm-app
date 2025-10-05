@@ -8,7 +8,6 @@ import {
   Button,
   Stack,
   Chip,
-  IconButton,
   TextField,
   InputAdornment
 } from '@mui/material';
@@ -20,7 +19,7 @@ import {
   SquareFoot,
   Edit,
   Visibility
-} from '@mui/icons-material';
+} from '@mui/icons-material'; // Fixed the import
 import { useNavigate } from 'react-router-dom';
 
 // Mock data - replace with actual API data later

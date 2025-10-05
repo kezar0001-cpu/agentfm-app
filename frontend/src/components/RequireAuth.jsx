@@ -1,11 +1,11 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 
 export default function RequireAuth({ children }) {
-  const { user } = useAuth();
   const location = useLocation();
-  if (!user) {
+  const token = localStorage.getItem('token'); // we only care if a session exists
+
+  if (!token) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;

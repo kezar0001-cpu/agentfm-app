@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Box, Grid, Paper, Typography, Stack, Button } from '@mui/material';
+import { Box, Grid, Paper, Typography, Stack, Button, Alert } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery.js';
 import DataState from '../components/DataState.jsx';
@@ -54,6 +54,15 @@ export default function DashboardPage() {
           {t('actions.refresh')}
         </Button>
       </Stack>
+
+      {/* Show backend connection warning */}
+      {query.isError && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Unable to connect to backend server. Please make sure the backend is running on port 3000.
+          <br />
+          <strong>Error:</strong> {query.error?.message}
+        </Alert>
+      )}
 
       <DataState
         isLoading={query.isLoading}

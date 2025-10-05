@@ -1,60 +1,172 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import AppLayout from './components/AppLayout.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import PropertiesPage from './pages/PropertiesPage.jsx';
-import PropertyDetailPage from './pages/PropertyDetailPage.jsx';
-import PlansPage from './pages/PlansPage.jsx';
-import InspectionsPage from './pages/InspectionsPage.jsx';
-import JobsPage from './pages/JobsPage.jsx';
-import ServiceRequestsPage from './pages/ServiceRequestsPage.jsx';
-import RecommendationsPage from './pages/RecommendationsPage.jsx';
-import SubscriptionsPage from './pages/SubscriptionsPage.jsx';
-import ReportsPage from './pages/ReportsPage.jsx';
-import NotFoundPage from './pages/NotFoundPage.jsx';
-import LoginPage from './pages/SignIn.jsx';
-import { AuthProvider } from './hooks/useAuth';
-import RequireAuth from './components/RequireAuth.jsx';
-import SignUp from './pages/SignUp.jsx';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
+import Dashboard from "./pages/DashboardPage";
+import InspectionsPage from "./pages/InspectionsPage";
+import JobsPage from "./pages/JobsPage";
+import PlansPage from "./pages/PlansPage";
+import PropertiesPage from "./pages/PropertiesPage";
+import AddPropertyPage from "./pages/AddPropertyPage";
+import PropertyDetailPage from "./pages/PropertyDetailPage";
+import RecommendationsPage from "./pages/RecommendationsPage";
+import ReportsPage from "./pages/ReportsPage";
+import ServiceRequestsPage from "./pages/ServiceRequestsPage";
+import SubscriptionsPage from "./pages/SubscriptionsPage";
+import AuthGate from "./authGate";
+import Layout from "./components/Layout";
 
-export default function App() {
-  const { t } = useTranslation();
+// Simple error boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-  const navigation = [
-    { to: '/', label: t('navigation.dashboard') },
-    { to: '/properties', label: t('navigation.properties') },
-    { to: '/plans', label: t('navigation.plans') },
-    { to: '/inspections', label: t('navigation.inspections') },
-    { to: '/jobs', label: t('navigation.jobs') },
-    { to: '/service-requests', label: t('navigation.serviceRequests') },
-    { to: '/recommendations', label: t('navigation.recommendations') },
-    { to: '/subscriptions', label: t('navigation.subscriptions') },
-    { to: '/reports', label: t('navigation.reports') },
-  ];
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
 
+  componentDidCatch(error, errorInfo) {
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px' }}>
+          <h1>Something went wrong.</h1>
+          <button onClick={() => window.location.reload()}>Reload Page</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function App() {
+  console.log('App component rendering');
+  
   return (
-    <AuthProvider>
+    <ErrorBoundary>
       <Routes>
-        {/* 🔹 Public route: no AppLayout */}
-        <Route path="login" element={<LoginPage />} />
-        <Route path="signup" element={<SignUp />} />
-
-        {/* 🔹 Private routes: wrapped in AppLayout */}
-        <Route element={<AppLayout navigation={navigation} />}>
-          <Route index element={<RequireAuth><DashboardPage /></RequireAuth>} />
-          <Route path="properties" element={<RequireAuth><PropertiesPage /></RequireAuth>} />
-          <Route path="properties/:id" element={<RequireAuth><PropertyDetailPage /></RequireAuth>} />
-          <Route path="plans" element={<RequireAuth><PlansPage /></RequireAuth>} />
-          <Route path="inspections" element={<RequireAuth><InspectionsPage /></RequireAuth>} />
-          <Route path="jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
-          <Route path="service-requests" element={<RequireAuth><ServiceRequestsPage /></RequireAuth>} />
-          <Route path="recommendations" element={<RequireAuth><RecommendationsPage /></RequireAuth>} />
-          <Route path="subscriptions" element={<RequireAuth><SubscriptionsPage /></RequireAuth>} />
-          <Route path="reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
-          <Route path="/404" element={<NotFoundPage />} />
-          <Route path="*" element={<Navigate to="/404" replace />} />
-        </Route>
+        {/* Public Routes */}
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        
+        {/* Protected Routes - Wrapped with AuthGate and Layout */}
+        <Route path="/" element={
+          <AuthGate>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/dashboard" element={
+          <AuthGate>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </AuthGate>
+        } />
+        
+        {/* Property Management Routes */}
+        <Route path="/properties" element={
+          <AuthGate>
+            <Layout>
+              <PropertiesPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/properties/add" element={
+          <AuthGate>
+            <Layout>
+              <AddPropertyPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/properties/:id" element={
+          <AuthGate>
+            <Layout>
+              <PropertyDetailPage />
+            </Layout>
+          </AuthGate>
+        } />
+        
+        {/* Other Feature Routes */}
+        <Route path="/inspections" element={
+          <AuthGate>
+            <Layout>
+              <InspectionsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/jobs" element={
+          <AuthGate>
+            <Layout>
+              <JobsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/plans" element={
+          <AuthGate>
+            <Layout>
+              <PlansPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/recommendations" element={
+          <AuthGate>
+            <Layout>
+              <RecommendationsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/reports" element={
+          <AuthGate>
+            <Layout>
+              <ReportsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/service-requests" element={
+          <AuthGate>
+            <Layout>
+              <ServiceRequestsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        <Route path="/subscriptions" element={
+          <AuthGate>
+            <Layout>
+              <SubscriptionsPage />
+            </Layout>
+          </AuthGate>
+        } />
+        
+        {/* 404 Route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
-    </AuthProvider>
+    </ErrorBoundary>
   );
 }
+
+function NotFound() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#1f2937' }}>404</h1>
+        <p style={{ marginTop: '0.5rem', color: '#6b7280' }}>The page you are looking for could not be found.</p>
+        <button 
+          onClick={() => window.location.href = '/signin'}
+          style={{ marginTop: '1rem', color: '#2563eb', textDecoration: 'underline', border: 'none', background: 'none', cursor: 'pointer' }}
+        >
+          Go to Sign In
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default App;

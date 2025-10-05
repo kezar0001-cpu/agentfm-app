@@ -1,94 +1,135 @@
-// src/pages/SignIn.jsx
 import { useState } from 'react';
-import { api } from '../api.js'; // <-- ensure this file exists at src/api.js
-import { useAuth } from '../hooks/useAuth.js';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  Alert
+} from '@mui/material';
 
 export default function SignIn() {
-  // NOTE: if your backend mounts under /api/auth, change this to '/api/auth/login'
-  const LOGIN_PATH = '/auth/login';
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [err, setErr] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+  };
 
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErr('');
-    setLoading(true);
+    setError('');
+
     try {
-      const res = await api(LOGIN_PATH, { method: 'POST', body: { email, password } });
-      if (res?.user) {
-        login(res.user);
+      // Mock authentication - works without backend
+      // Replace this with actual API call when backend is ready
+      if (formData.email === 'kezar0001@gmail.com' && formData.password === 'password') {
+        // Mock successful login
+        const user = {
+          id: 1,
+          email: formData.email,
+          name: 'John Doe',
+          role: 'client'
+        };
+        
+        localStorage.setItem('token', 'mock-jwt-token');
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        navigate('/dashboard');
+      } else {
+        setError('Invalid email or password. Use: kezar0001@gmail.com / password');
       }
-      // cookies set -> reload app so guards pick up the session
-      window.location.href = '/';
-    } catch (e) {
-      setErr(e.message || 'Login failed');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setError('Login failed. Please try again.');
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-md">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">AgentFM</h1>
-        <h1 className="text-2xl font-bold text-gray-500 text-center mb-4">Welcome to Efficiency!</h1>
-        <p className="text-sm text-center text-gray-500 mb-6">
-          Authenticate to continue to your dashboard.
-        </p>
+    <Container component="main" maxWidth="sm">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
+          <Typography component="h1" variant="h4" align="center" gutterBottom>
+            Sign in
+          </Typography>
+          <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 3 }}>
+            Enter your email and password to access your workspace.
+          </Typography>
 
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Welcome back</h2>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email address</label>
-            <input
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email"
               name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
               autoComplete="email"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 sm:text-sm"
+              autoFocus
+              value={formData.email}
+              onChange={handleChange}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input
+            <TextField
+              margin="normal"
+              required
+              fullWidth
               name="password"
+              label="Password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              id="password"
               autoComplete="current-password"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 sm:text-sm"
+              value={formData.password}
+              onChange={handleChange}
             />
-          </div>
-
-          {err && <div className="text-red-600 text-sm">{err}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Signing in…' : 'Login'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Don’t have an account?{' '}
-          <a href="/signup" className="text-blue-600 hover:underline">
-            Create account
-          </a>
-        </p>
-      </div>
-    </div>
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 3, mb: 2 }}
+              size="large"
+            >
+              Login
+            </Button>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?{' '}
+                <Button 
+                  component={Link}
+                  to="/signup"
+                  variant="text" 
+                  size="small"
+                  sx={{ textTransform: 'none' }}
+                >
+                  Create account
+                </Button>
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 }

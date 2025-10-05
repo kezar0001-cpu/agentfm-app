@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { api } from '../api.js';
-import { useAuth } from '../hooks/useAuth.js';
+import { Link } from 'react-router-dom';
+import { api } from '../api';
 
 export default function SignUp() {
   const [name, setName] = useState('');
@@ -8,23 +8,23 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
 
   async function onSubmit(e) {
     e.preventDefault();
     setErr('');
     setLoading(true);
     try {
+      console.log('Attempting registration...');
       const res = await api('/auth/register', {
         method: 'POST',
-        body: { name, email, password },
+        body: { name, email, password }
       });
-      if (res?.user) {
-        login(res.user);
-      }
+      console.log('Registration successful:', res);
+      localStorage.setItem('token', res.token);
       window.location.href = '/';
     } catch (e) {
-      setErr(e.message || 'Sign up failed');
+      console.error('Registration error:', e);
+      setErr(e.message);
     } finally {
       setLoading(false);
     }
@@ -33,59 +33,74 @@ export default function SignUp() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-md">
-        <h1 className="text-2xl font-bold text-center mb-2">Create your account</h1>
-        <p className="text-sm text-center text-gray-500 mb-6">Start managing your facilities in minutes.</p>
+        <h2 className="text-2xl font-bold mb-2 text-gray-900">Create Account</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Enter your details to create your workspace.
+        </p>
 
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Your name</label>
+            <label className="block text-sm font-medium text-gray-700">Full Name</label>
             <input
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Alex Johnson"
               required
+              disabled={loading}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 sm:text-sm"
+              placeholder="Your full name"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Email</label>
             <input
               type="email"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 sm:text-sm"
               placeholder="you@example.com"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Password</label>
             <input
               type="password"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              minLength={6}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 sm:text-sm"
               placeholder="••••••••"
             />
           </div>
 
-          {err && <div className="text-red-600 text-sm">{err}</div>}
+          {err && (
+            <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
+              <strong>Error:</strong> {err}
+              <br />
+              <span className="text-xs">Check if backend server is running</span>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'Creating…' : 'Create account'}
+            {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <a href="/login" className="text-blue-600 hover:underline">
-            Sign in
-          </a>
+          <Link to="/signin" className="text-blue-600 hover:underline">
+            Sign In
+          </Link>
         </p>
       </div>
     </div>
