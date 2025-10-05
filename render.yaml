@@ -1,14 +1,26 @@
 services:
+  # --- Backend ---
   - type: web
     name: agentfm-backend
     env: node
-    rootDirectory: backend
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://agentfm-frontend.onrender.com
+      - key: PORT
+        value: 3000
 
+  # --- Frontend ---
   - type: web
     name: agentfm-frontend
     env: static
-    rootDirectory: frontend
-    buildCommand: npm run build
-    staticPublishPath: dist
+    buildCommand: cd frontend && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://agentfm-backend.onrender.com
