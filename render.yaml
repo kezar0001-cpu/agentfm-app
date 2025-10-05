@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: agentfm-backend
+    env: node
+    rootDirectory: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+
+  - type: web
+    name: agentfm-frontend
+    env: static
+    rootDirectory: frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://agentfm-backend.onrender.com
