@@ -19,4 +19,5 @@ services:
     staticPublishPath: dist
     envVars:
       - key: REACT_APP_API_URL
-        value: https://agentfm-backend.onrender.com 
+        value: https://agentfm-backend.onrender.com
+        
