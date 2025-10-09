@@ -20,12 +20,14 @@ export default function SignIn() {
 
   useEffect(() => { saveTokenFromUrl(); }, []);
 
-  const googleUrl = useMemo(() => {
+    const googleUrl = useMemo(() => {
     if (!API_BASE) return null;
     const url = new URL('/auth/google', API_BASE);
     url.searchParams.set('role', selectedRole);
+    url.searchParams.set('action', 'signin');
     return url.toString();
   }, [selectedRole]);
+
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

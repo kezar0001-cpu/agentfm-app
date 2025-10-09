@@ -1,31 +1,34 @@
-// src/lib/auth.js
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+import { Router } from 'express';
 
-export function saveTokenFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  if (token) {
-    localStorage.setItem('auth_token', token);
-    window.history.replaceState({}, '', window.location.pathname);
-  }
-}
+const router = Router();
 
-export async function api(path, opts = {}) {
-  if (!API_BASE) throw new Error('Missing VITE_API_BASE_URL');
-  const headers = { ...(opts.headers || {}) };
-  if (opts.json) headers['Content-Type'] = 'application/json';
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...opts,
-    headers,
-    body: opts.json ? JSON.stringify(opts.json) : opts.body,
+// POST /auth/login
+router.post('/login', async (req, res) => {
+  // TODO: replace with real auth
+  const { email = '', password = '', role = 'client' } = req.body || {};
+  if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
+  return res.json({
+    token: 'demo-token',
+    user: { email, role }
   });
+});
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed ${res.status}`);
-  }
+// POST /auth/register
+router.post('/register', async (req, res) => {
+  // TODO: replace with real registration
+  const { email = '', name = '', role = 'client' } = req.body || {};
+  if (!email || !name) return res.status(400).json({ message: 'Name and email required' });
+  return res.json({
+    token: 'demo-token',
+    user: { email, name, role }
+  });
+});
 
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('application/json') ? res.json() : res.text();
-}
+// GET /auth/google
+router.get('/google', (req, res) => {
+  // TODO: start OAuth flow. Keeping this endpoint present fixes module resolution.
+  // You can read req.query.role and req.query.action ('signin' | 'signup').
+  res.status(501).send('Google OAuth not implemented');
+});
+
+export default router;
