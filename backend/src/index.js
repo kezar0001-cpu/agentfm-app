@@ -143,6 +143,6 @@ process.on('SIGTERM', async () => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Frontend: ${process.env.FRONTEND_URL}`);
-  console.log(`✅ Database: Connected to Neon PostgreSQL`);
+  console.log(`🔗 Frontend: ${process.env.FRONTEND_URL || 'Not configured'}`);
+  console.log(`✅ Database: Connected to PostgreSQL`);
 });
