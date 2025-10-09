@@ -8,6 +8,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`API on ${PORT}`));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,13 +25,17 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
-app.use(cors(corsOptions));
-app.use(express.json());
+const cors = require('cors');
 
-// Serve static files from React build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../frontend/dist')));
-}
+const corsOptions = {
+  origin: [
+    'https://buildstate.com.au',
+    'https://www.buildstate.com.au',
+    'http://localhost:5173'
+  ],
+  credentials: true
+};
+app.use(cors(corsOptions));
 
 // API Routes
 app.get('/api/health', (req, res) => {
