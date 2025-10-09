@@ -8,7 +8,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`API on ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`API listening on ${PORT}`));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,14 +16,14 @@ const __dirname = path.dirname(__filename);
 // Enhanced CORS configuration for production
 const corsOptions = {
   origin: [
-    'https://agentfm-frontend.onrender.com',
-    'http://localhost:5173', // Vite dev server
-    'http://localhost:3000', // Alternative local
+    'https://buildstate.com.au',
+    'https://www.buildstate.com.au',
+    'http://localhost:5173'
   ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  credentials: true
 };
+app.use(cors(corsOptions));
+
 
 const cors = require('cors');
 
@@ -37,10 +37,12 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// API Routes
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'AgentFM API is running' });
+
+// basic health probe for Render + uptime checks
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
 });
+
 
 // Auth routes
 app.post('/api/auth/signin', (req, res) => {
