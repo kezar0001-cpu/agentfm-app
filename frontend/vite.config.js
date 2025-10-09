@@ -1,7 +1,17 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  define: {
-    __API_BASE__: JSON.stringify(process.env.VITE_API_BASE_URL) // or remove define entirely
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_BASE_URL || 'https://agentfm-backend.onrender.com',
+        changeOrigin: true,
+      }
+    }
   }
 });
+
+

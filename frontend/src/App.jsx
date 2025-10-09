@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
@@ -15,7 +15,6 @@ import ServiceRequestsPage from "./pages/ServiceRequestsPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import AuthGate from "./authGate";
 import Layout from "./components/Layout";
-import { useEffect } from 'react';
 
 // Simple error boundary
 class ErrorBoundary extends React.Component {
@@ -46,27 +45,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function App() {
-  useEffect(() => {
-    console.log('App mounted successfully');
-    
-    // Global error handler
-    window.addEventListener('error', (event) => {
-      console.error('Global error:', event.error);
-    });
-    
-    return () => {
-      window.removeEventListener('error', () => {});
-    };
-  }, []);
-  
-  return (
-    <ErrorBoundary>
-      {/* ... rest of the code */}
-    </ErrorBoundary>
-  );
-}
-
 function NotFound() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
@@ -81,6 +59,50 @@ function NotFound() {
         </button>
       </div>
     </div>
+  );
+}
+
+function App() {
+  useEffect(() => {
+    console.log('App mounted successfully');
+    
+    // Global error handler
+    const errorHandler = (event) => {
+      console.error('Global error:', event.error);
+    };
+    
+    window.addEventListener('error', errorHandler);
+    
+    return () => {
+      window.removeEventListener('error', errorHandler);
+    };
+  }, []);
+  
+  return (
+    <ErrorBoundary>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        
+        {/* Protected routes */}
+        <Route path="/" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
+        <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
+        <Route path="/properties" element={<AuthGate><Layout><PropertiesPage /></Layout></AuthGate>} />
+        <Route path="/properties/add" element={<AuthGate><Layout><AddPropertyPage /></Layout></AuthGate>} />
+        <Route path="/properties/:id" element={<AuthGate><Layout><PropertyDetailPage /></Layout></AuthGate>} />
+        <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
+        <Route path="/jobs" element={<AuthGate><Layout><JobsPage /></Layout></AuthGate>} />
+        <Route path="/plans" element={<AuthGate><Layout><PlansPage /></Layout></AuthGate>} />
+        <Route path="/service-requests" element={<AuthGate><Layout><ServiceRequestsPage /></Layout></AuthGate>} />
+        <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
+        <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
+        <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+        
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 
