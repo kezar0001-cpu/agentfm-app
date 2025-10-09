@@ -1,5 +1,6 @@
-// Use relative path for production
-const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
+// Use environment variable for API base URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+  (import.meta.env.PROD ? 'https://agentfm-backend.onrender.com/api' : 'http://localhost:3000/api');
 
 async function apiCall(url, options = {}) {
   const token = localStorage.getItem('token');
@@ -9,10 +10,13 @@ async function apiCall(url, options = {}) {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
     },
+    credentials: 'include', // Important for CORS with credentials
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${url}`, {
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    
+    const response = await fetch(fullUrl, {
       ...defaultOptions,
       ...options,
       headers: {
