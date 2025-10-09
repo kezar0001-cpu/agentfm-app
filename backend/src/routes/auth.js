@@ -91,8 +91,13 @@ router.post('/register', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, orgId: user.orgId },
-      process.env.JWT_SECRET,
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role, 
+        orgId: user.orgId 
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -164,10 +169,15 @@ router.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, orgId: user.orgId },
-      process.env.JWT_SECRET,
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role, 
+        orgId: user.orgId 
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
-    });
+    );
 
     // Update last login
     await prisma.user.update({
@@ -206,21 +216,28 @@ router.get('/google', (req, res, next) => {
   
   passport.authenticate('google', {
     scope: ['profile', 'email'],
-    state: role  // Pass role as state
+    state: role
   })(req, res, next);
 });
 
 // GET /api/auth/google/callback - Google OAuth Callback
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/signin?error=auth_failed` }),
+  passport.authenticate('google', { 
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/signin?error=auth_failed` 
+  }),
   async (req, res) => {
     try {
       const user = req.user;
 
       // Generate JWT token
       const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, orgId: user.orgId },
-        process.env.JWT_SECRET,
+        { 
+          id: user.id, 
+          email: user.email, 
+          role: user.role, 
+          orgId: user.orgId 
+        },
+        process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: '7d' }
       );
 
@@ -233,12 +250,14 @@ router.get('/google/callback',
       };
 
       const redirectPath = dashboardRoutes[user.role] || '/dashboard';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
       // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}?token=${token}`);
+      res.redirect(`${frontendUrl}${redirectPath}?token=${token}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/signin?error=auth_failed`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/signin?error=auth_failed`);
     }
   }
 );
@@ -255,7 +274,7 @@ router.get('/me', async (req, res) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
