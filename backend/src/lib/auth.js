@@ -1,5 +1,5 @@
-// src/lib/auth.ts
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+// src/lib/auth.js
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export function saveTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -10,12 +10,9 @@ export function saveTokenFromUrl() {
   }
 }
 
-export async function api<T = any>(
-  path: string,
-  opts: RequestInit & { json?: any } = {}
-): Promise<T> {
+export async function api(path, opts = {}) {
   if (!API_BASE) throw new Error('Missing VITE_API_BASE_URL');
-  const headers: Record<string, string> = { ...(opts.headers as any) };
+  const headers = { ...(opts.headers || {}) };
   if (opts.json) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -30,5 +27,5 @@ export async function api<T = any>(
   }
 
   const ct = res.headers.get('content-type') || '';
-  return ct.includes('application/json') ? res.json() : ((await res.text()) as any);
+  return ct.includes('application/json') ? res.json() : res.text();
 }

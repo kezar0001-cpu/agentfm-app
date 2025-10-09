@@ -1,4 +1,3 @@
-// src/pages/SignUp.tsx
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -15,16 +14,17 @@ export default function SignUp() {
     name:'', email:'', password:'', confirmPassword:'', phone:'', company:'', role:'tenant'
   });
   const [subscriptionPlan, setSubscriptionPlan] = useState('starter');
-  const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => { saveTokenFromUrl(); }, []);
 
-  const handleChange = (e: any) => { setFormData({ ...formData, [e.target.name]: e.target.value }); setError(''); };
-  const handleRoleChange = (_: any, newRole: 'tenant'|'client' | null) => { if (newRole) setFormData({ ...formData, role: newRole }); };
+  const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }); setError(''); };
+  const handleRoleChange = (_e, newRole) => { if (newRole) setFormData({ ...formData, role: newRole }); };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e) => {
     e.preventDefault(); setError('');
 
     if (!formData.name || !formData.email || !formData.password || !formData.phone) {
@@ -36,19 +36,16 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      const res = await api<{ token: string; user: any }>('/auth/register', {
+      const res = await api('/auth/register', {
         method: 'POST',
-        json: {
-          ...formData,
-          subscriptionPlan: formData.role === 'client' ? subscriptionPlan : null,
-        },
+        json: { ...formData, subscriptionPlan: formData.role === 'client' ? subscriptionPlan : null },
       });
 
       localStorage.setItem('auth_token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
 
       navigate(formData.role === 'client' ? '/dashboard' : '/tenant/dashboard');
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
@@ -73,9 +70,7 @@ export default function SignUp() {
               backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 1
             }}>AgentFM</Typography>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: .5 }}>Create Account</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Join AgentFM to streamline your property management
-            </Typography>
+            <Typography variant="body2" color="text.secondary">Join AgentFM to streamline your property management</Typography>
           </Box>
 
           <Box sx={{ mb: 3 }}>
@@ -96,7 +91,7 @@ export default function SignUp() {
             </ToggleButtonGroup>
             <Typography variant="caption" color="text.secondary" align="center" display="block">
               {formData.role === 'tenant' ? 'For residents and tenants - Free forever'
-               : 'For property managers - Starting at $99/month'}
+                : 'For property managers - Starting at $99/month'}
             </Typography>
           </Box>
 
@@ -104,7 +99,7 @@ export default function SignUp() {
             <Box sx={{ mb: 3, p: 2, bgcolor: 'blue.50', borderRadius: 1, border: '1px solid', borderColor: 'blue.200' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>Choose Your Plan</Typography>
               <FormControl fullWidth>
-                <Select value={subscriptionPlan} onChange={(e) => setSubscriptionPlan(e.target.value as string)} size="small">
+                <Select value={subscriptionPlan} onChange={(e) => setSubscriptionPlan(e.target.value)} size="small">
                   <MenuItem value="starter"><Typography variant="body2" sx={{ fontWeight: 600 }}>Starter - $99/month</Typography></MenuItem>
                   <MenuItem value="professional"><Typography variant="body2" sx={{ fontWeight: 600 }}>Professional - $249/month</Typography></MenuItem>
                   <MenuItem value="enterprise"><Typography variant="body2" sx={{ fontWeight: 600 }}>Enterprise - $499/month</Typography></MenuItem>

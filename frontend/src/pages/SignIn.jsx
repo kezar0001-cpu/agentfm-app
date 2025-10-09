@@ -1,4 +1,3 @@
-// src/pages/SignIn.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -17,7 +16,7 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'client'|'admin'|'tenant'>('client');
+  const [selectedRole, setSelectedRole] = useState('client');
 
   useEffect(() => { saveTokenFromUrl(); }, []);
 
@@ -28,32 +27,29 @@ export default function SignIn() {
     return url.toString();
   }, [selectedRole]);
 
-  const handleChange = (e: any) => {
+  const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleRoleChange = (_: any, newRole: 'client'|'admin'|'tenant' | null) => {
+  const handleRoleChange = (_e, newRole) => {
     if (newRole) { setSelectedRole(newRole); setError(''); }
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await api<{ token: string; user: any }>('/auth/login', {
+      const res = await api('/auth/login', {
         method: 'POST',
         json: { email: formData.email, password: formData.password, role: selectedRole },
       });
       localStorage.setItem('auth_token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
-
-      const routes: Record<string, string> = {
-        client: '/dashboard', admin: '/admin/dashboard', tenant: '/tenant/dashboard'
-      };
+      const routes = { client: '/dashboard', admin: '/admin/dashboard', tenant: '/tenant/dashboard' };
       navigate(routes[selectedRole] || '/dashboard');
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -65,10 +61,10 @@ export default function SignIn() {
     window.location.href = googleUrl;
   };
 
-  const getRoleDescription = (role: string) =>
+  const getRoleDescription = (role) =>
     role === 'client' ? 'Property Managers & Business Accounts'
-    : role === 'admin' ? 'System Administrators & Support'
-    : 'Tenants & Residents';
+      : role === 'admin' ? 'System Administrators & Support'
+      : 'Tenants & Residents';
 
   return (
     <Container component="main" maxWidth="sm">
@@ -76,7 +72,8 @@ export default function SignIn() {
         <Paper elevation={3} sx={{ p: 4, width: '100%', borderRadius: 2 }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <Typography variant="h3" component="h1" sx={{
-              fontWeight: 700, background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              fontWeight: 700,
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
               backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 1
             }}>AgentFM</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -89,15 +86,24 @@ export default function SignIn() {
               Select your account type
             </Typography>
             <ToggleButtonGroup value={selectedRole} exclusive onChange={handleRoleChange} fullWidth sx={{ mb: 1 }}>
-              <ToggleButton value="client"><Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', py:1 }}>
-                <BusinessIcon sx={{ mb: .5 }}/> <Typography variant="caption" sx={{ fontWeight: 600 }}>Business</Typography>
-              </Box></ToggleButton>
-              <ToggleButton value="admin"><Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', py:1 }}>
-                <AdminIcon sx={{ mb: .5 }}/> <Typography variant="caption" sx={{ fontWeight: 600 }}>Admin</Typography>
-              </Box></ToggleButton>
-              <ToggleButton value="tenant"><Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', py:1 }}>
-                <HomeIcon sx={{ mb: .5 }}/> <Typography variant="caption" sx={{ fontWeight: 600 }}>Tenant</Typography>
-              </Box></ToggleButton>
+              <ToggleButton value="client">
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 1 }}>
+                  <BusinessIcon sx={{ mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Business</Typography>
+                </Box>
+              </ToggleButton>
+              <ToggleButton value="admin">
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 1 }}>
+                  <AdminIcon sx={{ mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Admin</Typography>
+                </Box>
+              </ToggleButton>
+              <ToggleButton value="tenant">
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 1 }}>
+                  <HomeIcon sx={{ mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Tenant</Typography>
+                </Box>
+              </ToggleButton>
             </ToggleButtonGroup>
             <Typography variant="caption" color="text.secondary" align="center" display="block">
               {getRoleDescription(selectedRole)}
@@ -107,14 +113,18 @@ export default function SignIn() {
           {error && <Alert severity="error" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 
           <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
-            <Button fullWidth variant="outlined" onClick={handleGoogle} disabled={loading}
-              startIcon={<GoogleIcon />} sx={{ textTransform:'none', borderColor:'#e0e0e0', color:'#757575',
-              '&:hover':{ borderColor:'#bdbdbd', backgroundColor:'#f5f5f5' } }}>
+            <Button
+              fullWidth variant="outlined" onClick={handleGoogle} disabled={loading}
+              startIcon={<GoogleIcon />} sx={{
+                textTransform: 'none', borderColor: '#e0e0e0', color: '#757575',
+                '&:hover': { borderColor: '#bdbdbd', backgroundColor: '#f5f5f5' }
+              }}>
               Google
             </Button>
-            <Button fullWidth variant="outlined" disabled
-              startIcon={<AppleIcon />} sx={{ textTransform:'none', borderColor:'#e0e0e0', color:'#000',
-              '&:hover':{ borderColor:'#bdbdbd', backgroundColor:'#f5f5f5' } }}>
+            <Button fullWidth variant="outlined" disabled startIcon={<AppleIcon />} sx={{
+              textTransform: 'none', borderColor: '#e0e0e0', color: '#000',
+              '&:hover': { borderColor: '#bdbdbd', backgroundColor: '#f5f5f5' }
+            }}>
               Apple (soon)
             </Button>
           </Box>
