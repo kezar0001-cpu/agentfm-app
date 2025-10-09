@@ -1,7 +1,9 @@
-// backend/src/index.js  (ESM)
+// backend/src/index.js (ESM)
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import passport from 'passport';
+import routes from './routes/index.js';
 
 dotenv.config();
 
@@ -13,22 +15,17 @@ app.use(cors({
   origin: ['https://buildstate.com.au','https://www.buildstate.com.au','http://localhost:5173'],
   credentials: true
 }));
+app.use(passport.initialize()); // <- required for Google OAuth
 
-// ---- Health check (used by Render + your own checks) ----
-app.get('/healthz', (_req,res)=>res.status(200).send('ok'));
+// ---- Health check (Render) ----
+app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 
 // ---- API routes ----
-app.post('/api/auth/signin', (req, res) => {
-  const { email } = req.body || {};
-  return res.json({
-    token: 'mock-token',
-    user: { id: 1, email, name: 'Test User', role: 'client' }
-  });
-});
+app.use('/', routes);
 
-// (Optional) 404 for unknown API routes
+// 404 for unknown API routes (optional)
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
-// ---- Start server (Render needs 0.0.0.0 and PORT env) ----
+// ---- Start server ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT,'0.0.0.0',()=>console.log(`API on ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`API on ${PORT}`));

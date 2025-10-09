@@ -1,111 +1,96 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+// backend/src/routes/auth.js (ESM)
+import { Router } from 'express';
+import passport from 'passport';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 
-const prisma = new PrismaClient();
-const router = express.Router();
+// TODO: import your real DB adapter that exposes db.query(sql, params)
+// import db from '../data/db.js';
 
-// ----- config
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error('JWT_SECRET is not defined');
-const TOKEN_EXPIRY = '1h';
+const router = Router();
 
-// ----- helpers
-function sign(user) {
-  // keep payload light but useful
-  return jwt.sign({ id: user.id, orgId: user.orgId, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
-}
-function sanitize(user) {
-  const { id, email, name, role, orgId } = user;
-  return { id, email, name, role, orgId };
-}
+/* --------- EMAIL/PASSWORD (keep your current handlers) --------- */
+// Example placeholders (remove if you already have these):
+router.post('/auth/login', async (req, res) => {
+  const { email, password, role = 'tenant' } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  // const rows = await db.query('SELECT * FROM users WHERE email=? AND role=?',[email, role]);
+  // const user = rows[0]; if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({error:'Invalid credentials'});
+  // const token = jwt.sign({ id:user.id, email:user.email, role:user.role }, process.env.JWT_SECRET, { expiresIn:'7d' });
+  // return res.json({ token, user:{ id:user.id, name:user.name, email:user.email, role:user.role }});
+  return res.json({ token: 'mock-token', user: { id: 1, email, role, name: 'Test User' } });
+});
 
-// ----- middleware
-function authRequired(req, res, next) {
-  const h = req.headers.authorization;
-  if (!h || !h.toLowerCase().startsWith('bearer ')) {
-    return res.status(401).json({ error: 'Authorization token is required.' });
+/* ------------------------- GOOGLE STRATEGY ------------------------- */
+passport.use(new GoogleStrategy(
+  {
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${process.env.BACKEND_URL}/auth/google/callback`,
+    passReqToCallback: true
+  },
+  async (req, accessToken, refreshToken, profile, done) => {
+    try {
+      const role = req.query.role || 'tenant';
+      const email = profile.emails?.[0]?.value;
+      const name  = profile.displayName || 'Google User';
+
+      // let rows = await db.query('SELECT * FROM users WHERE email=? AND role=?',[email, role]);
+      // if (rows.length === 0) {
+      //   const userId = await db.query(
+      //     `INSERT INTO users (name,email,role,google_id,email_verified,created_at) VALUES (?,?,?,?,?,NOW())`,
+      //     [name, email, role, profile.id, true]
+      //   );
+      //   rows = await db.query('SELECT * FROM users WHERE id=?',[userId]);
+      // }
+      // return done(null, rows[0]);
+
+      // TEMP mock user until DB wired
+      return done(null, { id: 1, email, role, name });
+    } catch (e) {
+      return done(e, null);
+    }
   }
-  const token = h.slice(7);
+));
+
+/* -------------------------- GOOGLE ROUTES -------------------------- */
+router.get(
+  '/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+);
+
+router.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/signin' }),
+  (req, res) => {
+    const token = jwt.sign(
+      { id: req.user.id, email: req.user.email, role: req.user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    const dashboard = { client:'/dashboard', admin:'/admin/dashboard', tenant:'/tenant/dashboard' }[req.user.role] || '/dashboard';
+    res.redirect(`${process.env.FRONTEND_URL}${dashboard}?token=${token}`);
+  }
+);
+
+/* --------------------------- JWT helper --------------------------- */
+export const authenticateToken = (req, res, next) => {
+  const token = (req.headers['authorization'] || '').split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Access token required' });
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    return next();
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
   } catch {
-    return res.status(401).json({ error: 'Invalid or expired token.' });
+    return res.status(403).json({ error: 'Invalid or expired token' });
   }
-}
+};
 
-// ----- routes
-
-// POST /auth/register
-router.post('/register', async (req, res) => {
-   console.log('📝 Register endpoint hit with body:', req.body);
-  console.log('📝 Headers:', req.headers);
-  const { name, email, password, orgName } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
-
-  try {
-    const exists = await prisma.user.findUnique({ where: { email } });
-    if (exists) return res.status(409).json({ error: 'A user with this email already exists.' });
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    // safe default if orgName omitted
-    const resolvedOrgName =
-      orgName && orgName.trim().length > 0 ? orgName.trim() : `${(email.split('@')[0] || 'org').trim()}'s Org`;
-
-    const user = await prisma.$transaction(async (tx) => {
-      const org = await tx.org.create({ data: { name: resolvedOrgName } });
-      return tx.user.create({
-        data: {
-          email,
-          name: name || null,
-          passwordHash,
-          role: 'owner',        // <- your schema uses String, not enum
-          orgId: org.id
-        },
-      });
-    });
-
-    const token = sign(user);
-    return res.status(201).json({ token, user: sanitize(user) });
-  } catch (err) {
-    console.error('Registration error:', err);
-    return res.status(500).json({ error: 'Unable to register user.' });
-  }
+router.get('/auth/me', authenticateToken, async (req, res) => {
+  // const rows = await db.query('SELECT id,name,email,role FROM users WHERE id=?',[req.user.id]);
+  // if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+  // res.json({ user: rows[0] });
+  res.json({ user: { id: req.user.id, email: req.user.email, role: req.user.role } }); // mock
 });
 
-// POST /auth/login
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
-
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: 'Invalid email or password.' });
-
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: 'Invalid email or password.' });
-
-    const token = sign(user);
-    return res.json({ token, user: sanitize(user) });
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Unable to login.' });
-  }
-});
-
-// GET /auth/me
-router.get('/me', authRequired, async (req, res) => {
-  try {
-    const u = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!u) return res.status(404).json({ error: 'User not found' });
-    return res.json({ user: sanitize(u) });
-  } catch (err) {
-    console.error('Me error:', err);
-    return res.status(500).json({ error: 'Unable to fetch user.' });
-  }
-});
-
-module.exports = { authRouter: router, authRequired };
+export default router;
