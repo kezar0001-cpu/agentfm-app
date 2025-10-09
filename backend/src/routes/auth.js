@@ -74,6 +74,8 @@ router.get(
   }
 );
 
+router.get('/__ping', (req, res) => res.send('auth router loaded'));
+
 /* --------------------------- JWT helper --------------------------- */
 export const authenticateToken = (req, res, next) => {
   const token = (req.headers['authorization'] || '').split(' ')[1];
