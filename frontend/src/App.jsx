@@ -15,6 +15,7 @@ import ServiceRequestsPage from "./pages/ServiceRequestsPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import AuthGate from "./authGate";
 import Layout from "./components/Layout";
+import { useEffect } from 'react';
 
 // Simple error boundary
 class ErrorBoundary extends React.Component {
@@ -46,108 +47,22 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  console.log('App component rendering');
+  useEffect(() => {
+    console.log('App mounted successfully');
+    
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+    });
+    
+    return () => {
+      window.removeEventListener('error', () => {});
+    };
+  }, []);
   
   return (
     <ErrorBoundary>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/signin" element={<SignIn />} />
-        <Route path="/signup" element={<SignUp />} />
-        
-        {/* Protected Routes - Wrapped with AuthGate and Layout */}
-        <Route path="/" element={
-          <AuthGate>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/dashboard" element={
-          <AuthGate>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </AuthGate>
-        } />
-        
-        {/* Property Management Routes */}
-        <Route path="/properties" element={
-          <AuthGate>
-            <Layout>
-              <PropertiesPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/properties/add" element={
-          <AuthGate>
-            <Layout>
-              <AddPropertyPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/properties/:id" element={
-          <AuthGate>
-            <Layout>
-              <PropertyDetailPage />
-            </Layout>
-          </AuthGate>
-        } />
-        
-        {/* Other Feature Routes */}
-        <Route path="/inspections" element={
-          <AuthGate>
-            <Layout>
-              <InspectionsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/jobs" element={
-          <AuthGate>
-            <Layout>
-              <JobsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/plans" element={
-          <AuthGate>
-            <Layout>
-              <PlansPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/recommendations" element={
-          <AuthGate>
-            <Layout>
-              <RecommendationsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/reports" element={
-          <AuthGate>
-            <Layout>
-              <ReportsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/service-requests" element={
-          <AuthGate>
-            <Layout>
-              <ServiceRequestsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        <Route path="/subscriptions" element={
-          <AuthGate>
-            <Layout>
-              <SubscriptionsPage />
-            </Layout>
-          </AuthGate>
-        } />
-        
-        {/* 404 Route */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      {/* ... rest of the code */}
     </ErrorBoundary>
   );
 }

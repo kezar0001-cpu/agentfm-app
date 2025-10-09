@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react';
+import { api } from '../api.js';
 
-// Mock data for development
-const mockDashboardData = {
-  openJobs: 12,
-  overdueJobs: 3,
-  completedJobs30d: 45,
-  averagePci: 78.5,
-  pendingRecommendations: 7,
-  updatedAt: new Date().toISOString()
-};
-
-const useApiQuery = ({ queryKey, url }) => {
+const useApiQuery = ({ queryKey, url, enabled = true }) => {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
@@ -18,33 +9,26 @@ const useApiQuery = ({ queryKey, url }) => {
   const [isFetching, setIsFetching] = useState(false);
 
   const fetchData = async () => {
-    if (isFetching) return; // Prevent multiple simultaneous requests
+    // Prevent multiple simultaneous requests
+    if (isFetching) return;
     
     setIsFetching(true);
     setIsError(false);
     setError(null);
 
     try {
-      // For development, use mock data and simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('useApiQuery fetching:', url);
+      const result = await api.get(url);
+      console.log('useApiQuery result:', result);
       
-      // Simulate successful response with mock data
-      setData(mockDashboardData);
-      
-      // If you want to try actual API call later, uncomment this:
-      /*
-      const response = await fetch(`http://localhost:3000/api${url}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-      setData(result);
-      */
+      // Handle both { data: [...] } and direct array responses
+      const responseData = result.data || result;
+      setData(responseData);
       
     } catch (err) {
-      console.warn('API call failed:', err.message);
+      console.error('useApiQuery error:', err);
       setIsError(true);
       setError(err);
-      // Even on error, set some mock data for development
-      setData(mockDashboardData);
     } finally {
       setIsLoading(false);
       setIsFetching(false);
@@ -52,10 +36,13 @@ const useApiQuery = ({ queryKey, url }) => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [url]); // Only depend on url
+    if (enabled) {
+      fetchData();
+    }
+  }, [url, enabled]); // Re-fetch when URL changes
 
   const refetch = () => {
+    setIsLoading(true);
     fetchData();
   };
 

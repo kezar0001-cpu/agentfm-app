@@ -1,24 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
+import { isAuthenticated } from '../lib/auth';
 
 function AuthGate({ children }) {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
+    const checkAuth = () => {
+      try {
+        const authenticated = isAuthenticated();
+        
+        console.log('AuthGate checking authentication:', authenticated);
 
-      console.log('AuthGate checking - Token:', token, 'User:', user);
-
-      if (!token || !user) {
-        console.log('No auth found, redirecting to signin');
-        navigate('/signin');
-      } else {
-        console.log('Auth valid, proceeding');
-        setIsChecking(false);
+        if (!authenticated) {
+          console.log('Not authenticated, redirecting to signin');
+          navigate('/signin', { replace: true });
+        } else {
+          console.log('Authentication valid, proceeding');
+          setIsChecking(false);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        navigate('/signin', { replace: true });
       }
     };
 
@@ -32,7 +37,8 @@ function AuthGate({ children }) {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          height: '100vh'
+          height: '100vh',
+          backgroundColor: '#f5f5f5'
         }}
       >
         <CircularProgress />
