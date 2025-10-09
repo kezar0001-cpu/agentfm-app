@@ -4,14 +4,16 @@ import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
   ToggleButtonGroup, ToggleButton, IconButton, InputAdornment, FormControl, Select, MenuItem
 } from '@mui/material';
-import { Visibility, VisibilityOff, Google as GoogleIcon, Apple as AppleIcon,
-  Business as BusinessIcon, Home as HomeIcon } from '@mui/icons-material';
+import {
+  Visibility, VisibilityOff, Google as GoogleIcon, Apple as AppleIcon,
+  Business as BusinessIcon, Home as HomeIcon
+} from '@mui/icons-material';
 import { API_BASE, api, saveTokenFromUrl } from '../lib/auth';
 
 export default function SignUp() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name:'', email:'', password:'', confirmPassword:'', phone:'', company:'', role:'tenant'
+    name: '', email: '', password: '', confirmPassword: '', phone: '', company: '', role: 'tenant'
   });
   const [subscriptionPlan, setSubscriptionPlan] = useState('starter');
   const [error, setError] = useState('');
@@ -21,8 +23,13 @@ export default function SignUp() {
 
   useEffect(() => { saveTokenFromUrl(); }, []);
 
-  const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }); setError(''); };
-  const handleRoleChange = (_e, newRole) => { if (newRole) setFormData({ ...formData, role: newRole }); };
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+  const handleRoleChange = (_e, newRole) => {
+    if (newRole) setFormData({ ...formData, role: newRole });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setError('');
@@ -85,6 +92,7 @@ export default function SignUp() {
               </ToggleButton>
               <ToggleButton value="client">
                 <Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', py:1 }}>
+                  <Business as={BusinessIcon} sx={{ display:'none' }} />
                   <BusinessIcon sx={{ mb:.5 }}/> <Typography variant="caption" sx={{ fontWeight: 600 }}>Business</Typography>
                 </Box>
               </ToggleButton>

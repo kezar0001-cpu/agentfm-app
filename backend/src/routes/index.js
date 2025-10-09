@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import auth from './auth.js';
-// import other routers here (properties, units, etc.)
+import authRouter from './auth.js';
 
 const router = Router();
 
-router.use('/', auth);
-// router.use('/properties', propertiesRouter); // example
+router.use('/auth', authRouter);
+
+router.get('/health', (_req, res) => res.json({ ok: true }));
 
 export default router;
