@@ -1,26 +1,41 @@
+# render.yaml (at repo root)
 services:
-  # --- Backend ---
+  # --------------------------
+  # Backend (Express + Prisma)
+  # --------------------------
   - type: web
     name: agentfm-backend
     env: node
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm run start
+    rootDir: backend
+    plan: free
+    buildCommand: |
+      npm ci
+      npx prisma migrate deploy
+    startCommand: node src/index.js
+    autoDeploy: true
     envVars:
+      # Set these in the Render dashboard (don’t put values here)
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
         sync: false
+      # FRONTEND_URL will be set after the frontend creates a URL; you can leave
+      # this blank for the first deploy and set it in the dashboard afterward.
       - key: FRONTEND_URL
-        value: https://agentfm-frontend.onrender.com
-      - key: PORT
-        value: 3000
+        sync: false
 
-  # --- Frontend ---
-  - type: web
+  # --------------------------
+  # Frontend (Vite static)
+  # --------------------------
+  - type: static
     name: agentfm-frontend
-    env: static
-    buildCommand: cd frontend && npm run build
-    staticPublishPath: frontend/dist
+    rootDir: frontend
+    buildCommand: |
+      npm ci
+      npm run build
+    staticPublishPath: dist
+    autoDeploy: true
     envVars:
+      # VITE needs the backend base URL at build time
       - key: VITE_API_BASE_URL
-        value: https://agentfm-backend.onrender.com
+        sync: false
