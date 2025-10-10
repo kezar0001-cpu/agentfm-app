@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import App from './App.jsx';
-import './i18n.js';
 import './index.css';  // Tailwind entry point
 
 // ✅ Query Client
