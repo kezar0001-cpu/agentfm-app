@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 const COOKIE_NAME = 'session';
 const ONE_DAY = 24 * 60 * 60; // seconds
@@ -27,4 +27,4 @@ function clearSession(res) {
   res.clearCookie(COOKIE_NAME, { sameSite: 'none', secure: true });
 }
 
-module.exports = { setSessionCookie, readSession, clearSession };
+export { setSessionCookie, readSession, clearSession };
