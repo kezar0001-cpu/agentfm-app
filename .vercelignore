@@ -4,28 +4,16 @@ backend/
 # Ignore development files
 *.pid
 *.log
-.env.local
-.env.development
 
-# Ignore documentation
-*.md
-!README.md
+# Ignore documentation (keep README.md)
+BUG_FIX_REPORT.md
+DEPLOYMENT_READY.md
+FRONTEND_BUILD_FIX.md
+VERCEL_CONFIG.md
+FINAL_SUMMARY.md
 
-# Ignore test files
-**/*.test.js
-**/*.test.jsx
-**/*.spec.js
-**/*.spec.jsx
-
-# Ignore build artifacts
-node_modules/
-.DS_Store
-.vscode/
-.idea/
-
-# Ignore git files
-.git/
-.gitignore
+# Ignore test files in backend only
+backend/test/
 
 # Ignore CI/CD files
 .github/
@@ -34,3 +22,5 @@ node_modules/
 # Ignore other config files
 render.yaml
 verify-build.sh
+package.json.bak
+yarn.lock
