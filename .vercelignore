@@ -1,0 +1,36 @@
+# Ignore backend directory (deployed separately)
+backend/
+
+# Ignore development files
+*.pid
+*.log
+.env.local
+.env.development
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore test files
+**/*.test.js
+**/*.test.jsx
+**/*.spec.js
+**/*.spec.jsx
+
+# Ignore build artifacts
+node_modules/
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore CI/CD files
+.github/
+.devcontainer/
+
+# Ignore other config files
+render.yaml
+verify-build.sh
