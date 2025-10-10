@@ -1,8 +1,10 @@
 // src/routes/uploads.js
-const router = require('express').Router();
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
+
+const router = express.Router();
 
 // Ensure the uploads directory exists
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
@@ -41,4 +43,4 @@ router.post('/single', upload.single('file'), (req, res) => {
 /** GET /uploads/ping -> { ok: true }  (sanity check) */
 router.get('/ping', (_req, res) => res.json({ ok: true }));
 
-module.exports = router;
+export default router;
