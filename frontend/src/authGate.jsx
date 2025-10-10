@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
-import { isAuthenticated } from '../lib/auth';
+import { isAuthenticated } from './lib/auth.js';
 
 function AuthGate({ children }) {
   const navigate = useNavigate();
