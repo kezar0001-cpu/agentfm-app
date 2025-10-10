@@ -74,4 +74,4 @@ function applyRules(findings, rules) {
   return recommendations;
 }
 
-module.exports = { computePCI, applyRules };
+export { computePCI, applyRules };
