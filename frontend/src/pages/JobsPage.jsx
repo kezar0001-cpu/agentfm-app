@@ -23,14 +23,14 @@ const STATUSES = ['open', 'in_progress', 'scheduled', 'completed'];
 
 export default function JobsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['jobs'], url: '/jobs' });
-  const mutation = useApiMutation({ url: '/jobs/:id', method: 'patch', invalidateKeys: [['jobs']] });
+  const query = useApiQuery({ queryKey: ['jobs'], url: '/api/jobs' });
+  const mutation = useApiMutation({ url: '/api/jobs/:id', method: 'patch', invalidateKeys: [['jobs']] });
 
   const jobs = normaliseArray(query.data);
 
   const handleStatusChange = async (jobId, status) => {
     try {
-      await mutation.mutateAsync({ url: `/jobs/${jobId}`, method: 'patch', data: { status } });
+      await mutation.mutateAsync({ url: `/api/jobs/${jobId}`, method: 'patch', data: { status } });
     } catch (error) {
       // Handled via mutation state.
     }

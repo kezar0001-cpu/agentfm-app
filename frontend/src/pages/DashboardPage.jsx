@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const { t } = useTranslation();
   const query = useApiQuery({
     queryKey: ['dashboard', 'summary'],
-    url: '/dashboard/summary',
+    url: '/api/dashboard/summary',
   });
 
   const metrics = useMemo(() => {

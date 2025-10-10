@@ -24,9 +24,9 @@ const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 export default function ServiceRequestsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['service-requests'], url: '/service-requests' });
+  const query = useApiQuery({ queryKey: ['service-requests'], url: '/api/service-requests' });
   const mutation = useApiMutation({
-    url: '/service-requests/:id',
+    url: '/api/service-requests/:id',
     method: 'patch',
     invalidateKeys: [['service-requests'], ['dashboard', 'overview']],
   });
@@ -35,7 +35,7 @@ export default function ServiceRequestsPage() {
 
   const handleUpdate = async (id, field, value) => {
     try {
-      await mutation.mutateAsync({ url: `/service-requests/${id}`, method: 'patch', data: { [field]: value } });
+      await mutation.mutateAsync({ url: `/api/service-requests/${id}`, method: 'patch', data: { [field]: value } });
     } catch (error) {
       // surfaced in mutation state
     }

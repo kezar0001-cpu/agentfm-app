@@ -29,8 +29,8 @@ const schema = z.object({
 
 export default function PlansPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['plans'], url: '/plans' });
-  const mutation = useApiMutation({ url: '/plans', method: 'post', invalidateKeys: [['plans']] });
+  const query = useApiQuery({ queryKey: ['plans'], url: '/api/plans' });
+  const mutation = useApiMutation({ url: '/api/plans', method: 'post', invalidateKeys: [['plans']] });
 
   const {
     register,

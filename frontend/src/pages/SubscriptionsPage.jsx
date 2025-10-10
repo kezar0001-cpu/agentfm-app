@@ -22,13 +22,13 @@ const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['subscriptions'], url: '/subscriptions' });
-  const mutation = useApiMutation({ url: '/subscriptions/:id', method: 'patch', invalidateKeys: [['subscriptions']] });
+  const query = useApiQuery({ queryKey: ['subscriptions'], url: '/api/subscriptions' });
+  const mutation = useApiMutation({ url: '/api/subscriptions/:id', method: 'patch', invalidateKeys: [['subscriptions']] });
 
   const subscriptions = normaliseArray(query.data);
 
   const handleStatusChange = async (subscriptionId, status) => {
-    await mutation.mutateAsync({ url: `/subscriptions/${subscriptionId}`, method: 'patch', data: { status } });
+    await mutation.mutateAsync({ url: `/api/subscriptions/${subscriptionId}`, method: 'patch', data: { status } });
   };
 
   return (

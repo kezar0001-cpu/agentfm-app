@@ -34,8 +34,8 @@ const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 
 export default function InspectionsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['inspections'], url: '/inspections' });
-  const mutation = useApiMutation({ url: '/inspections', method: 'post', invalidateKeys: [['inspections']] });
+  const query = useApiQuery({ queryKey: ['inspections'], url: '/api/inspections' });
+  const mutation = useApiMutation({ url: '/api/inspections', method: 'post', invalidateKeys: [['inspections']] });
 
   const {
     register,

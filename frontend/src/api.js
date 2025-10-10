@@ -19,12 +19,15 @@ async function apiCall(url, options = {}) {
   };
 
   try {
-    // Build full URL - handle /api prefix properly
-    let fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    // Build full URL with proper /api prefix
+    let fullUrl = url;
     
-    // Ensure /api prefix if not present
-    if (!fullUrl.includes('/api/') && !url.startsWith('http')) {
-      fullUrl = fullUrl.replace(API_BASE_URL, `${API_BASE_URL}/api`);
+    if (!url.startsWith('http')) {
+      // Ensure /api prefix exists
+      const path = url.startsWith('/api') 
+        ? url 
+        : `/api${url.startsWith('/') ? url : '/' + url}`;
+      fullUrl = `${API_BASE_URL}${path}`;
     }
     
     const response = await fetch(fullUrl, {

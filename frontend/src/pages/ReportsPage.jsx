@@ -23,7 +23,7 @@ const schema = z.object({
 export default function ReportsPage() {
   const { t } = useTranslation();
   const [success, setSuccess] = useState(false);
-  const mutation = useApiMutation({ url: '/reports', method: 'post' });
+  const mutation = useApiMutation({ url: '/api/reports', method: 'post' });
 
   const {
     register,
