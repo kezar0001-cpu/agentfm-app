@@ -1,14 +1,42 @@
-const express = require('express');
-const { z } = require('zod');
-const validate = require('../middleware/validate');
-const { requireAuth } = require('../auth');
-const {
+import express from 'express';
+import { z } from 'zod';
+import validate from '../middleware/validate.js';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../index.js';
+import {
   listServiceRequests,
   createServiceRequest,
   updateServiceRequest,
-} = require('../data/memoryStore');
+} from '../data/memoryStore.js';
 
 const router = express.Router();
+
+// Middleware to verify JWT token
+const requireAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: { org: true }
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
 
 const STATUSES = ['NEW', 'TRIAGED', 'SCHEDULED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -75,4 +103,4 @@ router.patch('/:id', validate(requestUpdateSchema), (req, res) => {
   res.json(result);
 });
 
-module.exports = router;
+export default router;

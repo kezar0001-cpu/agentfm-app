@@ -1,4 +1,4 @@
-const { randomUUID } = require('crypto');
+import { randomUUID } from 'crypto';
 
 const DEFAULT_ORG_ID = 'org1';
 
@@ -651,7 +651,7 @@ function getDashboardSummary(orgId) {
   };
 }
 
-module.exports = {
+export {
   listProperties,
   addProperty,
   findProperty,
