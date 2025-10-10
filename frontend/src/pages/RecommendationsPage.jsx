@@ -20,9 +20,9 @@ import { normaliseArray } from '../utils/error.js';
 
 export default function RecommendationsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['recommendations'], url: '/recommendations' });
+  const query = useApiQuery({ queryKey: ['recommendations'], url: '/api/recommendations' });
   const mutation = useApiMutation({
-    url: '/recommendations/:id/convert',
+    url: '/api/recommendations/:id/convert',
     method: 'post',
     invalidateKeys: [['recommendations'], ['jobs']],
   });
@@ -31,7 +31,7 @@ export default function RecommendationsPage() {
 
   const handleConvert = async (recommendationId) => {
     try {
-      await mutation.mutateAsync({ url: `/recommendations/${recommendationId}/convert`, method: 'post' });
+      await mutation.mutateAsync({ url: `/api/recommendations/${recommendationId}/convert`, method: 'post' });
     } catch (error) {
       // Handled via mutation state.
     }

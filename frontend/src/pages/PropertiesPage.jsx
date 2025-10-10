@@ -190,15 +190,15 @@ export default function PropertiesPage() {
   }, [searchTerm, filterType]);
 
   const handleAddProperty = () => {
-    navigate('/properties/add');
+    navigate('/api/properties/add');
   };
 
   const handleViewProperty = (propertyId) => {
-    navigate(`/properties/${propertyId}`);
+    navigate(`/api/properties/${propertyId}`);
   };
 
   const handleEditProperty = (propertyId) => {
-    navigate(`/properties/${propertyId}/edit`);
+    navigate(`/api/properties/${propertyId}/edit`);
   };
 
   const propertyTypes = ['all', ...new Set(mockProperties.map(p => p.type.toLowerCase()))];

@@ -7,7 +7,14 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://agentfm-ba
 export async function api(endpoint, options = {}) {
   const { json, ...fetchOptions } = options;
   
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  // Build URL with proper /api prefix
+  let url = endpoint;
+  if (!endpoint.startsWith('http')) {
+    const path = endpoint.startsWith('/api') 
+      ? endpoint 
+      : `/api${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    url = `${API_BASE}${path}`;
+  }
   
   const headers = {
     'Content-Type': 'application/json',
@@ -109,3 +116,5 @@ export function logout() {
 export function getAuthToken() {
   return localStorage.getItem('auth_token') || localStorage.getItem('token');
 }
+
+
