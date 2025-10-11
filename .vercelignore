@@ -1,0 +1,26 @@
+# Ignore backend directory (deployed separately)
+backend/
+
+# Ignore development files
+*.pid
+*.log
+
+# Ignore documentation (keep README.md)
+BUG_FIX_REPORT.md
+DEPLOYMENT_READY.md
+FRONTEND_BUILD_FIX.md
+VERCEL_CONFIG.md
+FINAL_SUMMARY.md
+
+# Ignore test files in backend only
+backend/test/
+
+# Ignore CI/CD files
+.github/
+.devcontainer/
+
+# Ignore other config files
+render.yaml
+verify-build.sh
+package.json.bak
+yarn.lock
