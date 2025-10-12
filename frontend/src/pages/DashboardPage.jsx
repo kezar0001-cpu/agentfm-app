@@ -3,7 +3,7 @@ import { Box, Grid, Paper, Typography, Stack, Button, Alert } from '@mui/materia
 import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery.js';
 import DataState from '../components/DataState.jsx';
-import { saveTokenFromUrl } from '../auth.js'; // ← NEW: reads ?token=... and stores it
+import { saveTokenFromUrl } from '../lib/auth.js'; // ← NEW: reads ?token=... and stores it
 
 const CARD_SX = {
   p: 3,
