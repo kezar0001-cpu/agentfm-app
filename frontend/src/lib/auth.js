@@ -122,12 +122,25 @@ export function getCurrentUser() {
 /**
  * Logout user
  */
-export function logout() {
+export async function logout() {
+  // Best-effort: clear the server-side passport session cookie
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',   // IMPORTANT so the cookie is sent
+    });
+  } catch (e) {
+    // ignore — we still clear client state below
+    console.warn('Server logout failed (continuing):', e);
+  }
+
+  // Always clear client auth state
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
-  localStorage.removeItem('token'); // Old token key for compatibility
+  localStorage.removeItem('token'); // legacy key
   sessionStorage.clear();
 }
+
 
 /**
  * Get auth token
