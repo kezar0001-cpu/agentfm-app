@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useTranslation } from 'react-i18next';
+import { useEffect } from 'react';
 import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
@@ -34,10 +35,18 @@ const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
 
+  // Existing subscriptions list (in-memory demo store)
   const query = useApiQuery({
     queryKey: ['subscriptions'],
     url: '/api/subscriptions',
   });
+
+  // NEW: Source of truth for user's subscription status (updated by Stripe webhook)
+  const meQuery = useApiQuery({
+    queryKey: ['me'],
+    url: '/api/auth/me',
+  });
+
   const mutation = useApiMutation({
     url: '/api/subscriptions/:id',
     method: 'patch',
@@ -50,9 +59,12 @@ export default function SubscriptionsPage() {
   });
 
   const subscriptions = normaliseArray(query.data);
-  const hasActiveSubscription = subscriptions.some(
-    (sub) => sub.status === 'active'
-  );
+
+  // Decide ACTIVE primarily from /api/auth/me; fall back to in-memory list
+  const userStatus = meQuery.data?.user?.subscriptionStatus;
+  const hasActiveSubscription =
+    userStatus === 'ACTIVE' ||
+    subscriptions.some((sub) => sub.status === 'active');
 
   const handleStatusChange = async (subscriptionId, status) => {
     await mutation.mutateAsync({
@@ -65,6 +77,15 @@ export default function SubscriptionsPage() {
   const params = new URLSearchParams(window.location.search);
   const showSuccess = params.get('success') === '1';
   const showCanceled = params.get('canceled') === '1';
+
+  // After successful Stripe checkout, refresh data so the page reflects ACTIVE immediately
+  useEffect(() => {
+    if (showSuccess) {
+      meQuery.refetch?.();
+      query.refetch?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccess]);
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
@@ -80,7 +101,7 @@ export default function SubscriptionsPage() {
       } else {
         throw new Error('No checkout URL returned');
       }
-    } catch (_) {
+    } catch {
       // error shown via checkoutMutation.error
     }
   };
@@ -254,9 +275,9 @@ export default function SubscriptionsPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600 }}>ID</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Plan</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{t('subscriptions.plan')}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{t('subscriptions.status')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -335,5 +356,3 @@ export default function SubscriptionsPage() {
     </Box>
   );
 }
-
-
