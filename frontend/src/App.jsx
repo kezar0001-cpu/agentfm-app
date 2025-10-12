@@ -1,7 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/DashboardPage";
@@ -15,10 +14,9 @@ import RecommendationsPage from "./pages/RecommendationsPage";
 import ReportsPage from "./pages/ReportsPage";
 import ServiceRequestsPage from "./pages/ServiceRequestsPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
-
 import AuthGate from "./authGate";
 import Layout from "./components/Layout";
-import GlobalGuard from "./components/GlobalGuard.jsx";
+import GlobalGuard from './components/GlobalGuard.jsx';
 
 // Simple error boundary
 class ErrorBoundary extends React.Component {
@@ -26,15 +24,10 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false };
   }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
+  static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error, errorInfo) {
     console.error('App Error:', error, errorInfo);
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -65,22 +58,21 @@ function NotFound() {
   );
 }
 
-function App() {
+export default function App() {
   useEffect(() => {
     console.log('App mounted successfully');
-
     const errorHandler = (event) => {
       console.error('Global error:', event.error);
     };
-
     window.addEventListener('error', errorHandler);
     return () => window.removeEventListener('error', errorHandler);
   }, []);
 
+  // Single return; your routes unchanged
   return (
-    <BrowserRouter>
-      <GlobalGuard />
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <GlobalGuard />
         <Routes>
           {/* Public routes */}
           <Route path="/signin" element={<SignIn />} />
@@ -103,9 +95,7 @@ function App() {
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </ErrorBoundary>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
-
-export default App;
