@@ -1,17 +1,10 @@
 ﻿import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  Button,
-  Box
-} from '@mui/material';
+import LogoutButton from './LogoutButton';
+import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 
 function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
-
-  console.log('NavBar is rendering - current path:', location.pathname);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -25,15 +18,6 @@ function NavBar() {
     { name: 'Subscriptions', href: '/subscriptions' },
   ];
 
-  const navigate = useNavigate();
-const handleLogout = async () => {
-  try {
-    await logout(); // clear client session/token (and server if you add a call there)
-  } finally {
-    navigate('/signin', { replace: true });
-  }
-};
-
   const handleNavigation = (path) => {
     navigate(path);
   };
@@ -41,19 +25,14 @@ const handleLogout = async () => {
   return (
     <AppBar position="static" sx={{ backgroundColor: 'white', color: 'black', boxShadow: 2 }}>
       <Toolbar>
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            flexGrow: 0, 
-            mr: 4, 
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
+        <Typography
+          variant="h6"
+          sx={{ flexGrow: 0, mr: 4, fontWeight: 'bold', cursor: 'pointer' }}
           onClick={() => navigate('/dashboard')}
         >
           AgentFM
         </Typography>
-        
+
         <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
           {navigation.map((item) => (
             <Button
@@ -67,7 +46,7 @@ const handleLogout = async () => {
                 borderBottom: location.pathname === item.href ? '2px solid #1976d2' : 'none',
                 borderRadius: 0,
                 minWidth: 'auto',
-                px: 2
+                px: 2,
               }}
             >
               {item.name}
@@ -75,15 +54,7 @@ const handleLogout = async () => {
           ))}
         </Box>
 
-        <Button 
-          variant="outlined" 
-          color="error"
-          onClick={handleLogout}
-          size="small"
-          sx={{ textTransform: 'none' }}
-        >
-          Logout
-        </Button>
+        <LogoutButton variant="outlined" color="error" size="small" sx={{ textTransform: 'none' }} />
       </Toolbar>
     </AppBar>
   );
