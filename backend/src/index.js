@@ -25,7 +25,7 @@ app.set('trust proxy', 1);
 // ---- CORS
 const allowlist = new Set(
   (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
-    .map(s => s && s.trim())
+    .map((s) => s && s.trim())
     .filter(Boolean)
 );
 if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
@@ -38,11 +38,11 @@ if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
   'https://agentfm.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
-].forEach(o => allowlist.add(o));
+].forEach((o) => allowlist.add(o));
 
 const corsOptions = {
   origin(origin, cb) {
-    if (!origin) return cb(null, true);          // tools like curl/Postman
+    if (!origin) return cb(null, true); // tools like curl/Postman
     if (allowlist.has(origin)) return cb(null, true);
     return cb(new Error(`CORS blocked for origin: ${origin}`));
   },
@@ -53,8 +53,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ---- Session (needed for Passport OAuth; JWT is used for API auth)
@@ -79,7 +77,7 @@ app.use(passport.session());
 
 // ---- Routes (single import block, no duplicates)
 import authRoutes from './routes/auth.js';
-import billingRoutes from './routes/billing.js';
+import billingRoutes, { webhook as stripeWebhook } from './routes/billing.js';
 import propertiesRoutes from './routes/properties.js';
 import tenantsRoutes from './routes/tenants.js';
 import maintenanceRoutes from './routes/maintenance.js';
@@ -93,6 +91,13 @@ import recommendationsRoutes from './routes/recommendations.js';
 import plansRoutes from './routes/plans.js';
 import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
+
+// ---- Stripe webhook MUST be before express.json so the raw body is available
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
+
+// ---- Body parsers (after webhook)
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // ---- Mount (after session/passport)
 app.use('/api/auth', authRoutes);
@@ -167,11 +172,19 @@ app.use((err, _req, res, _next) => {
 // ---- Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 SIGINT received. Shutting down gracefully…');
-  try { await prisma.$disconnect(); } finally { process.exit(0); }
+  try {
+    await prisma.$disconnect();
+  } finally {
+    process.exit(0);
+  }
 });
 process.on('SIGTERM', async () => {
   console.log('\n🛑 SIGTERM received. Shutting down gracefully…');
-  try { await prisma.$disconnect(); } finally { process.exit(0); }
+  try {
+    await prisma.$disconnect();
+  } finally {
+    process.exit(0);
+  }
 });
 
 // ---- Start
