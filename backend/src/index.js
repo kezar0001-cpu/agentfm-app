@@ -7,22 +7,22 @@ import session from 'express-session';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 
-// Load env
+// ---- Load env
 dotenv.config();
 
-// Prisma (exported so other modules can import { prisma } from '../index.js')
+// ---- Prisma (exported so other modules can `import { prisma }`)
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
 });
 
-// App
+// ---- App
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);
 
-// ===== CORS =====
+// ---- CORS
 const allowlist = new Set(
   (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
     .map(s => s && s.trim())
@@ -30,7 +30,7 @@ const allowlist = new Set(
 );
 if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
 
-// Sensible defaults (prod + dev)
+// sensible defaults
 [
   'https://www.buildstate.com.au',
   'https://buildstate.com.au',
@@ -42,8 +42,7 @@ if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
 
 const corsOptions = {
   origin(origin, cb) {
-    // Allow non-browser tools (no Origin header) and any origin in allowlist
-    if (!origin) return cb(null, true);
+    if (!origin) return cb(null, true);          // tools like curl/Postman
     if (allowlist.has(origin)) return cb(null, true);
     return cb(new Error(`CORS blocked for origin: ${origin}`));
   },
@@ -58,7 +57,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ===== Session (needed for Passport OAuth; JWT is used for API auth) =====
+// ---- Session (needed for Passport OAuth; JWT is used for API auth)
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'replace-this-session-secret',
@@ -73,13 +72,14 @@ app.use(
   })
 );
 
-// ===== Passport =====
+// ---- Passport
 import './config/passport.js'; // registers Google strategy (uses env + prisma)
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ===== Routes (static imports — no top-level await) =====
+// ---- Routes (single import block, no duplicates)
 import authRoutes from './routes/auth.js';
+import billingRoutes from './routes/billing.js';
 import propertiesRoutes from './routes/properties.js';
 import tenantsRoutes from './routes/tenants.js';
 import maintenanceRoutes from './routes/maintenance.js';
@@ -94,8 +94,9 @@ import plansRoutes from './routes/plans.js';
 import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
 
-// Mount
+// ---- Mount (after session/passport)
 app.use('/api/auth', authRoutes);
+app.use('/api/billing', billingRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/tenants', tenantsRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
@@ -110,7 +111,7 @@ app.use('/api/plans', plansRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/serviceRequests', serviceRequestsRoutes);
 
-// ===== Health =====
+// ---- Health
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -132,7 +133,7 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-// ===== Root =====
+// ---- Root
 app.get('/', (_req, res) => {
   res.json({
     message: 'AgentFM API Server',
@@ -148,12 +149,12 @@ app.get('/', (_req, res) => {
   });
 });
 
-// ===== 404 =====
+// ---- 404
 app.use('*', (req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-// ===== Error handler =====
+// ---- Error handler
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
   res.status(err.status || 500).json({
@@ -163,7 +164,7 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// ===== Graceful shutdown =====
+// ---- Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 SIGINT received. Shutting down gracefully…');
   try { await prisma.$disconnect(); } finally { process.exit(0); }
@@ -173,7 +174,7 @@ process.on('SIGTERM', async () => {
   try { await prisma.$disconnect(); } finally { process.exit(0); }
 });
 
-// ===== Start =====
+// ---- Start
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
