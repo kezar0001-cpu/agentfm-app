@@ -1,6 +1,5 @@
 ﻿import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-import { logout } from '../lib/auth';
   AppBar, 
   Toolbar, 
   Typography, 
