@@ -7,23 +7,22 @@ import session from 'express-session';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 
-// Load environment variables
+// Load env
 dotenv.config();
 
-// ===== Prisma (exported so other modules can import { prisma } from '../index.js') =====
+// Prisma (exported so other modules can import { prisma } from '../index.js')
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
 });
 
-// ===== App bootstrap =====
+// App
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust Render/Proxy for correct secure cookies & redirects
+// Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);
 
 // ===== CORS =====
-// Build a robust allowlist from env plus sensible defaults
 const allowlist = new Set(
   (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
     .map(s => s && s.trim())
@@ -31,20 +30,22 @@ const allowlist = new Set(
 );
 if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
 
-// Common defaults (prod + dev)
+// Sensible defaults (prod + dev)
 [
   'https://www.buildstate.com.au',
   'https://buildstate.com.au',
-  'https://agentfm.vercel.app',      // include if you use Vercel
+  'https://api.buildstate.com.au',
+  'https://agentfm.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
 ].forEach(o => allowlist.add(o));
 
 const corsOptions = {
   origin(origin, cb) {
-    // Allow non-browser tools (curl/Postman) with no Origin header
+    // Allow non-browser tools (no Origin header) and any origin in allowlist
     if (!origin) return cb(null, true);
-    return cb(null, allowlist.has(origin));
+    if (allowlist.has(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -57,14 +58,14 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ===== Session (needed only for Passport OAuth state/callback; JWT used after) =====
+// ===== Session (needed for Passport OAuth; JWT is used for API auth) =====
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'replace-this-session-secret',
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production', // set Secure in prod
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -73,41 +74,41 @@ app.use(
 );
 
 // ===== Passport =====
-import './config/passport.js';      // registers Google strategy (uses env + prisma)
+import './config/passport.js'; // registers Google strategy (uses env + prisma)
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ===== Routes =====
+// ===== Routes (static imports — no top-level await) =====
 import authRoutes from './routes/auth.js';
-// Only import the routes you have; wrap optional ones so missing files don’t crash:
-let propertiesRoutes, tenantsRoutes, maintenanceRoutes, unitsRoutes, jobsRoutes, inspectionsRoutes, subscriptionsRoutes, uploadsRoutes, reportsRoutes, recommendationsRoutes, plansRoutes, dashboardRoutes;
-try { propertiesRoutes = (await import('./routes/properties.js')).default; } catch {}
-try { tenantsRoutes = (await import('./routes/tenants.js')).default; } catch {}
-try { maintenanceRoutes = (await import('./routes/maintenance.js')).default; } catch {}
-try { unitsRoutes = (await import('./routes/units.js')).default; } catch {}
-try { jobsRoutes = (await import('./routes/jobs.js')).default; } catch {}
-try { inspectionsRoutes = (await import('./routes/inspections.js')).default; } catch {}
-try { subscriptionsRoutes = (await import('./routes/subscriptions.js')).default; } catch {}
-try { uploadsRoutes = (await import('./routes/uploads.js')).default; } catch {}
-try { reportsRoutes = (await import('./routes/reports.js')).default; } catch {}
-try { recommendationsRoutes = (await import('./routes/recommendations.js')).default; } catch {}
-try { plansRoutes = (await import('./routes/plans.js')).default; } catch {}
-try { dashboardRoutes = (await import('./routes/dashboard.js')).default; } catch {}
+import propertiesRoutes from './routes/properties.js';
+import tenantsRoutes from './routes/tenants.js';
+import maintenanceRoutes from './routes/maintenance.js';
+import unitsRoutes from './routes/units.js';
+import jobsRoutes from './routes/jobs.js';
+import inspectionsRoutes from './routes/inspections.js';
+import subscriptionsRoutes from './routes/subscriptions.js';
+import uploadsRoutes from './routes/uploads.js';
+import reportsRoutes from './routes/reports.js';
+import recommendationsRoutes from './routes/recommendations.js';
+import plansRoutes from './routes/plans.js';
+import dashboardRoutes from './routes/dashboard.js';
+import serviceRequestsRoutes from './routes/serviceRequests.js';
 
 // Mount
 app.use('/api/auth', authRoutes);
-if (propertiesRoutes) app.use('/api/properties', propertiesRoutes);
-if (tenantsRoutes) app.use('/api/tenants', tenantsRoutes);
-if (maintenanceRoutes) app.use('/api/maintenance', maintenanceRoutes);
-if (unitsRoutes) app.use('/api/units', unitsRoutes);
-if (jobsRoutes) app.use('/api/jobs', jobsRoutes);
-if (inspectionsRoutes) app.use('/api/inspections', inspectionsRoutes);
-if (subscriptionsRoutes) app.use('/api/subscriptions', subscriptionsRoutes);
-if (uploadsRoutes) app.use('/api/uploads', uploadsRoutes);
-if (reportsRoutes) app.use('/api/reports', reportsRoutes);
-if (recommendationsRoutes) app.use('/api/recommendations', recommendationsRoutes);
-if (plansRoutes) app.use('/api/plans', plansRoutes);
-if (dashboardRoutes) app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/properties', propertiesRoutes);
+app.use('/api/tenants', tenantsRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/units', unitsRoutes);
+app.use('/api/jobs', jobsRoutes);
+app.use('/api/inspections', inspectionsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
+app.use('/api/uploads', uploadsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/recommendations', recommendationsRoutes);
+app.use('/api/plans', plansRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/serviceRequests', serviceRequestsRoutes);
 
 // ===== Health =====
 app.get('/health', async (_req, res) => {
