@@ -326,11 +326,11 @@ router.get('/google/callback',
         TENANT: '/tenant/dashboard'
       };
 
-      const redirectPath = dashboardRoutes[user.role] || '/dashboard';
+      const nextPath = dashboardRoutes[user.role] || '/dashboard';
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
       // Redirect to frontend with token
-      res.redirect(`${frontendUrl}${redirectPath}?token=${token}`);
+      res.redirect(`${frontendUrl}/signin?token=${token}&next=${encodeURIComponent(nextPath)}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';

@@ -55,35 +55,54 @@ export async function api(endpoint, options = {}) {
 /**
  * Save token from URL (for OAuth redirects)
  */
-export function saveTokenFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  const user = params.get('user');
-  
-  if (token) {
+export function saveTokenFromUrl(autoRedirect = true) {
+  try {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+    const next = url.searchParams.get('next') || '/dashboard';
+    const userParam = url.searchParams.get('user');
+
+    if (!token) return false;
+
+    // persist token
     localStorage.setItem('auth_token', token);
-    if (user) {
-      try {
-        localStorage.setItem('user', decodeURIComponent(user));
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-      }
+    localStorage.setItem('token', token); // keep old key for compatibility
+
+    // if backend ever sends a user payload, store it
+    if (userParam) {
+      try { localStorage.setItem('user', decodeURIComponent(userParam)); } catch {}
+    } else if (!localStorage.getItem('user')) {
+      // best-effort: populate user in background so pages that read localStorage still work
+      fetch(`${API_BASE}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (data?.user) localStorage.setItem('user', JSON.stringify(data.user));
+        })
+        .catch(() => {});
     }
-    // Clean URL
-    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // clean URL (remove token/next/user from the bar)
+    url.searchParams.delete('token');
+    url.searchParams.delete('next');
+    url.searchParams.delete('user');
+    const cleaned = `${url.pathname}${url.search ? `?${url.searchParams.toString()}` : ''}${url.hash || ''}`;
+    window.history.replaceState({}, '', cleaned);
+
+    if (autoRedirect) window.location.replace(next);
     return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
-/**
- * Check if user is authenticated
- */
 export function isAuthenticated() {
-  const token = localStorage.getItem('auth_token');
-  const user = localStorage.getItem('user');
-  return !!(token && user);
+  // minimal change: token alone is enough; we fetch /me to fill user later
+  return !!getAuthToken();
 }
+
 
 /**
  * Get current user data
