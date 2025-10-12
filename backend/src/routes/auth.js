@@ -357,35 +357,31 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { 
-        org: true,
-        propertyManagerProfile: true,
-        ownerProfile: true,
-        technicianProfile: true,
-        tenantProfile: true
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        phone: true,
-        company: true,
-        emailVerified: true,
-        subscriptionPlan: true,
-        subscriptionStatus: true,
-        trialEndDate: true,
-        orgId: true,
-        org: true,
-        propertyManagerProfile: true,
-        ownerProfile: true,
-        technicianProfile: true,
-        tenantProfile: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    });
+  where: { id: decoded.id },
+  select: {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+    phone: true,
+    company: true,
+    emailVerified: true,
+    subscriptionPlan: true,
+    subscriptionStatus: true,
+    trialEndDate: true,
+    orgId: true,
+
+    // relations (true returns the whole related record)
+    org: true,
+    propertyManagerProfile: true,
+    ownerProfile: true,
+    technicianProfile: true,
+    tenantProfile: true,
+
+    createdAt: true,
+    updatedAt: true,
+  },
+});
 
     if (!user) {
       return res.status(404).json({
