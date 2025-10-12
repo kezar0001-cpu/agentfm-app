@@ -1,57 +1,71 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import useApiQuery from '../hooks/useApiQuery.js';
-import { getAuthToken, saveTokenFromUrl, logout } from '../lib/auth';
+import { API_BASE, getAuthToken } from '../lib/auth.js';
 
-const OPEN_ROUTES = new Set(['/signin', '/signup', '/forgot-password']);
+/**
+ * Minimal global guard:
+ * - Skips public routes
+ * - If no token -> do nothing (AuthGate handles redirect to /signin)
+ * - Refreshes /api/auth/me to get latest subscriptionStatus
+ * - Redirects to /subscriptions when inactive; to /dashboard when active & stuck on /subscriptions
+ */
+const PUBLIC_PATHS = new Set(['/signin', '/signup']);
+const SUBS_PATH = '/subscriptions';
+const DASHBOARD_PATH = '/dashboard';
 
 export default function GlobalGuard() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const inFlight = useRef(false);
 
-  // capture ?token=... if present, but don't redirect here
-  useEffect(() => { saveTokenFromUrl(false); }, []);
-
-  const token = getAuthToken();
-
-  // if no token and not on an open route, send to /signin with next=
   useEffect(() => {
-    if (!token && !OPEN_ROUTES.has(location.pathname)) {
-      const q = new URLSearchParams();
-      q.set('next', location.pathname + location.search);
-      navigate(`/signin?${q.toString()}`, { replace: true });
+    const path = location.pathname;
+    const token = getAuthToken();
+
+    // Never interfere on public routes
+    if (PUBLIC_PATHS.has(path)) return;
+
+    // If logged out, let AuthGate do its job
+    if (!token) return;
+
+    // Quick local check to reduce flicker
+    const userStr = localStorage.getItem('user');
+    let activeLocal = false;
+    try {
+      const u = userStr ? JSON.parse(userStr) : null;
+      activeLocal = u?.subscriptionStatus === 'ACTIVE';
+    } catch {}
+
+    if (activeLocal && path === SUBS_PATH) {
+      navigate(DASHBOARD_PATH, { replace: true });
+      return;
     }
-  }, [token, location, navigate]);
 
-  const skipChecks = !token || OPEN_ROUTES.has(location.pathname);
+    // Avoid repeated fetches while a check is already running
+    if (inFlight.current) return;
+    inFlight.current = true;
 
-  // validate token + get user (source of truth)
-  const meQuery = useApiQuery({
-    queryKey: ['me'],
-    url: '/api/auth/me',
-    enabled: !skipChecks,
-    retry: false,
-  });
+    fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const u = data?.user;
+        if (u) localStorage.setItem('user', JSON.stringify(u));
 
-  // invalid/expired token → log out → /signin
-  useEffect(() => {
-    if (!skipChecks && meQuery.isError) {
-      logout();
-      navigate('/signin', { replace: true });
-    }
-  }, [skipChecks, meQuery.isError, navigate]);
+        const active = u?.subscriptionStatus === 'ACTIVE';
+        if (!active && path !== SUBS_PATH) {
+          navigate(SUBS_PATH, { replace: true });
+        } else if (active && path === SUBS_PATH) {
+          navigate(DASHBOARD_PATH, { replace: true });
+        }
+      })
+      .finally(() => {
+        inFlight.current = false;
+      });
+  // re-check on location change
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // gate PROPERTY_MANAGER without ACTIVE sub → /subscriptions
-  useEffect(() => {
-    const u = meQuery.data?.user;
-    if (!u) return;
-    if (u.role === 'PROPERTY_MANAGER') {
-      const status = u.subscriptionStatus;
-      if (status !== 'ACTIVE' && location.pathname !== '/subscriptions') {
-        navigate('/subscriptions', { replace: true });
-      }
-    }
-  }, [meQuery.data, location.pathname, navigate]);
-
-  return null; // no UI, just guards
+  return null;
 }
