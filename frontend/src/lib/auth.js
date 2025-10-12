@@ -52,6 +52,18 @@ export async function api(endpoint, options = {}) {
   }
 }
 
+// Map a role to its portal base path
+export function portalPathForRole(role) {
+  switch (role) {
+    case 'ADMIN':             return '/admin/dashboard';
+    case 'PROPERTY_MANAGER':  return '/dashboard';
+    case 'OWNER':             return '/owner/dashboard';
+    case 'TECHNICIAN':        return '/tech/dashboard';
+    case 'TENANT':            return '/tenant/dashboard';
+    default:                  return '/dashboard';
+  }
+}
+
 /**
  * Save token from URL (for OAuth redirects)
  */
@@ -79,7 +91,16 @@ export function saveTokenFromUrl(autoRedirect = true) {
       })
         .then(r => (r.ok ? r.json() : null))
         .then(data => {
-          if (data?.user) localStorage.setItem('user', JSON.stringify(data.user));
+          if (data?.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            // NEW: if we’re on the wrong portal after the first redirect, correct it
+            const target = portalPathForRole(data.user.role);
+            const here = window.location.pathname;
+            if (autoRedirect && !here.startsWith(target)) {
+              window.location.replace(target);
+            }
+          }
         })
         .catch(() => {});
     }
@@ -91,6 +112,7 @@ export function saveTokenFromUrl(autoRedirect = true) {
     const cleaned = `${url.pathname}${url.search ? `?${url.searchParams.toString()}` : ''}${url.hash || ''}`;
     window.history.replaceState({}, '', cleaned);
 
+    // keep your immediate redirect behaviour
     if (autoRedirect) window.location.replace(next);
     return true;
   } catch {
@@ -98,8 +120,8 @@ export function saveTokenFromUrl(autoRedirect = true) {
   }
 }
 
+// keep your minimal token-only auth check
 export function isAuthenticated() {
-  // minimal change: token alone is enough; we fetch /me to fill user later
   return !!getAuthToken();
 }
 
