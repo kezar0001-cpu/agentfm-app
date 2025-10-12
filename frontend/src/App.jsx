@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/DashboardPage";
@@ -68,34 +68,31 @@ export default function App() {
     return () => window.removeEventListener('error', errorHandler);
   }, []);
 
-  // Single return; your routes unchanged
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <GlobalGuard />
-        <Routes>
-          {/* Public routes */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+      <GlobalGuard />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
 
-          {/* Protected routes */}
-          <Route path="/" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
-          <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
-          <Route path="/properties" element={<AuthGate><Layout><PropertiesPage /></Layout></AuthGate>} />
-          <Route path="/properties/add" element={<AuthGate><Layout><AddPropertyPage /></Layout></AuthGate>} />
-          <Route path="/properties/:id" element={<AuthGate><Layout><PropertyDetailPage /></Layout></AuthGate>} />
-          <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
-          <Route path="/jobs" element={<AuthGate><Layout><JobsPage /></Layout></AuthGate>} />
-          <Route path="/plans" element={<AuthGate><Layout><PlansPage /></Layout></AuthGate>} />
-          <Route path="/service-requests" element={<AuthGate><Layout><ServiceRequestsPage /></Layout></AuthGate>} />
-          <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
-          <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
-          <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+        {/* Protected routes */}
+        <Route path="/" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
+        <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
+        <Route path="/properties" element={<AuthGate><Layout><PropertiesPage /></Layout></AuthGate>} />
+        <Route path="/properties/add" element={<AuthGate><Layout><AddPropertyPage /></Layout></AuthGate>} />
+        <Route path="/properties/:id" element={<AuthGate><Layout><PropertyDetailPage /></Layout></AuthGate>} />
+        <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
+        <Route path="/jobs" element={<AuthGate><Layout><JobsPage /></Layout></AuthGate>} />
+        <Route path="/plans" element={<AuthGate><Layout><PlansPage /></Layout></AuthGate>} />
+        <Route path="/service-requests" element={<AuthGate><Layout><ServiceRequestsPage /></Layout></AuthGate>} />
+        <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
+        <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
+        <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </ErrorBoundary>
   );
 }
