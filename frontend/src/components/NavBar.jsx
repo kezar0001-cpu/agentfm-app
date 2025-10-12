@@ -1,5 +1,6 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+﻿import { useNavigate, useLocation } from 'react-router-dom';
 import { 
+import { logout } from '../lib/auth';
   AppBar, 
   Toolbar, 
   Typography, 
@@ -25,16 +26,14 @@ function NavBar() {
     { name: 'Subscriptions', href: '/subscriptions' },
   ];
 
-  const handleLogout = () => {
-    console.log('Logout clicked');
-    // Clear authentication data
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('token');
-    
-    // Redirect to signin
-    navigate('/signin');
-  };
+  const navigate = useNavigate();
+const handleLogout = async () => {
+  try {
+    await logout(); // clear client session/token (and server if you add a call there)
+  } finally {
+    navigate('/signin', { replace: true });
+  }
+};
 
   const handleNavigation = (path) => {
     navigate(path);
