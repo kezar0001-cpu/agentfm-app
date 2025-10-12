@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Box, Grid, Paper, Typography, Stack, Button, Alert } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery.js';
 import DataState from '../components/DataState.jsx';
+import { saveTokenFromUrl } from '../auth.js'; // ← NEW: reads ?token=... and stores it
 
 const CARD_SX = {
   p: 3,
@@ -17,6 +18,12 @@ const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+
+  // NEW: on first render, capture token from URL and clean the URL
+  useEffect(() => {
+    saveTokenFromUrl();
+  }, []);
+
   const query = useApiQuery({
     queryKey: ['dashboard', 'summary'],
     url: '/api/dashboard/summary',
