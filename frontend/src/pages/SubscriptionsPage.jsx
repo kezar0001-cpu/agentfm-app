@@ -29,6 +29,7 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
+import { API_BASE, getAuthToken } from '../lib/auth.js';
 
 const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 
@@ -41,10 +42,16 @@ export default function SubscriptionsPage() {
     url: '/api/subscriptions',
   });
 
-  // NEW: Source of truth for user's subscription status (updated by Stripe webhook)
+  // Source of truth for user's subscription status
   const meQuery = useApiQuery({
     queryKey: ['me'],
     url: '/api/auth/me',
+  });
+
+  // Fallback confirmation if webhook hasn’t updated DB yet
+  const confirmMutation = useApiMutation({
+    url: '/api/billing/confirm',
+    method: 'post',
   });
 
   const mutation = useApiMutation({
@@ -77,8 +84,9 @@ export default function SubscriptionsPage() {
   const params = new URLSearchParams(window.location.search);
   const showSuccess = params.get('success') === '1';
   const showCanceled = params.get('canceled') === '1';
+  const sessionId = params.get('session_id');
 
-  // After successful Stripe checkout, refresh data so the page reflects ACTIVE immediately
+  // After successful Stripe checkout, refetch data
   useEffect(() => {
     if (showSuccess) {
       meQuery.refetch?.();
@@ -86,6 +94,38 @@ export default function SubscriptionsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSuccess]);
+
+  // Fallback: confirm the session on return (if webhook lagged/missed)
+  useEffect(() => {
+    if (!showSuccess || !sessionId) return;
+
+    (async () => {
+      try {
+        await confirmMutation.mutateAsync({ data: { sessionId } });
+
+        // Refresh /me and also update localStorage so guards see ACTIVE
+        const token = getAuthToken();
+        if (token) {
+          const r = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          });
+          const data = r.ok ? await r.json() : null;
+          if (data?.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+          }
+        }
+
+        // Clean the URL: keep success banner, remove session_id
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete('session_id');
+        window.history.replaceState({}, '', clean.pathname + (clean.search ? `?${clean.searchParams.toString()}` : ''));
+      } catch {
+        // Any error will be reflected by confirmMutation.isError if you want to show it
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccess, sessionId]);
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
