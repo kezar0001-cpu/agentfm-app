@@ -6,6 +6,19 @@ import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
 import { API_BASE } from '../lib/auth';
 
+const buildImageUrl = (value, fallbackText, size = '600x320') => {
+  const placeholder = `https://via.placeholder.com/${size}?text=${encodeURIComponent(fallbackText || 'Property')}`;
+  if (!value) return placeholder;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
+    return value;
+  }
+  if (/^\d+x\d+\?text=/i.test(value)) {
+    return `https://via.placeholder.com/${value}`;
+  }
+  const normalised = value.startsWith('/') ? value : `/${value}`;
+  return `${API_BASE}${normalised}`;
+};
+
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,11 +44,11 @@ export default function PropertyDetailPage() {
       <DataState isLoading={isLoading} isError={isError} error={error} onRetry={refetch}>
         {property && (
           <Card>
-            {property.coverImage && (
+            {(property.coverImage || property.images?.length) && (
               <CardMedia
                 component="img"
                 height="300"
-                image={`${API_BASE}${property.coverImage}`}
+                image={buildImageUrl(property.coverImage || property.images?.[0], property.name, '800x360')}
                 alt={property.name}
               />
             )}

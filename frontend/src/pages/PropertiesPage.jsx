@@ -32,9 +32,23 @@ const PropertyCard = ({ property, onView, onEdit }) => {
     setCurrentImage(index);
   };
 
+  const placeholderImage = `https://via.placeholder.com/300x140?text=${encodeURIComponent(property.name)}`;
+
+  const resolveImageUrl = (value) => {
+    if (!value) return placeholderImage;
+    if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
+      return value;
+    }
+    if (/^\d+x\d+\?text=/i.test(value)) {
+      return `https://via.placeholder.com/${value}`;
+    }
+    const normalised = value.startsWith('/') ? value : `/${value}`;
+    return `${API_BASE}${normalised}`;
+  };
+
   const imageUrl = images.length > 0
-    ? `${API_BASE}${images[currentImage]}`
-    : `https://via.placeholder.com/300x140?text=${encodeURIComponent(property.name)}`;
+    ? resolveImageUrl(images[currentImage])
+    : placeholderImage;
 
   return (
     <Card
