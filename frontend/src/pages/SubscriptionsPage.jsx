@@ -3,13 +3,6 @@ import {
   Box,
   Typography,
   Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Select,
-  MenuItem,
   Stack,
   Button,
   Card,
@@ -28,104 +21,55 @@ import { useEffect } from 'react';
 import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
-import { normaliseArray } from '../utils/error.js';
-import { API_BASE, getAuthToken } from '../lib/auth.js';
-
-const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
 
-  // Existing subscriptions list (in-memory demo store)
-  const query = useApiQuery({
-    queryKey: ['subscriptions'],
-    url: '/api/subscriptions',
-  });
-
-  // Source of truth for user's subscription status
+  // This query is the single source of truth for the user's subscription status
   const meQuery = useApiQuery({
     queryKey: ['me'],
     url: '/api/auth/me',
   });
 
-  // Fallback confirmation if webhook hasn’t updated DB yet
+  // This mutation confirms the Stripe session if the webhook is delayed
   const confirmMutation = useApiMutation({
     url: '/api/billing/confirm',
     method: 'post',
+    onSuccess: () => {
+      // After a successful confirmation, refetch the user's data
+      // to get the 'ACTIVE' subscription status.
+      meQuery.refetch();
+    },
   });
 
-  const mutation = useApiMutation({
-    url: '/api/subscriptions/:id',
-    method: 'patch',
-    invalidateKeys: [['subscriptions']],
-  });
-
+  // This mutation initiates the Stripe checkout process
   const checkoutMutation = useApiMutation({
     url: '/api/billing/checkout',
     method: 'post',
   });
 
-  const subscriptions = normaliseArray(query.data);
+  // Determine if the user has an active subscription from the /api/auth/me endpoint
+  const hasActiveSubscription = meQuery.data?.user?.subscriptionStatus === 'ACTIVE';
 
-  // Decide ACTIVE primarily from /api/auth/me; fall back to in-memory list
-  const userStatus = meQuery.data?.user?.subscriptionStatus;
-  const hasActiveSubscription =
-    userStatus === 'ACTIVE' ||
-    subscriptions.some((sub) => sub.status === 'active');
-
-  const handleStatusChange = async (subscriptionId, status) => {
-    await mutation.mutateAsync({
-      url: `/api/subscriptions/${subscriptionId}`,
-      method: 'patch',
-      data: { status },
-    });
-  };
-
-  const params = new URLSearchParams(window.location.search);
-  const showSuccess = params.get('success') === '1';
-  const showCanceled = params.get('canceled') === '1';
-  const sessionId = params.get('session_id');
-
-  // After successful Stripe checkout, refetch data
+  // This effect runs when the user is redirected back from Stripe
   useEffect(() => {
-    if (showSuccess) {
-      meQuery.refetch?.();
-      query.refetch?.();
+    const params = new URLSearchParams(window.location.search);
+    const showSuccess = params.get('success') === '1';
+    const sessionId = params.get('session_id');
+
+    // If the redirect includes a session_id, confirm it with the backend
+    if (showSuccess && sessionId) {
+      // The onSuccess callback in confirmMutation will trigger a refetch of meQuery
+      confirmMutation.mutateAsync({ data: { sessionId } });
+
+      // Clean the session_id from the URL for a cleaner user experience
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('session_id');
+      window.history.replaceState({}, '', cleanUrl.toString());
     }
+    // This effect should only run once when the component mounts or the location changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSuccess]);
-
-  // Fallback: confirm the session on return (if webhook lagged/missed)
-  useEffect(() => {
-    if (!showSuccess || !sessionId) return;
-
-    (async () => {
-      try {
-        await confirmMutation.mutateAsync({ data: { sessionId } });
-
-        // Refresh /me and also update localStorage so guards see ACTIVE
-        const token = getAuthToken();
-        if (token) {
-          const r = await fetch(`${API_BASE}/api/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-            credentials: 'include',
-          });
-          const data = r.ok ? await r.json() : null;
-          if (data?.user) {
-            localStorage.setItem('user', JSON.stringify(data.user));
-          }
-        }
-
-        // Clean the URL: keep success banner, remove session_id
-        const clean = new URL(window.location.href);
-        clean.searchParams.delete('session_id');
-        window.history.replaceState({}, '', clean.pathname + (clean.search ? `?${clean.searchParams.toString()}` : ''));
-      } catch {
-        // Any error will be reflected by confirmMutation.isError if you want to show it
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSuccess, sessionId]);
+  }, [location.key]);
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
@@ -137,14 +81,19 @@ export default function SubscriptionsPage() {
         },
       });
       if (res?.url) {
+        // Redirect the user to the Stripe checkout page
         window.location.href = res.url;
       } else {
         throw new Error('No checkout URL returned');
       }
     } catch {
-      // error shown via checkoutMutation.error
+      // Error is shown via checkoutMutation.error state
     }
   };
+
+  const params = new URLSearchParams(window.location.search);
+  const showSuccess = params.get('success') === '1';
+  const showCanceled = params.get('canceled') === '1';
 
   return (
     <Box sx={{ py: 4 }}>
@@ -179,218 +128,157 @@ export default function SubscriptionsPage() {
             </Alert>
           )}
 
-          {/* Pricing Card - Only show if no active subscription */}
-          {!hasActiveSubscription && (
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Card
-                sx={{
-                  maxWidth: 500,
-                  width: '100%',
-                  border: '2px solid',
-                  borderColor: 'primary.main',
-                  boxShadow: 3,
-                }}
-              >
-                <CardContent sx={{ p: 4 }}>
-                  <Stack spacing={3}>
-                    {/* Plan Header */}
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Chip
-                        label="MOST POPULAR"
-                        color="primary"
-                        size="small"
-                        sx={{ mb: 2, fontWeight: 600 }}
-                      />
-                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                        Starter Plan
+          {/* Conditional Rendering: Show Pricing Card OR Active Subscription View */}
+          <DataState
+            isLoading={meQuery.isLoading || confirmMutation.isPending}
+            isError={meQuery.isError}
+            error={meQuery.error}
+            onRetry={meQuery.refetch}
+          >
+            {hasActiveSubscription ? (
+              // Active Subscription View
+              <Paper sx={{ p: 3, maxWidth: 500, mx: 'auto' }}>
+                <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+                  Subscription Details
+                </Typography>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Plan</Typography>
+                    <Chip
+                      label={meQuery.data?.user?.subscriptionPlan || 'Unknown'}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                    <Chip
+                      label={meQuery.data?.user?.subscriptionStatus || 'Unknown'}
+                      color="success"
+                    />
+                  </Box>
+                  {meQuery.data?.user?.trialEndDate && meQuery.data?.user?.subscriptionStatus === 'TRIAL' && (
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">Trial Ends</Typography>
+                      <Typography>
+                        {new Date(meQuery.data.user.trialEndDate).toLocaleDateString()}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 1 }}>
-                        <Typography variant="h2" sx={{ fontWeight: 700 }}>
-                          $29
-                        </Typography>
-                        <Typography variant="h6" color="text.secondary">
-                          /month
-                        </Typography>
-                      </Box>
                     </Box>
-
-                    <Divider />
-
-                    {/* Features List */}
-                    <List sx={{ py: 0 }}>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Unlimited properties & units" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Assign owners, tenants & technicians" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Inspection & job management" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Maintenance plans & scheduling" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Reports & analytics dashboard" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Service requests & recommendations" />
-                      </ListItem>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary="Email support" />
-                      </ListItem>
-                    </List>
-
-                    <Button
-                      variant="contained"
-                      size="large"
-                      fullWidth
-                      onClick={() => startCheckout('STARTER')}
-                      disabled={checkoutMutation.isPending}
-                      sx={{
-                        py: 1.5,
-                        fontSize: '1.1rem',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                      }}
-                    >
-                      {checkoutMutation.isPending ? 'Processing...' : 'Subscribe Now'}
-                    </Button>
-
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ textAlign: 'center', display: 'block' }}
-                    >
-                      Secure payment powered by Stripe • Cancel anytime
-                    </Typography>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-
-          {/* Active Subscriptions Table */}
-          {hasActiveSubscription && (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-                Active Subscriptions
-              </Typography>
-
-              {mutation.isError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {mutation.error.message}
-                </Alert>
-              )}
-
-              <DataState
-                isLoading={query.isLoading}
-                isError={query.isError}
-                error={query.error}
-                isEmpty={!query.isLoading && !query.isError && subscriptions.length === 0}
-                onRetry={query.refetch}
-              >
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>ID</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{t('subscriptions.plan')}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{t('subscriptions.status')}</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {subscriptions.map((subscription) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell>{subscription.id}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={subscription.planName || subscription.planId}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{subscription.customerName || subscription.customerId}</TableCell>
-                        <TableCell>
-                          <Select
-                            size="small"
-                            value={subscription.status || ''}
-                            onChange={(event) =>
-                              handleStatusChange(subscription.id, event.target.value)
-                            }
-                            disabled={mutation.isPending}
-                          >
-                            {STATUSES.map((status) => (
-                              <MenuItem key={status} value={status}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </DataState>
-            </Paper>
-          )}
-
-          {/* FAQ or Additional Info Section */}
-          {!hasActiveSubscription && (
-            <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                Why subscribe to AgentFM?
-              </Typography>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    🏢 Streamline Your Operations
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage all your properties, units, and team members from one unified platform.
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    ✅ Stay Compliant
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Track inspections, maintenance plans, and generate reports for compliance and decision-making.
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    👥 Collaborate Better
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Invite owners, tenants, and technicians to collaborate seamlessly on jobs and service requests.
-                  </Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          )}
+                  )}
+                  <Box>
+                    {/* In a real app, this would link to your Stripe customer portal */}
+                    <Button variant="outlined">Manage Billing</Button>
+                  </Box>
+                </Stack>
+              </Paper>
+            ) : (
+              // Pricing Card View
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Card
+                  sx={{
+                    maxWidth: 500,
+                    width: '100%',
+                    border: '2px solid',
+                    borderColor: 'primary.main',
+                    boxShadow: 3,
+                  }}
+                >
+                  <CardContent sx={{ p: 4 }}>
+                    <Stack spacing={3}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Chip
+                          label="MOST POPULAR"
+                          color="primary"
+                          size="small"
+                          sx={{ mb: 2, fontWeight: 600 }}
+                        />
+                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                          Starter Plan
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 1 }}>
+                          <Typography variant="h2" sx={{ fontWeight: 700 }}>
+                            $29
+                          </Typography>
+                          <Typography variant="h6" color="text.secondary">
+                            /month
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Divider />
+                      <List sx={{ py: 0 }}>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Unlimited properties & units" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Assign owners, tenants & technicians" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Inspection & job management" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Maintenance plans & scheduling" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Reports & analytics dashboard" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Service requests & recommendations" />
+                        </ListItem>
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                          <ListItemText primary="Email support" />
+                        </ListItem>
+                      </List>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        fullWidth
+                        onClick={() => startCheckout('STARTER')}
+                        disabled={checkoutMutation.isPending}
+                        sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 600, textTransform: 'none' }}
+                      >
+                        {checkoutMutation.isPending ? 'Processing...' : 'Subscribe Now'}
+                      </Button>
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
+                        Secure payment powered by Stripe • Cancel anytime
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Box>
+            )}
+          </DataState>
+          
+          {/* FAQ Section */}
+          <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+              Frequently Asked Questions
+            </Typography>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  Can I cancel my subscription at any time?
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  What happens when my free trial ends?
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  You will be prompted to subscribe to a paid plan to continue using the service. Your data will be saved, and you can pick up right where you left off after subscribing.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
         </Stack>
       </Container>
     </Box>
