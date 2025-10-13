@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
+import path from 'path'; // 👈 MINIMAL CHANGE: Added path import
 
 // ---- Load env
 dotenv.config();
@@ -55,6 +56,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(cookieParser());
 
+// 👇 MINIMAL CHANGE: Serve uploaded images statically
+const __dirname = path.resolve();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ---
+
 // ---- Session (needed for Passport OAuth; JWT is used for API auth)
 app.use(
   session({
@@ -87,109 +93,4 @@ import inspectionsRoutes from './routes/inspections.js';
 import subscriptionsRoutes from './routes/subscriptions.js';
 import uploadsRoutes from './routes/uploads.js';
 import reportsRoutes from './routes/reports.js';
-import recommendationsRoutes from './routes/recommendations.js';
-import plansRoutes from './routes/plans.js';
-import dashboardRoutes from './routes/dashboard.js';
-import serviceRequestsRoutes from './routes/serviceRequests.js';
-
-// ---- Stripe webhook MUST be before express.json so the raw body is available
-app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
-
-// ---- Body parsers (after webhook)
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// ---- Mount (after session/passport)
-app.use('/api/auth', authRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/properties', propertiesRoutes);
-app.use('/api/tenants', tenantsRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
-app.use('/api/units', unitsRoutes);
-app.use('/api/jobs', jobsRoutes);
-app.use('/api/inspections', inspectionsRoutes);
-app.use('/api/subscriptions', subscriptionsRoutes);
-app.use('/api/uploads', uploadsRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/recommendations', recommendationsRoutes);
-app.use('/api/plans', plansRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/serviceRequests', serviceRequestsRoutes);
-
-// ---- Health
-app.get('/health', async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({
-      status: 'OK',
-      service: 'AgentFM Backend',
-      database: 'Connected',
-      environment: process.env.NODE_ENV || 'development',
-      time: new Date().toISOString(),
-    });
-  } catch (err) {
-    res.status(503).json({
-      status: 'ERROR',
-      service: 'AgentFM Backend',
-      database: 'Disconnected',
-      error: err?.message || 'unknown',
-      time: new Date().toISOString(),
-    });
-  }
-});
-
-// ---- Root
-app.get('/', (_req, res) => {
-  res.json({
-    message: 'AgentFM API Server',
-    version: '1.0.0',
-    frontend: process.env.FRONTEND_URL || null,
-    docs: {
-      health: '/health',
-      auth: '/api/auth',
-      properties: '/api/properties',
-      tenants: '/api/tenants',
-      maintenance: '/api/maintenance',
-    },
-  });
-});
-
-// ---- 404
-app.use('*', (req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
-});
-
-// ---- Error handler
-app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
-});
-
-// ---- Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 SIGINT received. Shutting down gracefully…');
-  try {
-    await prisma.$disconnect();
-  } finally {
-    process.exit(0);
-  }
-});
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 SIGTERM received. Shutting down gracefully…');
-  try {
-    await prisma.$disconnect();
-  } finally {
-    process.exit(0);
-  }
-});
-
-// ---- Start
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 FRONTEND_URL: ${process.env.FRONTEND_URL || 'not set'}`);
-});
+import recommendationsRoutes from './routes/recommend
