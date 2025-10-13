@@ -1,54 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography, Button, Stack, Chip, TextField, InputAdornment, CardMedia, IconButton,
+  Box, Grid, Card, CardContent, Typography, Button, Stack, Chip, TextField, InputAdornment,
 } from '@mui/material';
-import { Add, Search, LocationOn, Apartment, Edit, Visibility, ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
+import { Add, Search, LocationOn, Apartment, Edit, Visibility } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
-import { API_BASE } from '../lib/auth';
+import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
 
 const PropertyCard = ({ property, onView, onEdit }) => {
-  const [currentImage, setCurrentImage] = useState(0);
   const images = (property.images && Array.isArray(property.images) && property.images.length > 0) ? property.images : [];
-
-  useEffect(() => {
-    let interval;
-    if (images.length > 1) {
-      interval = setInterval(() => {
-        setCurrentImage((prev) => (prev + 1) % images.length);
-      }, 3000); // Slide every 3 seconds
-    }
-    return () => clearInterval(interval);
-  }, [images.length]);
-
-  const handleImageCycle = (e, direction) => {
-    e.stopPropagation();
-    const newIndex = (currentImage + direction + images.length) % images.length;
-    setCurrentImage(newIndex);
-  };
-
-  const handleDotClick = (index) => {
-    setCurrentImage(index);
-  };
-
-  const placeholderImage = `https://via.placeholder.com/300x140?text=${encodeURIComponent(property.name)}`;
-
-  const resolveImageUrl = (value) => {
-    if (!value) return placeholderImage;
-    if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
-      return value;
-    }
-    if (/^\d+x\d+\?text=/i.test(value)) {
-      return `https://via.placeholder.com/${value}`;
-    }
-    const normalised = value.startsWith('/') ? value : `/${value}`;
-    return `${API_BASE}${normalised}`;
-  };
-
-  const imageUrl = images.length > 0
-    ? resolveImageUrl(images[currentImage])
-    : placeholderImage;
 
   return (
     <Card
@@ -62,76 +23,14 @@ const PropertyCard = ({ property, onView, onEdit }) => {
         '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
       }}
     >
-      <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: '8px 8px 0 0', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-        <CardMedia
-          component="img"
-          height="200"
-          image={imageUrl}
-          alt={`${property.name} image ${currentImage + 1}`}
-          sx={{ objectFit: 'cover', width: '100%' }}
+      <Box sx={{ position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+        <PropertyImageCarousel
+          images={images}
+          fallbackText={property.name}
+          placeholderSize="300x200"
+          height={200}
+          containerSx={{ borderRadius: '8px 8px 0 0' }}
         />
-        {images.length > 1 && (
-          <>
-            <IconButton
-              onClick={(e) => handleImageCycle(e, -1)}
-              size="small"
-              sx={{
-                position: 'absolute',
-                top: '50%',
-                left: 8,
-                transform: 'translateY(-50%)',
-                backgroundColor: 'rgba(255,255,255,0.8)',
-                '&:hover': { backgroundColor: 'rgba(255,255,255,0.95)' },
-                zIndex: 2,
-              }}
-            >
-              <ArrowBackIos fontSize="small" />
-            </IconButton>
-            <IconButton
-              onClick={(e) => handleImageCycle(e, 1)}
-              size="small"
-              sx={{
-                position: 'absolute',
-                top: '50%',
-                right: 8,
-                transform: 'translateY(-50%)',
-                backgroundColor: 'rgba(255,255,255,0.8)',
-                '&:hover': { backgroundColor: 'rgba(255,255,255,0.95)' },
-                zIndex: 2,
-              }}
-            >
-              <ArrowForwardIos fontSize="small" />
-            </IconButton>
-            <Box sx={{
-              position: 'absolute',
-              bottom: 8,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              gap: 0.5,
-              zIndex: 2,
-            }}>
-              {images.map((_, index) => (
-                <Box
-                  key={index}
-                  onClick={() => handleDotClick(index)}
-                  sx={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    backgroundColor: index === currentImage ? 'primary.main' : 'grey.300',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.3s, transform 0.2s',
-                    '&:hover': {
-                      backgroundColor: index === currentImage ? 'primary.dark' : 'grey.400',
-                      transform: 'scale(1.2)',
-                    },
-                  }}
-                />
-              ))}
-            </Box>
-          </>
-        )}
       </Box>
       <CardContent sx={{ flexGrow: 1, p: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{property.name}</Typography>
@@ -250,6 +149,13 @@ export default function PropertiesPage() {
             </Grid>
           ))}
         </Grid>
+        {!isLoading && filteredProperties.length === 0 && properties.length > 0 && (
+          <Box sx={{ py: 4 }}>
+            <Typography color="text.secondary">
+              No properties match the current filters.
+            </Typography>
+          </Box>
+        )}
       </DataState>
     </Box>
   );

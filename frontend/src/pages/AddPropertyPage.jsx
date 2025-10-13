@@ -18,7 +18,6 @@ const AddPropertyPage = () => {
   });
 
   const onSubmit = async (data) => {
-    console.log('Form data:', data);
     const formData = new FormData();
     formData.append('name', data.name || '');
     formData.append('address', data.address || '');
@@ -30,10 +29,10 @@ const AddPropertyPage = () => {
     imageFiles.forEach((file) => {
       formData.append('images', file);
     });
-    console.log('FormData entries:', Array.from(formData.entries()));
 
     try {
       await addPropertyMutation.mutateAsync({ data: formData });
+      setImageFiles([]);
     } catch (err) {
       console.error('Add property error:', err);
     }
@@ -41,7 +40,6 @@ const AddPropertyPage = () => {
 
   const handleImageChange = (event) => {
     setImageFiles(Array.from(event.target.files));
-    console.log('Selected images:', Array.from(event.target.files));
   };
 
   return (
