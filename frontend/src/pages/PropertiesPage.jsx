@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -17,6 +17,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import { Add, Search, LocationOn, Apartment, Edit, Visibility } from '@mui/icons-material';
+import { debounce } from 'lodash';
 import { useNavigate } from 'react-router-dom';
 import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
@@ -122,7 +123,25 @@ const PropertyCard = ({ property, onView, onEdit }) => {
 export default function PropertiesPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [filterType, setFilterType] = useState('all');
+
+  const debouncedSearch = useMemo(
+    () => debounce(value => setSearchTerm(value), 300),
+    [setSearchTerm]
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
+
+  const handleSearchChange = event => {
+    const { value } = event.target;
+    setSearchInput(value);
+    debouncedSearch(value);
+  };
 
   const { data, isLoading, isError, error, refetch } = useApiQuery({ queryKey: ['properties'], url: '/api/properties' });
   const properties = data?.properties || [];
@@ -143,7 +162,9 @@ export default function PropertiesPage() {
   }, [properties]);
 
   const resetFilters = () => {
+    debouncedSearch.cancel();
     setSearchTerm('');
+    setSearchInput('');
     setFilterType('all');
   };
 
@@ -173,8 +194,8 @@ export default function PropertiesPage() {
             <TextField
               fullWidth
               placeholder="Search by name or address..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               InputProps={{
                 startAdornment: (<InputAdornment position="start"><Search sx={{ color: 'grey.500' }} /></InputAdornment>),
                 sx: { borderRadius: 2 },
