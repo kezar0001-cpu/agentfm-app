@@ -7,6 +7,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { PrismaClient } from '@prisma/client';
 import path from 'path'; // Your existing code has this
+import fs from 'fs';
 
 // ---- Load env
 dotenv.config();
@@ -55,8 +56,11 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 
 // ---- Serve Static Files ---
-const __dirname = path.resolve();
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadPath));
 
 // ---- Session
 // ... (your existing session configuration remains the same)

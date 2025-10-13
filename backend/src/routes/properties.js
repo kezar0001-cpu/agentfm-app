@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
@@ -34,10 +35,14 @@ router.use(authenticate);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 
 // --- Multer Configuration for Image Uploads ---
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(process.cwd(), 'uploads');
-    cb(null, uploadPath);
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
