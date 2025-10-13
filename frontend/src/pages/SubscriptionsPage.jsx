@@ -25,50 +25,37 @@ import DataState from '../components/DataState.jsx';
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
 
-  // This query is the single source of truth for the user's subscription status
   const meQuery = useApiQuery({
     queryKey: ['me'],
     url: '/api/auth/me',
   });
 
-  // This mutation confirms the Stripe session if the webhook is delayed
   const confirmMutation = useApiMutation({
     url: '/api/billing/confirm',
     method: 'post',
     onSuccess: () => {
-      // After a successful confirmation, refetch the user's data
-      // to get the 'ACTIVE' subscription status.
       meQuery.refetch();
     },
   });
 
-  // This mutation initiates the Stripe checkout process
   const checkoutMutation = useApiMutation({
     url: '/api/billing/checkout',
     method: 'post',
   });
 
-  // Determine if the user has an active subscription from the /api/auth/me endpoint
   const hasActiveSubscription = meQuery.data?.user?.subscriptionStatus === 'ACTIVE';
 
-  // This effect runs when the user is redirected back from Stripe
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const showSuccess = params.get('success') === '1';
     const sessionId = params.get('session_id');
 
-    // If the redirect includes a session_id, confirm it with the backend
     if (showSuccess && sessionId) {
-      // The onSuccess callback in confirmMutation will trigger a refetch of meQuery
       confirmMutation.mutateAsync({ data: { sessionId } });
-
-      // Clean the session_id from the URL for a cleaner user experience
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('session_id');
       window.history.replaceState({}, '', cleanUrl.toString());
     }
-    // This effect should only run once when the component mounts or the location changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
 
   const startCheckout = async (plan = 'STARTER') => {
@@ -81,14 +68,11 @@ export default function SubscriptionsPage() {
         },
       });
       if (res?.url) {
-        // Redirect the user to the Stripe checkout page
         window.location.href = res.url;
       } else {
         throw new Error('No checkout URL returned');
       }
-    } catch {
-      // Error is shown via checkoutMutation.error state
-    }
+    } catch {}
   };
 
   const params = new URLSearchParams(window.location.search);
@@ -99,7 +83,6 @@ export default function SubscriptionsPage() {
     <Box sx={{ py: 4 }}>
       <Container maxWidth="lg">
         <Stack spacing={4}>
-          {/* Header */}
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
               {hasActiveSubscription ? 'Your Subscription' : 'Get Started with AgentFM'}
@@ -111,24 +94,22 @@ export default function SubscriptionsPage() {
             </Typography>
           </Box>
 
-          {/* Banners */}
           {showSuccess && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              <strong>Payment successful!</strong> Your subscription is now active. Welcome to AgentFM!
+              <strong>Payment successful!</strong> Your subscription is now active.
             </Alert>
           )}
           {showCanceled && (
             <Alert severity="info" sx={{ mb: 2 }}>
-              Checkout was canceled. No charges were made. You can subscribe anytime.
+              Checkout was canceled. No charges were made.
             </Alert>
           )}
           {checkoutMutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
+              {checkoutMutation.error?.message || 'Checkout failed.'}
             </Alert>
           )}
 
-          {/* Conditional Rendering: Show Pricing Card OR Active Subscription View */}
           <DataState
             isLoading={meQuery.isLoading || confirmMutation.isPending}
             isError={meQuery.isError}
@@ -136,7 +117,6 @@ export default function SubscriptionsPage() {
             onRetry={meQuery.refetch}
           >
             {hasActiveSubscription ? (
-              // Active Subscription View
               <Paper sx={{ p: 3, maxWidth: 500, mx: 'auto' }}>
                 <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
                   Subscription Details
@@ -166,13 +146,11 @@ export default function SubscriptionsPage() {
                     </Box>
                   )}
                   <Box>
-                    {/* In a real app, this would link to your Stripe customer portal */}
                     <Button variant="outlined">Manage Billing</Button>
                   </Box>
                 </Stack>
               </Paper>
             ) : (
-              // Pricing, "Why Subscribe", and FAQ sections for non-subscribed users
               <>
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                   <Card
@@ -254,63 +232,63 @@ export default function SubscriptionsPage() {
                   </Card>
                 </Box>
                 
-                {/* Why Subscribe Section */}
-                <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Why subscribe to AgentFM?
-                  </Typography>
-                  <Stack spacing={2}>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        🏢 Streamline Your Operations
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Manage all your properties, units, and team members from one unified platform.
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        ✅ Stay Compliant
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Track inspections, maintenance plans, and generate reports for compliance and decision-making.
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        👥 Collaborate Better
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Invite owners, tenants, and technicians to collaborate seamlessly on jobs and service requests.
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Paper>
+                <Stack spacing={4} sx={{ maxWidth: 800, mx: 'auto' }}>
+                  <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      Why subscribe to AgentFM?
+                    </Typography>
+                    <Stack spacing={2}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          🏢 Streamline Your Operations
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Manage all your properties, units, and team members from one unified platform.
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          ✅ Stay Compliant
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Track inspections, maintenance plans, and generate reports for compliance and decision-making.
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          👥 Collaborate Better
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Invite owners, tenants, and technicians to collaborate seamlessly on jobs and service requests.
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
 
-                {/* FAQ Section */}
-                <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Frequently Asked Questions
-                  </Typography>
-                  <Stack spacing={2}>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        Can I cancel my subscription at any time?
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        What happens when my free trial ends?
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        You will be prompted to subscribe to a paid plan to continue using the service. Your data will be saved, and you can pick up right where you left off after subscribing.
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Paper>
+                  <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      Frequently Asked Questions
+                    </Typography>
+                    <Stack spacing={2}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          Can I cancel my subscription at any time?
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          What happens when my free trial ends?
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          You will be prompted to subscribe to a paid plan to continue using the service. Your data will be saved, and you can pick up right where you left off after subscribing.
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                </Stack>
               </>
             )}
           </DataState>
