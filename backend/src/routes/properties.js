@@ -132,14 +132,32 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // --- Zod Schemas for Validation ---
+const optionalStringField = z
+  .preprocess((value) => {
+    if (value === undefined || value === null) return value;
+    if (typeof value !== 'string') return value;
+
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  }, z.string().min(1).nullable().optional());
+
 const propertyFieldSchemas = {
-  name: z.string().min(1, 'Name is required'),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  postcode: z.string().optional(),
-  country: z.string().optional(),
-  type: z.string().optional(),
-  status: z.string().optional(),
+  name: z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim() : value),
+    z.string().min(1, 'Name is required'),
+  ),
+  address: optionalStringField,
+  city: optionalStringField,
+  postcode: optionalStringField,
+  country: optionalStringField,
+  type: optionalStringField,
+  status: z
+    .preprocess((value) => {
+      if (value === undefined || value === null) return value;
+      if (typeof value !== 'string') return value;
+      const trimmed = value.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }, z.string().optional()),
 };
 
 const propertySchema = z.object({
