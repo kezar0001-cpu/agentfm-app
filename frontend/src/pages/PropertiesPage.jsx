@@ -16,16 +16,50 @@ import {
   DialogContentText,
   DialogActions,
 } from '@mui/material';
-import { Add, Search, LocationOn, Apartment, Edit, Visibility } from '@mui/icons-material';
+import {
+  Add,
+  Search,
+  LocationOn,
+  Apartment,
+  Business,
+  Factory,
+  Storefront,
+  Hotel,
+  Domain,
+  Edit,
+  Visibility,
+} from '@mui/icons-material';
 import { debounce } from 'lodash';
 import { useNavigate } from 'react-router-dom';
 import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
 import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
 
+const typeIcons = {
+  residential: { icon: Apartment, color: 'primary.main' },
+  commercial: { icon: Business, color: 'secondary.main' },
+  industrial: { icon: Factory, color: 'warning.main' },
+  retail: { icon: Storefront, color: 'success.main' },
+  hospitality: { icon: Hotel, color: 'info.main' },
+  office: { icon: Domain, color: 'secondary.main' },
+};
+
+const formatTypeName = type => {
+  if (!type) return 'N/A';
+  return type
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 const PropertyCard = ({ property, onView, onEdit }) => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const images = (property.images && Array.isArray(property.images) && property.images.length > 0) ? property.images : [];
+
+  const typeKey = property.type?.toLowerCase().trim();
+  const { icon: TypeIcon = Apartment, color: typeColor = 'primary.main' } =
+    (typeKey && typeIcons[typeKey]) || {};
+  const formattedType = formatTypeName(property.type);
 
   const handleEditClick = () => {
     setIsConfirmOpen(true);
@@ -70,8 +104,8 @@ const PropertyCard = ({ property, onView, onEdit }) => {
               <Typography variant="body2" color="text.secondary">{property.address || 'No address'}</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Apartment fontSize="small" color="primary" />
-              <Typography variant="body2" color="text.secondary">{property.type || 'N/A'} • {property._count?.units || 0} units</Typography>
+              <TypeIcon fontSize="small" sx={{ color: typeColor }} />
+              <Typography variant="body2" color="text.secondary">{formattedType} • {property._count?.units || 0} units</Typography>
             </Box>
           </Stack>
         </CardContent>
