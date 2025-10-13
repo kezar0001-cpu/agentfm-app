@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import App from './App.jsx';
 import './index.css';  // Tailwind entry point
+import './i18n.js';
 
 // ✅ Query Client
 const queryClient = new QueryClient({

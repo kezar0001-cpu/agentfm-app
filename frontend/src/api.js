@@ -1,6 +1,8 @@
 // frontend/src/api.js
 // Production-ready API client
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.buildstate.com.au';
+import { API_BASE } from './lib/auth.js';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || API_BASE;
 
 // Get auth token from localStorage
 function getAuthToken() {
