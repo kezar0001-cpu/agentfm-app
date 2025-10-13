@@ -89,15 +89,15 @@ export const api = {
     method: 'POST',
     body: data instanceof FormData ? data : JSON.stringify(data),
   }),
-  
+
   put: (url, data) => apiCall(url, {
     method: 'PUT',
-    body: JSON.stringify(data),
+    body: data instanceof FormData ? data : JSON.stringify(data),
   }),
-  
+
   patch: (url, data) => apiCall(url, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: data instanceof FormData ? data : JSON.stringify(data),
   }),
   
   delete: (url) => apiCall(url, {

@@ -9,6 +9,87 @@ import fs from 'fs';
 
 const router = Router();
 
+// --- Helpers ---
+
+const uploadPath = path.join(process.cwd(), 'uploads');
+const absoluteUploadPath = path.resolve(uploadPath);
+const fsp = fs.promises;
+
+const normalizePropertyPayload = (payload = {}) => {
+  const normalized = {};
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        if (key === 'status') return; // keep current status if the field is emptied
+        normalized[key] = null;
+        return;
+      }
+      normalized[key] = trimmed;
+      return;
+    }
+
+    normalized[key] = value;
+  });
+
+  return normalized;
+};
+
+const toAbsoluteUploadPath = (imagePath) => {
+  if (!imagePath || typeof imagePath !== 'string') return null;
+  if (!imagePath.startsWith('/uploads')) return null;
+  const relative = imagePath.replace(/^\/+/, '');
+  const resolved = path.resolve(process.cwd(), relative);
+  if (!resolved.startsWith(absoluteUploadPath)) return null;
+  return resolved;
+};
+
+const removeImageFiles = async (imagePaths = []) => {
+  if (!Array.isArray(imagePaths) || imagePaths.length === 0) return;
+
+  await Promise.allSettled(
+    imagePaths.map(async (imagePath) => {
+      const absolutePath = toAbsoluteUploadPath(imagePath);
+      if (!absolutePath) return;
+
+      try {
+        await fsp.unlink(absolutePath);
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          console.warn(`Failed to remove image ${absolutePath}:`, error);
+        }
+      }
+    }),
+  );
+};
+
+const parseExistingImages = (value, fallback = []) => {
+  if (value === undefined || value === null) return Array.isArray(fallback) ? fallback : [];
+
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) {
+        throw new Error('existingImages must be an array');
+      }
+      return parsed.filter((item) => typeof item === 'string' && item.trim().length > 0);
+    } catch (error) {
+      throw new Error('Invalid existingImages payload');
+    }
+  }
+
+  throw new Error('Invalid existingImages payload');
+};
+
 // --- Middleware ---
 
 const authenticate = async (req, res, next) => {
@@ -35,7 +116,7 @@ router.use(authenticate);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 
 // --- Multer Configuration for Image Uploads ---
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const UPLOAD_DIR = uploadPath;
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -51,14 +132,47 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // --- Zod Schemas for Validation ---
-const propertySchema = z.object({
+const propertyFieldSchemas = {
   name: z.string().min(1, 'Name is required'),
   address: z.string().optional(),
   city: z.string().optional(),
   postcode: z.string().optional(),
   country: z.string().optional(),
   type: z.string().optional(),
-  status: z.string().optional().default('Active'),
+  status: z.string().optional(),
+};
+
+const propertySchema = z.object({
+  ...propertyFieldSchemas,
+  status: propertyFieldSchemas.status.default('Active'),
+});
+
+const propertyUpdateSchema = z.object({
+  name: propertyFieldSchemas.name.optional(),
+  address: propertyFieldSchemas.address,
+  city: propertyFieldSchemas.city,
+  postcode: propertyFieldSchemas.postcode,
+  country: propertyFieldSchemas.country,
+  type: propertyFieldSchemas.type,
+  status: propertyFieldSchemas.status,
+});
+
+const unitSchema = z.object({
+  unitCode: z.string().min(1, 'Unit code is required'),
+  address: z.string().optional(),
+  bedrooms: z
+    .preprocess((value) => {
+      if (value === undefined || value === null) return null;
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') return null;
+        const numeric = Number(trimmed);
+        return Number.isNaN(numeric) ? value : numeric;
+      }
+      return value;
+    }, z.number().int().min(0).nullable())
+    .optional(),
+  status: z.string().optional(),
 });
 
 // --- Routes ---
@@ -96,23 +210,26 @@ router.get('/', async (req, res) => {
 
 // POST /api/properties
 router.post('/', upload.array('images', 10), async (req, res) => {
+  const uploadedImagePaths = (req.files ? req.files.map((file) => `/uploads/${file.filename}`) : []);
   try {
     const { name, address, city, postcode, country, type, status } = req.body;
-    const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
-    const validatedData = propertySchema.parse({ name, address, city, postcode, country, type, status });
+    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status });
+    const validatedData = propertySchema.parse(payload);
     const property = await prisma.property.create({
       data: {
         ...validatedData,
-        images,
+        images: uploadedImagePaths,
         orgId: req.user.orgId,
       },
     });
     res.status(201).json({ success: true, property });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      await removeImageFiles(uploadedImagePaths);
       return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
     }
     console.error('Create property error:', error);
+    await removeImageFiles(uploadedImagePaths);
     res.status(500).json({ success: false, message: 'Failed to create property' });
   }
 });
@@ -152,18 +269,134 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/properties/:id - Update a property
-router.patch('/:id', async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not implemented' });
+router.patch('/:id', upload.array('images', 10), async (req, res) => {
+  const uploadedImagePaths = (req.files ? req.files.map((file) => `/uploads/${file.filename}`) : []);
+  try {
+    const { id } = req.params;
+    const existingProperty = await prisma.property.findFirst({
+      where: { id, orgId: req.user.orgId },
+    });
+
+    if (!existingProperty) {
+      await removeImageFiles(uploadedImagePaths);
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    const { name, address, city, postcode, country, type, status } = req.body;
+    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status });
+    const validatedData = propertyUpdateSchema.parse(payload);
+
+    let keepImages;
+    try {
+      keepImages = parseExistingImages(req.body.existingImages, existingProperty.images);
+    } catch (parseError) {
+      await removeImageFiles(uploadedImagePaths);
+      return res.status(400).json({ success: false, message: parseError.message });
+    }
+
+    const images = [...keepImages, ...uploadedImagePaths];
+    const updateData = {
+      ...validatedData,
+      images,
+    };
+
+    const updatedPropertyRecord = await prisma.property.update({
+      where: { id: existingProperty.id },
+      data: updateData,
+    });
+
+    const removedImages = existingProperty.images.filter((imagePath) => !keepImages.includes(imagePath));
+    await removeImageFiles(removedImages);
+
+    const property = await prisma.property.findFirst({
+      where: { id: updatedPropertyRecord.id, orgId: req.user.orgId },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        city: true,
+        postcode: true,
+        country: true,
+        type: true,
+        status: true,
+        images: true,
+        orgId: true,
+        createdAt: true,
+        updatedAt: true,
+        units: {
+          orderBy: { unitCode: 'asc' },
+        },
+      },
+    });
+
+    res.json({ success: true, property });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      await removeImageFiles(uploadedImagePaths);
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+    }
+    console.error('Update property error:', error);
+    await removeImageFiles(uploadedImagePaths);
+    res.status(500).json({ success: false, message: 'Failed to update property' });
+  }
 });
 
 // DELETE /api/properties/:id - Delete a property
 router.delete('/:id', async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not implemented' });
+  try {
+    const { id } = req.params;
+    const property = await prisma.property.findFirst({
+      where: { id, orgId: req.user.orgId },
+      select: { id: true, images: true },
+    });
+
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    await prisma.property.delete({ where: { id: property.id } });
+    await removeImageFiles(property.images || []);
+
+    res.json({ success: true, message: 'Property deleted successfully' });
+  } catch (error) {
+    console.error('Delete property error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete property' });
+  }
 });
 
 // POST /api/properties/:propertyId/units - Create a unit for a property
 router.post('/:propertyId/units', async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not implemented' });
+  try {
+    const { propertyId } = req.params;
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, orgId: req.user.orgId },
+      select: { id: true },
+    });
+
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    const parsedBody = unitSchema.parse(req.body);
+
+    const unit = await prisma.unit.create({
+      data: {
+        propertyId: property.id,
+        unitCode: parsedBody.unitCode,
+        address: parsedBody.address || null,
+        bedrooms: parsedBody.bedrooms ?? null,
+        status: parsedBody.status || 'Vacant',
+      },
+    });
+
+    res.status(201).json({ success: true, unit });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+    }
+    console.error('Create unit error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create unit' });
+  }
 });
 
 export default router;
