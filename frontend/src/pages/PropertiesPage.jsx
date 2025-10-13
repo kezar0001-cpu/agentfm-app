@@ -1,72 +1,37 @@
+// frontend/src/pages/PropertiesPage.jsx
 import { useState, useMemo } from 'react';
 import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Stack,
-  Chip,
-  TextField,
-  InputAdornment,
-  CircularProgress,
-  Alert
+  Box, Grid, Card, CardContent, Typography, Button, Stack, Chip, TextField, InputAdornment, CardMedia,
 } from '@mui/material';
-import {
-  Add,
-  Search,
-  LocationOn,
-  Apartment,
-  SquareFoot,
-  Edit,
-  Visibility
-} from '@mui/icons-material';
+import { Add, Search, LocationOn, Apartment, Edit, Visibility } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
+import { API_BASE } from '../lib/auth';
 
 const PropertyCard = ({ property, onView, onEdit }) => {
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Active': return 'success';
-      case 'Maintenance': return 'warning';
-      case 'Inactive': return 'error';
-      default: return 'default';
-    }
+    return status === 'Active' ? 'success' : 'default';
   };
 
   return (
-    <Card 
-      sx={{ 
-        height: '100%',
-        transition: 'all 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 4
-        }
-      }}
-    >
-      <CardContent>
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 4 } }}>
+      <CardMedia
+        component="img"
+        height="140"
+        image={property.coverImage ? `${API_BASE}${property.coverImage}` : `https://via.placeholder.com/300x140?text=${property.name}`}
+        alt={property.name}
+      />
+      <CardContent sx={{ flexGrow: 1 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Typography variant="h6" component="h3" gutterBottom>
-            {property.name}
-          </Typography>
-          <Chip
-            label={property.status}
-            color={getStatusColor(property.status)}
-            size="small"
-          />
+          <Typography variant="h6" component="h3" gutterBottom>{property.name}</Typography>
+          <Chip label={property.status} color={getStatusColor(property.status)} size="small" />
         </Stack>
-        
         <Stack spacing={1} sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <LocationOn fontSize="small" color="action" />
-            <Typography variant="body2" color="text.secondary">
-              {property.address || 'No address specified'}
-            </Typography>
+            <Typography variant="body2" color="text.secondary">{property.address || 'No address'}</Typography>
           </Box>
-          
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Apartment fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
@@ -74,28 +39,11 @@ const PropertyCard = ({ property, onView, onEdit }) => {
             </Typography>
           </Box>
         </Stack>
-
-        <Stack direction="row" spacing={1} sx={{ mt: 3 }}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Visibility />}
-            onClick={() => onView(property.id)}
-            fullWidth
-          >
-            View
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Edit />}
-            onClick={() => onEdit(property.id)}
-            fullWidth
-          >
-            Edit
-          </Button>
-        </Stack>
       </CardContent>
+      <Stack direction="row" spacing={1} sx={{ p: 2, pt: 0 }}>
+        <Button size="small" variant="outlined" startIcon={<Visibility />} onClick={() => onView(property.id)} fullWidth>View</Button>
+        <Button size="small" variant="outlined" startIcon={<Edit />} onClick={() => onEdit(property.id)} fullWidth>Edit</Button>
+      </Stack>
     </Card>
   );
 };
@@ -103,7 +51,7 @@ const PropertyCard = ({ property, onView, onEdit }) => {
 export default function PropertiesPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const { data, isLoading, isError, error, refetch } = useApiQuery({
     queryKey: ['properties'],
     url: '/api/properties',
@@ -112,65 +60,43 @@ export default function PropertiesPage() {
   const properties = data?.properties || [];
 
   const filteredProperties = useMemo(() => {
-    return properties.filter(property =>
-      property.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (property.address || '').toLowerCase().includes(searchTerm.toLowerCase())
+    if (!properties) return [];
+    return properties.filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.address || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, properties]);
-
-  const handleAddProperty = () => navigate('/properties/add');
-  const handleViewProperty = (id) => navigate(`/properties/${id}`);
-  const handleEditProperty = (id) => navigate(`/properties/${id}/edit`);
 
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <div>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Properties
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage your property portfolio
-          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>Properties</Typography>
+          <Typography variant="body1" color="text.secondary">Manage your property portfolio</Typography>
         </div>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleAddProperty}
-          size="large"
-        >
+        <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/properties/add')} size="large">
           Add Property
         </Button>
       </Stack>
 
-      <Card sx={{ p: 3, mb: 4 }}>
+      <Card sx={{ p: 2, mb: 4 }}>
         <TextField
           fullWidth
           placeholder="Search properties by name or address..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search color="action" />
-              </InputAdornment>
-            ),
-          }}
+          InputProps={{ startAdornment: (<InputAdornment position="start"><Search /></InputAdornment>) }}
         />
       </Card>
-      
-      <DataState isLoading={isLoading} isError={isError} error={error} onRetry={refetch} isEmpty={properties.length === 0}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Showing {filteredProperties.length} of {properties.length} properties
-        </Typography>
-        
+
+      <DataState isLoading={isLoading} isError={isError} error={error} onRetry={refetch} isEmpty={!isLoading && properties.length === 0}>
         <Grid container spacing={3}>
           {filteredProperties.map(property => (
-            <Grid item xs={12} sm={6} lg={4} key={property.id}>
+            <Grid item xs={12} sm={6} md={4} key={property.id}>
               <PropertyCard
                 property={property}
-                onView={handleViewProperty}
-                onEdit={handleEditProperty}
+                onView={() => navigate(`/properties/${property.id}`)}
+                onEdit={() => navigate(`/properties/${property.id}/edit`)}
               />
             </Grid>
           ))}
