@@ -8,10 +8,15 @@ const AddPropertyPage = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
   const [imageFiles, setImageFiles] = useState([]);
-  const { mutate: addProperty, isLoading, error } = useApiQuery({ url: '/properties', method: 'POST' });
+  const token = localStorage.getItem('token'); // Retrieve token from storage
+  const { mutate: addProperty, isLoading, error } = useApiQuery({
+    url: '/properties',
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined, // Add token if available
+  });
 
   const onSubmit = async (data) => {
-    console.log('Form data:', data); // Debug log
+    console.log('Form data:', data);
     const formData = new FormData();
     formData.append('name', data.name || '');
     formData.append('address', data.address || '');
@@ -23,7 +28,7 @@ const AddPropertyPage = () => {
     imageFiles.forEach((file, index) => {
       formData.append(`images[${index}]`, file);
     });
-    console.log('FormData entries:', Array.from(formData.entries())); // Debug form data
+    console.log('FormData entries:', Array.from(formData.entries()));
 
     try {
       await addProperty(formData, {
@@ -45,7 +50,7 @@ const AddPropertyPage = () => {
 
   const handleImageChange = (event) => {
     setImageFiles(Array.from(event.target.files));
-    console.log('Selected images:', Array.from(event.target.files)); // Debug log
+    console.log('Selected images:', Array.from(event.target.files));
   };
 
   return (
@@ -109,7 +114,7 @@ const AddPropertyPage = () => {
               hidden
               multiple
               onChange={handleImageChange}
-              accept="image/*" // Restrict to images
+              accept="image/*"
             />
           </Button>
           <Typography variant="body2" color="text.secondary">
