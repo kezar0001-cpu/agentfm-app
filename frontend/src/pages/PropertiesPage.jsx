@@ -82,7 +82,14 @@ const PropertyCard = ({ property, onView, onEdit }) => {
             startIcon={<Visibility />}
             onClick={() => onView(property.id)}
             fullWidth
-            sx={{ '&:hover': { borderColor: 'primary.main', color: 'primary.main' } }}
+            sx={{
+              '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
+              '&:focus-visible': {
+                outline: theme => `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: 2,
+              },
+            }}
+            aria-label={`View property ${property.name}`}
           >
             View
           </Button>
@@ -92,7 +99,14 @@ const PropertyCard = ({ property, onView, onEdit }) => {
             startIcon={<Edit />}
             onClick={handleEditClick}
             fullWidth
-            sx={{ '&:hover': { borderColor: 'primary.main', color: 'primary.main' } }}
+            sx={{
+              '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
+              '&:focus-visible': {
+                outline: theme => `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: 2,
+              },
+            }}
+            aria-label={`Edit property ${property.name}`}
           >
             Edit
           </Button>
@@ -200,24 +214,42 @@ export default function PropertiesPage() {
                 startAdornment: (<InputAdornment position="start"><Search sx={{ color: 'grey.500' }} /></InputAdornment>),
                 sx: { borderRadius: 2 },
               }}
+              inputProps={{ 'aria-label': 'Search properties by name or address' }}
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setSearchInput('');
+                  setSearchTerm('');
+                }
+              }}
               sx={{ '& .MuiOutlinedInput-root': { '&:hover fieldset': { borderColor: 'primary.main' } } }}
             />
           </Grid>
           <Grid item xs={12} md={6}>
             <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-              {propertyTypes.map(type => (
-                <Chip
-                  key={type}
-                  label={type === 'all' ? 'All Properties' : type.charAt(0).toUpperCase() + type.slice(1)}
-                  variant={filterType === type ? 'filled' : 'outlined'}
-                  onClick={() => setFilterType(type)}
-                  color={filterType === type ? 'primary' : 'default'}
-                  sx={{
-                    fontWeight: filterType === type ? 600 : 400,
-                    '&:hover': { backgroundColor: filterType === type ? 'primary.light' : 'grey.100' },
-                  }}
-                />
-              ))}
+              {propertyTypes.map(type => {
+                const chipLabel = type === 'all' ? 'All Properties' : type.charAt(0).toUpperCase() + type.slice(1);
+                const chipFilterTarget = type === 'all' ? 'all properties' : type;
+
+                return (
+                  <Chip
+                    key={type}
+                    label={chipLabel}
+                    variant={filterType === type ? 'filled' : 'outlined'}
+                    onClick={() => setFilterType(type)}
+                    color={filterType === type ? 'primary' : 'default'}
+                    sx={{
+                      fontWeight: filterType === type ? 600 : 400,
+                      '&:hover': { backgroundColor: filterType === type ? 'primary.light' : 'grey.100' },
+                      '&.Mui-focusVisible': {
+                        outline: theme => `2px solid ${theme.palette.primary.main}`,
+                        outlineOffset: 2,
+                      },
+                    }}
+                    aria-label={`Filter by ${chipFilterTarget}`}
+                  />
+                );
+              })}
             </Stack>
           </Grid>
         </Grid>
