@@ -105,7 +105,7 @@ model Property {
   country             String?
   type                String?
   status              String              @default("Active")
-  images              Json?
+  images String[] @default([])
   orgId               String
   org                 Org                 @relation(fields: [orgId], references: [id])
   units               Unit[]
