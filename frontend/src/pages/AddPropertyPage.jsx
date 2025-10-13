@@ -1,4 +1,3 @@
-// frontend/src/pages/AddPropertyPage.jsx
 import { useState } from 'react';
 import {
   Box, Card, CardContent, Typography, TextField, Button, Stack, MenuItem, Grid, Stepper, Step, StepLabel, Alert, CircularProgress,
@@ -6,9 +5,9 @@ import {
 import { Save, ArrowBack, CloudUpload } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import useApiMutation from '../hooks/useApiMutation';
-import { api } from '../lib/auth';
+import api from '../api';
 
-const steps = ['Basic Information', 'Upload Image', 'Review & Submit'];
+const steps = ['Basic Information', 'Upload Images', 'Review & Submit'];
 
 export default function AddPropertyPage() {
   const navigate = useNavigate();
@@ -16,32 +15,27 @@ export default function AddPropertyPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    city: '',
-    postcode: '',
-    type: 'Residential',
-    coverImage: '',
+    name: '', address: '', city: '', postcode: '', type: 'Residential', images: [],
   });
 
-  const mutation = useApiMutation({ url: '/api/properties', method: 'post' });
+  const mutation = useApiMutation({ url: '/api/properties', method: 'POST' });
 
-  const handleInputChange = (field) => (event) => {
-    setFormData(prev => ({ ...prev, [field]: event.target.value }));
-  };
+  const handleInputChange = (e) => setFormData(p => ({ ...p, [e.target.name]: e.target.value }));
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     setUploadError('');
     const uploadFormData = new FormData();
-    uploadFormData.append('file', file);
+    for (const file of files) {
+      uploadFormData.append('files', file);
+    }
 
     try {
-      const res = await api('/api/uploads/single', { method: 'POST', body: uploadFormData });
-      setFormData(prev => ({ ...prev, coverImage: res.url }));
+      const res = await api.post('/api/uploads/multiple', uploadFormData);
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...res.urls] }));
     } catch (err) {
       setUploadError(err.message || 'File upload failed.');
     } finally {
@@ -49,8 +43,8 @@ export default function AddPropertyPage() {
     }
   };
 
-  const handleNext = () => setActiveStep((prev) => prev + 1);
-  const handleBack = () => setActiveStep((prev) => prev - 1);
+  const handleNext = () => setActiveStep(p => p + 1);
+  const handleBack = () => setActiveStep(p => p - 1);
 
   const handleSubmit = async () => {
     try {
@@ -72,34 +66,31 @@ export default function AddPropertyPage() {
 
       <Card><CardContent>
         {activeStep === 0 && (
-          <Grid container spacing={3}>
-            <Grid item xs={12}><Typography variant="h6">Basic Information</Typography></Grid>
-            <Grid item xs={12}><TextField fullWidth label="Property Name" value={formData.name} onChange={handleInputChange('name')} required /></Grid>
-            <Grid item xs={12}><TextField fullWidth label="Street Address" value={formData.address} onChange={handleInputChange('address')} /></Grid>
-            <Grid item xs={12} sm={6}><TextField fullWidth label="City" value={formData.city} onChange={handleInputChange('city')} /></Grid>
-            <Grid item xs={12} sm={6}><TextField fullWidth label="Postcode" value={formData.postcode} onChange={handleInputChange('postcode')} /></Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth select label="Property Type" value={formData.type} onChange={handleInputChange('type')}>
-                {['Residential', 'Commercial', 'Industrial', 'Retail'].map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </TextField>
-            </Grid>
+          <Grid container spacing={2}>
+            <Grid item xs={12}><TextField fullWidth name="name" label="Property Name" value={formData.name} onChange={handleInputChange} required /></Grid>
+            <Grid item xs={12}><TextField fullWidth name="address" label="Street Address" value={formData.address} onChange={handleInputChange} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth name="city" label="City" value={formData.city} onChange={handleInputChange} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth name="postcode" label="Postcode" value={formData.postcode} onChange={handleInputChange} /></Grid>
           </Grid>
         )}
 
         {activeStep === 1 && (
           <Box>
-            <Typography variant="h6" gutterBottom>Upload Cover Image</Typography>
+            <Typography variant="h6" gutterBottom>Upload Property Images</Typography>
             <Button variant="contained" component="label" startIcon={<CloudUpload />} disabled={isUploading}>
-              {isUploading ? 'Uploading...' : 'Choose Image'}
-              <input type="file" hidden accept="image/*" onChange={handleFileUpload} />
+              {isUploading ? 'Uploading...' : 'Choose Images'}
+              <input type="file" hidden multiple accept="image/*" onChange={handleFileUpload} />
             </Button>
             {isUploading && <CircularProgress size={24} sx={{ ml: 2 }} />}
             {uploadError && <Alert severity="error" sx={{ mt: 2 }}>{uploadError}</Alert>}
-            {formData.coverImage && (
-              <Box sx={{ mt: 3, border: '1px dashed grey', p: 1 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Image Preview:</Typography>
-                <img src={formData.coverImage} alt="Preview" style={{ maxWidth: '100%', maxHeight: '300px' }} />
-              </Box>
+            {formData.images.length > 0 && (
+              <Grid container spacing={2} sx={{ mt: 2 }}>
+                {formData.images.map(url => (
+                  <Grid item key={url} xs={6} sm={4} md={3}>
+                    <img src={url} alt="Preview" style={{ width: '100%', height: 'auto', borderRadius: '8px' }} />
+                  </Grid>
+                ))}
+              </Grid>
             )}
           </Box>
         )}
@@ -108,7 +99,7 @@ export default function AddPropertyPage() {
           <Box>
             <Typography variant="h6" gutterBottom>Review & Submit</Typography>
             {Object.entries(formData).map(([key, value]) => (
-              <Typography key={key}><strong>{key}:</strong> {value || 'N/A'}</Typography>
+              <Typography key={key}><strong>{key}:</strong> {Array.isArray(value) ? value.join(', ') : value || 'N/A'}</Typography>
             ))}
             {mutation.isError && <Alert severity="error" sx={{ mt: 2 }}>{mutation.error.message}</Alert>}
           </Box>
