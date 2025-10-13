@@ -15,6 +15,53 @@ const uploadPath = path.join(process.cwd(), 'uploads');
 const absoluteUploadPath = path.resolve(uploadPath);
 const fsp = fs.promises;
 
+const ensureUserOrg = async (user) => {
+  if (!user) throw new Error('User context is required');
+
+  const hasOrgId = typeof user.orgId === 'string' && user.orgId.trim().length > 0;
+  if (hasOrgId) {
+    const existingOrg = await prisma.org.findUnique({
+      where: { id: user.orgId },
+      select: { id: true },
+    });
+
+    if (existingOrg) {
+      return existingOrg.id;
+    }
+  }
+
+  const orgId = await prisma.$transaction(async (tx) => {
+    const freshUser = await tx.user.findUnique({
+      where: { id: user.id },
+      select: { orgId: true, company: true, name: true },
+    });
+
+    if (freshUser?.orgId) {
+      return freshUser.orgId;
+    }
+
+    const orgName =
+      (freshUser?.company && freshUser.company.trim()) ||
+      (freshUser?.name && freshUser.name.trim()) ||
+      'New Organization';
+
+    const newOrg = await tx.org.create({
+      data: { name: orgName },
+      select: { id: true },
+    });
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: { orgId: newOrg.id },
+    });
+
+    return newOrg.id;
+  });
+
+  user.orgId = orgId;
+  return orgId;
+};
+
 const normalizePropertyPayload = (payload = {}) => {
   const normalized = {};
   Object.entries(payload).forEach(([key, value]) => {
@@ -198,8 +245,9 @@ const unitSchema = z.object({
 // GET /api/properties
 router.get('/', async (req, res) => {
   try {
+    const orgId = await ensureUserOrg(req.user);
     const properties = await prisma.property.findMany({
-      where: { orgId: req.user.orgId },
+      where: { orgId },
       select: {
         id: true,
         name: true,
@@ -230,6 +278,7 @@ router.get('/', async (req, res) => {
 router.post('/', upload.array('images', 10), async (req, res) => {
   const uploadedImagePaths = (req.files ? req.files.map((file) => `/uploads/${file.filename}`) : []);
   try {
+    const orgId = await ensureUserOrg(req.user);
     const { name, address, city, postcode, country, type, status } = req.body;
     const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status });
     const validatedData = propertySchema.parse(payload);
@@ -237,7 +286,7 @@ router.post('/', upload.array('images', 10), async (req, res) => {
       data: {
         ...validatedData,
         images: uploadedImagePaths,
-        orgId: req.user.orgId,
+        orgId,
       },
     });
     res.status(201).json({ success: true, property });
@@ -255,8 +304,9 @@ router.post('/', upload.array('images', 10), async (req, res) => {
 // GET /api/properties/:id
 router.get('/:id', async (req, res) => {
   try {
+    const orgId = await ensureUserOrg(req.user);
     const property = await prisma.property.findFirst({
-      where: { id: req.params.id, orgId: req.user.orgId },
+      where: { id: req.params.id, orgId },
       select: {
         id: true,
         name: true,
@@ -291,8 +341,9 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
   const uploadedImagePaths = (req.files ? req.files.map((file) => `/uploads/${file.filename}`) : []);
   try {
     const { id } = req.params;
+    const orgId = await ensureUserOrg(req.user);
     const existingProperty = await prisma.property.findFirst({
-      where: { id, orgId: req.user.orgId },
+      where: { id, orgId },
     });
 
     if (!existingProperty) {
@@ -327,7 +378,7 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
     await removeImageFiles(removedImages);
 
     const property = await prisma.property.findFirst({
-      where: { id: updatedPropertyRecord.id, orgId: req.user.orgId },
+      where: { id: updatedPropertyRecord.id, orgId },
       select: {
         id: true,
         name: true,
@@ -363,8 +414,9 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = await ensureUserOrg(req.user);
     const property = await prisma.property.findFirst({
-      where: { id, orgId: req.user.orgId },
+      where: { id, orgId },
       select: { id: true, images: true },
     });
 
@@ -386,8 +438,9 @@ router.delete('/:id', async (req, res) => {
 router.post('/:propertyId/units', async (req, res) => {
   try {
     const { propertyId } = req.params;
+    const orgId = await ensureUserOrg(req.user);
     const property = await prisma.property.findFirst({
-      where: { id: propertyId, orgId: req.user.orgId },
+      where: { id: propertyId, orgId },
       select: { id: true },
     });
 
