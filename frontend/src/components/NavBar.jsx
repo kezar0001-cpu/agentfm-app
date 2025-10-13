@@ -1,10 +1,23 @@
-﻿import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LogoutButton from './LogoutButton';
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Divider,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 
 function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuAnchor, setMobileMenuAnchor] = useState(null);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -20,20 +33,56 @@ function NavBar() {
 
   const handleNavigation = (path) => {
     navigate(path);
+    handleCloseMobileMenu();
+  };
+
+  const handleOpenMobileMenu = (event) => {
+    setMobileMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseMobileMenu = () => {
+    setMobileMenuAnchor(null);
   };
 
   return (
-    <AppBar position="static" sx={{ backgroundColor: 'white', color: 'black', boxShadow: 2 }}>
-      <Toolbar>
+    <AppBar
+      position="static"
+      sx={{
+        backgroundColor: 'white',
+        color: 'black',
+        boxShadow: 2,
+      }}
+    >
+      <Toolbar
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          py: { xs: 1, md: 0 },
+        }}
+      >
         <Typography
           variant="h6"
-          sx={{ flexGrow: 0, mr: 4, fontWeight: 'bold', cursor: 'pointer' }}
+          sx={{
+            flexGrow: 0,
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            mr: { xs: 0, md: 4 },
+          }}
           onClick={() => navigate('/dashboard')}
         >
           AgentFM
         </Typography>
 
-        <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: { xs: 'none', md: 'flex' },
+            gap: 1,
+            flexWrap: 'wrap',
+          }}
+        >
           {navigation.map((item) => (
             <Button
               key={item.name}
@@ -54,7 +103,61 @@ function NavBar() {
           ))}
         </Box>
 
-        <LogoutButton variant="outlined" color="error" size="small" sx={{ textTransform: 'none' }} />
+        <Box sx={{ display: { xs: 'flex', md: 'none' }, marginLeft: 'auto' }}>
+          <IconButton
+            size="large"
+            aria-label="open navigation menu"
+            aria-controls="mobile-menu"
+            aria-haspopup="true"
+            onClick={handleOpenMobileMenu}
+            color="inherit"
+          >
+            <MenuIcon />
+          </IconButton>
+          <Menu
+            id="mobile-menu"
+            anchorEl={mobileMenuAnchor}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            open={Boolean(mobileMenuAnchor)}
+            onClose={handleCloseMobileMenu}
+            keepMounted
+            sx={{
+              '& .MuiPaper-root': {
+                minWidth: 220,
+              },
+            }}
+          >
+            {navigation.map((item) => (
+              <MenuItem
+                key={item.name}
+                onClick={() => handleNavigation(item.href)}
+                selected={location.pathname === item.href}
+              >
+                {item.name}
+              </MenuItem>
+            ))}
+            <Divider sx={{ my: 1 }} />
+            <Box sx={{ px: 2, pb: 1 }}>
+              <LogoutButton
+                fullWidth
+                variant="outlined"
+                color="error"
+                size="small"
+                sx={{ textTransform: 'none' }}
+              />
+            </Box>
+          </Menu>
+        </Box>
+
+        <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <LogoutButton
+            variant="outlined"
+            color="error"
+            size="small"
+            sx={{ textTransform: 'none' }}
+          />
+        </Box>
       </Toolbar>
     </AppBar>
   );
