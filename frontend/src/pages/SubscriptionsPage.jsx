@@ -172,113 +172,148 @@ export default function SubscriptionsPage() {
                 </Stack>
               </Paper>
             ) : (
-              // Pricing Card View
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Card
-                  sx={{
-                    maxWidth: 500,
-                    width: '100%',
-                    border: '2px solid',
-                    borderColor: 'primary.main',
-                    boxShadow: 3,
-                  }}
-                >
-                  <CardContent sx={{ p: 4 }}>
-                    <Stack spacing={3}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Chip
-                          label="MOST POPULAR"
-                          color="primary"
-                          size="small"
-                          sx={{ mb: 2, fontWeight: 600 }}
-                        />
-                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                          Starter Plan
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 1 }}>
-                          <Typography variant="h2" sx={{ fontWeight: 700 }}>
-                            $29
+              // Pricing, "Why Subscribe", and FAQ sections for non-subscribed users
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Card
+                    sx={{
+                      maxWidth: 500,
+                      width: '100%',
+                      border: '2px solid',
+                      borderColor: 'primary.main',
+                      boxShadow: 3,
+                    }}
+                  >
+                    <CardContent sx={{ p: 4 }}>
+                      <Stack spacing={3}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Chip
+                            label="MOST POPULAR"
+                            color="primary"
+                            size="small"
+                            sx={{ mb: 2, fontWeight: 600 }}
+                          />
+                          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                            Starter Plan
                           </Typography>
-                          <Typography variant="h6" color="text.secondary">
-                            /month
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 1 }}>
+                            <Typography variant="h2" sx={{ fontWeight: 700 }}>
+                              $29
+                            </Typography>
+                            <Typography variant="h6" color="text.secondary">
+                              /month
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                      <Divider />
-                      <List sx={{ py: 0 }}>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Unlimited properties & units" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Assign owners, tenants & technicians" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Inspection & job management" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Maintenance plans & scheduling" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Reports & analytics dashboard" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Service requests & recommendations" />
-                        </ListItem>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
-                          <ListItemText primary="Email support" />
-                        </ListItem>
-                      </List>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        fullWidth
-                        onClick={() => startCheckout('STARTER')}
-                        disabled={checkoutMutation.isPending}
-                        sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 600, textTransform: 'none' }}
-                      >
-                        {checkoutMutation.isPending ? 'Processing...' : 'Subscribe Now'}
-                      </Button>
-                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
-                        Secure payment powered by Stripe • Cancel anytime
+                        <Divider />
+                        <List sx={{ py: 0 }}>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Unlimited properties & units" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Assign owners, tenants & technicians" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Inspection & job management" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Maintenance plans & scheduling" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Reports & analytics dashboard" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Service requests & recommendations" />
+                          </ListItem>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><CheckCircleIcon color="success" /></ListItemIcon>
+                            <ListItemText primary="Email support" />
+                          </ListItem>
+                        </List>
+                        <Button
+                          variant="contained"
+                          size="large"
+                          fullWidth
+                          onClick={() => startCheckout('STARTER')}
+                          disabled={checkoutMutation.isPending}
+                          sx={{ py: 1.5, fontSize: '1.1rem', fontWeight: 600, textTransform: 'none' }}
+                        >
+                          {checkoutMutation.isPending ? 'Processing...' : 'Subscribe Now'}
+                        </Button>
+                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
+                          Secure payment powered by Stripe • Cancel anytime
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Box>
+                
+                {/* Why Subscribe Section */}
+                <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Why subscribe to AgentFM?
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        🏢 Streamline Your Operations
                       </Typography>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Manage all your properties, units, and team members from one unified platform.
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        ✅ Stay Compliant
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Track inspections, maintenance plans, and generate reports for compliance and decision-making.
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        👥 Collaborate Better
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Invite owners, tenants, and technicians to collaborate seamlessly on jobs and service requests.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                {/* FAQ Section */}
+                <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Frequently Asked Questions
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Can I cancel my subscription at any time?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        What happens when my free trial ends?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        You will be prompted to subscribe to a paid plan to continue using the service. Your data will be saved, and you can pick up right where you left off after subscribing.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </>
             )}
           </DataState>
-          
-          {/* FAQ Section */}
-          <Paper sx={{ p: 3, bgcolor: 'grey.50', maxWidth: 800, mx: 'auto' }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-              Frequently Asked Questions
-            </Typography>
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  Can I cancel my subscription at any time?
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  What happens when my free trial ends?
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  You will be prompted to subscribe to a paid plan to continue using the service. Your data will be saved, and you can pick up right where you left off after subscribing.
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
         </Stack>
       </Container>
     </Box>
