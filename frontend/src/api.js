@@ -1,6 +1,6 @@
 // frontend/src/api.js
 // Production-ready API client
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://agentfm-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.buildstate.com.au';
 
 // Get auth token from localStorage
 function getAuthToken() {
