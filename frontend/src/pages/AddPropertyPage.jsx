@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { Box, Button, TextField, Typography, Stack, MenuItem, FormControl, InputLabel, Select } from '@mui/material';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import useApiQuery from '../hooks/useApiQuery';
+import useApiMutation from '../hooks/useApiMutation.js';
 
 const AddPropertyPage = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
   const [imageFiles, setImageFiles] = useState([]);
-  const token = localStorage.getItem('token'); // Retrieve token from storage
-  const { mutate: addProperty, isLoading, error } = useApiQuery({
-    url: '/properties',
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined, // Add token if available
+
+  const addPropertyMutation = useApiMutation({
+    url: '/api/properties',
+    method: 'post',
+    onSuccess: () => {
+      navigate('/properties');
+    },
   });
 
   const onSubmit = async (data) => {
@@ -25,26 +27,15 @@ const AddPropertyPage = () => {
     formData.append('country', data.country || '');
     formData.append('type', data.type || '');
     formData.append('status', data.status || 'Active');
-    imageFiles.forEach((file, index) => {
-      formData.append(`images[${index}]`, file);
+    imageFiles.forEach((file) => {
+      formData.append('images', file);
     });
     console.log('FormData entries:', Array.from(formData.entries()));
 
     try {
-      await addProperty(formData, {
-        onSuccess: () => {
-          console.log('Property added successfully');
-          alert('Property added successfully!');
-          navigate('/properties');
-        },
-        onError: (err) => {
-          console.error('Add property error:', err);
-          alert('Failed to add property: ' + (err.message || 'Unknown error'));
-        },
-      });
+      await addPropertyMutation.mutateAsync({ data: formData });
     } catch (err) {
-      console.error('Unexpected error:', err);
-      alert('Unexpected error adding property');
+      console.error('Add property error:', err);
     }
   };
 
@@ -125,11 +116,15 @@ const AddPropertyPage = () => {
             variant="contained"
             color="primary"
             fullWidth
-            disabled={isLoading}
+            disabled={addPropertyMutation.isPending}
           >
-            {isLoading ? 'Adding...' : 'Add Property'}
+            {addPropertyMutation.isPending ? 'Adding...' : 'Add Property'}
           </Button>
-          {error && <Typography color="error">{error.message}</Typography>}
+          {addPropertyMutation.isError && (
+            <Typography color="error">
+              {addPropertyMutation.error?.message || 'Failed to add property'}
+            </Typography>
+          )}
         </Stack>
       </form>
     </Box>
