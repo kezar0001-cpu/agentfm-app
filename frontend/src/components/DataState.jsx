@@ -20,10 +20,22 @@ export default function DataState({
 
   if (isLoading) {
     return (
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ py: 4 }}>
-        <CircularProgress size={24} />
-        <Typography>{t('feedback.loading')}</Typography>
-      </Stack>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          py: 4,
+        }}
+        aria-live="polite"
+        role="status"
+        aria-busy="true"
+      >
+        <CircularProgress size={40} color="primary" aria-label={t('feedback.loading')} />
+        <Typography sx={{ ml: 2 }}>
+          {t('feedback.loadingProperties', 'Loading Properties...')}
+        </Typography>
+      </Box>
     );
   }
 
