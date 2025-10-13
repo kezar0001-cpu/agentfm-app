@@ -142,6 +142,18 @@ export default function PropertiesPage() {
     return ['all', ...Array.from(types)];
   }, [properties]);
 
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterType('all');
+  };
+
+  const hasFiltersApplied = searchTerm.trim() !== '' || filterType !== 'all';
+  const isPropertiesEmpty = !isLoading && properties.length === 0;
+  const isFilteredEmpty = !isLoading && filteredProperties.length === 0 && properties.length > 0;
+  const emptyMessage = isFilteredEmpty
+    ? 'No properties match your filters. Try resetting or adding a new property.'
+    : 'No properties available yet. Try adding a new property to get started.';
+
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1200px', margin: '0 auto' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4, flexWrap: 'wrap', gap: 2 }}>
@@ -189,7 +201,17 @@ export default function PropertiesPage() {
           </Grid>
         </Grid>
       </Card>
-      <DataState isLoading={isLoading} isError={isError} error={error} onRetry={refetch} isEmpty={!isLoading && properties.length === 0}>
+      <DataState
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={refetch}
+        isEmpty={isPropertiesEmpty || isFilteredEmpty}
+        emptyMessage={emptyMessage}
+        onResetFilters={resetFilters}
+        onAddProperty={() => navigate('/properties/add')}
+        showResetButton={hasFiltersApplied}
+      >
         <Grid container spacing={4}>
           {filteredProperties.map(property => (
             <Grid item xs={12} sm={6} md={4} key={property.id}>
@@ -201,13 +223,6 @@ export default function PropertiesPage() {
             </Grid>
           ))}
         </Grid>
-        {!isLoading && filteredProperties.length === 0 && properties.length > 0 && (
-          <Box sx={{ py: 4 }}>
-            <Typography color="text.secondary">
-              No properties match the current filters.
-            </Typography>
-          </Box>
-        )}
       </DataState>
     </Box>
   );
