@@ -1,139 +1,179 @@
+// frontend/src/pages/AddPropertyPage.jsx
 import { useState } from 'react';
-import { Box, Button, TextField, Typography, Stack, MenuItem, FormControl, InputLabel, Select } from '@mui/material';
-import { useForm } from 'react-hook-form';
+import {
+  Box, Card, CardContent, Typography, TextField, Button, Stack, MenuItem, Grid, Stepper, Step, StepLabel, Alert, CircularProgress, IconButton
+} from '@mui/material';
+import { Save, ArrowBack, CloudUpload, Delete } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import useApiQuery from '../hooks/useApiQuery';
+import useApiMutation from '../hooks/useApiMutation';
+import { api } from '../api';
+import { API_BASE } from '../lib/auth';
+import * as Yup from 'yup';
 
-const AddPropertyPage = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+const steps = ['Basic Information', 'Upload Images', 'Review & Submit'];
+
+const validationSchema = Yup.object({
+  name: Yup.string().required('Property name is required'),
+  address: Yup.string(),
+  city: Yup.string(),
+  postcode: Yup.string().matches(/^\d{4}$/, 'Must be a 4-digit postcode'),
+  type: Yup.string().oneOf(['Commercial', 'Residential', 'Retail', 'Industrial', 'Mixed Use']),
+  description: Yup.string(),
+  images: Yup.array().of(Yup.string()).nullable(),
+});
+
+export default function AddPropertyPage() {
   const navigate = useNavigate();
-  const [imageFiles, setImageFiles] = useState([]);
-  const token = localStorage.getItem('token'); // Retrieve token from storage
-  const { mutate: addProperty, isLoading, error } = useApiQuery({
-    url: '/properties',
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined, // Add token if available
+  const [activeStep, setActiveStep] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    postcode: '',
+    type: 'Residential',
+    description: '',
+    images: [],
   });
 
-  const onSubmit = async (data) => {
-    console.log('Form data:', data);
-    const formData = new FormData();
-    formData.append('name', data.name || '');
-    formData.append('address', data.address || '');
-    formData.append('city', data.city || '');
-    formData.append('postcode', data.postcode || '');
-    formData.append('country', data.country || '');
-    formData.append('type', data.type || '');
-    formData.append('status', data.status || 'Active');
-    imageFiles.forEach((file, index) => {
-      formData.append(`images[${index}]`, file);
-    });
-    console.log('FormData entries:', Array.from(formData.entries()));
+  const mutation = useApiMutation({ url: '/api/properties', method: 'post' });
+
+  const handleInputChange = (field) => (event) => {
+    setFormData(prev => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+
+    if (files.some(file => file.size > 5 * 1024 * 1024)) {
+      setUploadError('Files must be under 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+    const uploadFormData = new FormData();
+    files.forEach(file => uploadFormData.append('files', file));
 
     try {
-      await addProperty(formData, {
-        onSuccess: () => {
-          console.log('Property added successfully');
-          alert('Property added successfully!');
-          navigate('/properties');
-        },
-        onError: (err) => {
-          console.error('Add property error:', err);
-          alert('Failed to add property: ' + (err.message || 'Unknown error'));
-        },
-      });
+      const res = await api.post('/api/uploads/multiple', uploadFormData);
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...res.urls] }));
+      alert(`Successfully uploaded ${res.urls.length} image(s)`);
     } catch (err) {
-      console.error('Unexpected error:', err);
-      alert('Unexpected error adding property');
+      setUploadError(err.message || 'File upload failed.');
+    } finally {
+      setIsUploading(false);
+      event.target.value = null;
     }
   };
 
-  const handleImageChange = (event) => {
-    setImageFiles(Array.from(event.target.files));
-    console.log('Selected images:', Array.from(event.target.files));
+  const handleDeleteImage = (indexToDelete) => {
+    setFormData(prev => ({
+      ...prev, images: prev.images.filter((_, index) => index !== indexToDelete),
+    }));
   };
 
-  return (
-    <Box sx={{ p: 4, maxWidth: '600px', margin: '0 auto' }}>
-      <Typography variant="h4" sx={{ mb: 4 }}>Add New Property</Typography>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Stack spacing={3}>
-          <TextField
-            label="Name"
-            {...register('name', { required: 'Name is required' })}
-            error={!!errors.name}
-            helperText={errors.name?.message}
-            fullWidth
-          />
-          <TextField
-            label="Address"
-            {...register('address')}
-            fullWidth
-          />
-          <TextField
-            label="City"
-            {...register('city')}
-            fullWidth
-          />
-          <TextField
-            label="Postcode"
-            {...register('postcode')}
-            fullWidth
-          />
-          <TextField
-            label="Country"
-            {...register('country')}
-            fullWidth
-          />
-          <FormControl fullWidth>
-            <InputLabel>Type</InputLabel>
-            <Select
-              label="Type"
-              {...register('type')}
-              defaultValue=""
-            >
-              <MenuItem value="Residential">Residential</MenuItem>
-              <MenuItem value="Commercial">Commercial</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              label="Status"
-              {...register('status')}
-              defaultValue="Active"
-            >
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Inactive">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-          <Button variant="contained" component="label">
-            Upload Images
-            <input
-              type="file"
-              hidden
-              multiple
-              onChange={handleImageChange}
-              accept="image/*"
-            />
-          </Button>
-          <Typography variant="body2" color="text.secondary">
-            {imageFiles.length > 0 ? `${imageFiles.length} file(s) selected` : 'No files selected'}
-          </Typography>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            fullWidth
-            disabled={isLoading}
-          >
-            {isLoading ? 'Adding...' : 'Add Property'}
-          </Button>
-          {error && <Typography color="error">{error.message}</Typography>}
-        </Stack>
-      </form>
-    </Box>
-  );
-};
+  const handleNext = () => setActiveStep((prev) => prev + 1);
+  const handleBack = () => setActiveStep((prev) => prev - 1);
 
-export default AddPropertyPage;
+  const validateForm = async () => {
+    try {
+      await validationSchema.validate(formData, { abortEarly: false });
+      setErrors({});
+      return true;
+    } catch (err) {
+      const newErrors = err.inner.reduce((acc, { path, message }) => ({ ...acc, [path]: message }), {});
+      setErrors(newErrors);
+      return false;
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (await validateForm()) {
+      try {
+        const response = await mutation.mutateAsync({ data: formData });
+        alert('Property added successfully!');
+        navigate('/properties');
+      } catch (error) {
+        setErrors({ submit: error.message || 'Failed to add property' });
+      }
+    }
+  };
+
+  const propertyTypes = ['Commercial', 'Residential', 'Retail', 'Industrial', 'Mixed Use'];
+
+  return (
+    <Box>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Add New Property</Typography>
+        <Button startIcon={<ArrowBack />} onClick={() => navigate('/properties')}>Back</Button>
+      </Stack>
+
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Stepper activeStep={activeStep} alternativeLabel>
+            {steps.map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+          </Stepper>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          {activeStep === 0 && (
+            <Grid container spacing={3}>
+              <Grid item xs={12}><Typography variant="h6">Basic Information</Typography></Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Property Name"
+                  value={formData.name}
+                  onChange={handleInputChange('name')}
+                  error={!!errors.name}
+                  helperText={errors.name}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Street Address"
+                  value={formData.address}
+                  onChange={handleInputChange('address')}
+                  error={!!errors.address}
+                  helperText={errors.address}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="City"
+                  value={formData.city}
+                  onChange={handleInputChange('city')}
+                  error={!!errors.city}
+                  helperText={errors.city}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Postcode"
+                  value={formData.postcode}
+                  onChange={handleInputChange('postcode')}
+                  error={!!errors.postcode}
+                  helperText={errors.postcode}
+                />
+              </Grid>
+            </Grid>
+          )}
+
+          {activeStep === 1 && (
+            <Grid container spacing={3}>
+              <Grid item xs={12}><Typography variant="h6">Property Details & Image</Typography></Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Property
