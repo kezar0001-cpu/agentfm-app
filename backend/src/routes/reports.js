@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
 import { createReportRequest } from '../data/memoryStore.js';
 
 const router = express.Router();

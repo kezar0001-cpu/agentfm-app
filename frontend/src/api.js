@@ -1,111 +1,107 @@
 // frontend/src/api.js
-// Production-ready API client
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.buildstate.com.au';
+// Production-ready API client (absolute base + credentials included)
 
-// Get auth token from localStorage
-function getAuthToken() {
-  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+// Base URL from env, sanitized (no trailing slash)
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+if (!API_BASE) {
+  // eslint-disable-next-line no-console
+  console.warn('VITE_API_BASE_URL is not set; API calls may fail.');
 }
 
-// Main API call function
+// Safe URL join: accepts '/api/...'(preferred) or 'api/...'
+function joinUrl(path) {
+  const p = path.startsWith('/') ? path.slice(1) : path;
+  return new URL(p, API_BASE + '/').toString();
+}
+
+// Read bearer token if you still use it anywhere (cookies are primary)
+function getAuthToken() {
+  try {
+    return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  } catch {
+    return null;
+  }
+}
+
+// Core caller
 async function apiCall(url, options = {}) {
   const token = getAuthToken();
-  
+
+  // Build absolute URL against API_BASE
+  const path =
+    url.startsWith('/api') || url.startsWith('api')
+      ? url
+      : `/api${url.startsWith('/') ? url : '/' + url}`;
+  const fullUrl = url.startsWith('http') ? url : joinUrl(path);
+
+  // Headers: JSON by default; let browser set FormData boundaries
+  const isFormData = options.body instanceof FormData;
   const headers = {
-    // This will be populated below
-    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(options.headers || {}),
   };
 
-  // 👇 MINIMAL CHANGE START: Conditionally set Content-Type
-  // Do NOT set Content-Type for FormData; the browser must handle it to include the boundary.
-  if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-  // 👆 MINIMAL CHANGE END
+  // Compose request
+  const req = {
+    method: options.method || 'GET',
+    headers,
+    credentials: 'include', // crucial for cross-site cookie auth
+    body:
+      options.body ??
+      (options.data instanceof FormData
+        ? options.data
+        : options.data !== undefined
+        ? JSON.stringify(options.data)
+        : undefined),
+  };
 
   try {
-    // Build full URL with proper /api prefix
-    let fullUrl = url;
-    
-    if (!url.startsWith('http')) {
-      const path = url.startsWith('/api') 
-        ? url 
-        : `/api${url.startsWith('/') ? url : '/' + url}`;
-      fullUrl = `${API_BASE_URL}${path}`;
-    }
-    
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-      credentials: 'include',
-    });
+    const res = await fetch(fullUrl, req);
+    const text = await res.text();
 
-    // Handle 401 Unauthorized - redirect to signin
-    if (response.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/signin';
-      throw new Error('Unauthorized - please sign in again');
+    if (!res.ok) {
+      let data;
+      try {
+        data = text ? JSON.parse(text) : undefined;
+      } catch {
+        data = undefined;
+      }
+      const serverMsg = data?.message || data?.error || text || 'Request failed';
+      const err = new Error(serverMsg);
+      err.status = res.status;
+      err.body = data ?? text;
+      // eslint-disable-next-line no-console
+      console.error('API ERROR', { url: fullUrl, status: res.status, body: err.body });
+      throw err;
     }
 
-    // 👇 MINIMAL CHANGE START: Better error handling for non-JSON server responses
-    const text = await response.text();
-    let responseData;
+    // Prefer JSON if parsable; otherwise return raw text
     try {
-        responseData = JSON.parse(text);
-    } catch (e) {
-        // If parsing fails, it's not a valid JSON response.
-        if (!response.ok) {
-            throw new Error(text || `HTTP ${response.status} Error`);
-        }
-        // It could be a non-JSON success response, which we don't expect but handle gracefully.
-        return text; 
+      return text ? JSON.parse(text) : undefined;
+    } catch {
+      return text;
     }
-    // 👆 MINIMAL CHANGE END
-
-    if (!response.ok) {
-      const errorMessage = responseData.message || responseData.error || `HTTP ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return responseData;
-  } catch (error) {
-    console.error('API call failed:', error);
-    throw error;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('API call failed:', e);
+    throw e;
   }
 }
 
-// 👇 MINIMAL CHANGE START: Pass FormData directly without stringifying
+// Public helpers
 export const api = {
-  get: (url) => apiCall(url, { method: 'GET' }),
-  
-  post: (url, data) => apiCall(url, {
-    method: 'POST',
-    body: data instanceof FormData ? data : JSON.stringify(data),
-  }),
-  
-  put: (url, data) => apiCall(url, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  
-  patch: (url, data) => apiCall(url, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-  
-  delete: (url) => apiCall(url, {
-    method: 'DELETE',
-  }),
-
+  get: (url, opts) => apiCall(url, { ...(opts || {}), method: 'GET' }),
+  post: (url, data, opts) => apiCall(url, { ...(opts || {}), method: 'POST', data }),
+  put: (url, data, opts) => apiCall(url, { ...(opts || {}), method: 'PUT', data }),
+  patch: (url, data, opts) => apiCall(url, { ...(opts || {}), method: 'PATCH', data }),
+  delete: (url, opts) => apiCall(url, { ...(opts || {}), method: 'DELETE' }),
   request: ({ url, method = 'GET', data, params, headers }) => {
-    // ... (rest of your existing request function)
+    const p = params
+      ? url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString()
+      : url;
+    return apiCall(p, { method, data, headers });
   },
 };
-// 👆 MINIMAL CHANGE END
 
 export default api;

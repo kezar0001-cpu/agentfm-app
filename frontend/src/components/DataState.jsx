@@ -8,15 +8,34 @@ export default function DataState({
   isEmpty,
   onRetry,
   children,
+  emptyMessage,
+  onResetFilters,
+  onAddProperty,
+  resetButtonLabel = 'Reset Filters',
+  addButtonLabel = 'Add a Property',
+  showResetButton = true,
+  showAddButton = true,
 }) {
   const { t } = useTranslation();
 
   if (isLoading) {
     return (
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ py: 4 }}>
-        <CircularProgress size={24} />
-        <Typography>{t('feedback.loading')}</Typography>
-      </Stack>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          py: 4,
+        }}
+        aria-live="polite"
+        role="status"
+        aria-busy="true"
+      >
+        <CircularProgress size={40} color="primary" aria-label={t('feedback.loading')} />
+        <Typography sx={{ ml: 2 }}>
+          {t('feedback.loadingProperties', 'Loading Properties...')}
+        </Typography>
+      </Box>
     );
   }
 
@@ -40,8 +59,30 @@ export default function DataState({
 
   if (isEmpty) {
     return (
-      <Box sx={{ py: 4 }}>
-        <Typography color="text.secondary">{t('feedback.empty')}</Typography>
+      <Box sx={{ py: 6, textAlign: 'center' }}>
+        <Typography color="text.secondary">
+          {emptyMessage || t('feedback.empty')}
+        </Typography>
+        {(onResetFilters || onAddProperty) && (
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            justifyContent="center"
+            alignItems="center"
+            sx={{ mt: 3 }}
+          >
+            {onResetFilters && showResetButton && (
+              <Button variant="outlined" onClick={onResetFilters}>
+                {resetButtonLabel}
+              </Button>
+            )}
+            {onAddProperty && showAddButton && (
+              <Button variant="contained" onClick={onAddProperty}>
+                {addButtonLabel}
+              </Button>
+            )}
+          </Stack>
+        )}
       </Box>
     );
   }

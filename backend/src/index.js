@@ -5,16 +5,16 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
-import { PrismaClient } from '@prisma/client';
 import path from 'path'; // Your existing code has this
+import fs from 'fs';
+import { ensurePropertySchema } from './utils/ensurePropertySchema.js';
+import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
 
 // ---- Load env
 dotenv.config();
 
-// ---- Prisma (exported so other modules can `import { prisma }`)
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
-});
+// ---- Prisma (re-exported for backwards compatibility)
+export { prismaInstance as prisma };
 
 // ---- App
 const app = express();
@@ -55,8 +55,11 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 
 // ---- Serve Static Files ---
-const __dirname = path.resolve();
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadPath));
 
 // ---- Session
 // ... (your existing session configuration remains the same)
@@ -125,25 +128,73 @@ app.use('/api/serviceRequests', serviceRequestsRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
-// ... (all of your existing code at the end of the file remains the same)
 app.get('/health', async (_req, res) => {
-    //...
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({ status: 'error', message: 'Database connection failed' });
+  }
 });
+
 app.get('/', (_req, res) => {
-    //...
+  res.json({ status: 'ok', message: 'AgentFM API is running' });
 });
+
 app.use('*', (req, res) => {
-    //...
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
+
 app.use((err, _req, res, _next) => {
-    //...
+  console.error('Unhandled error:', err);
+  if (res.headersSent) {
+    return;
+  }
+  const status = err.statusCode || err.status || 500;
+  res.status(status).json({
+    success: false,
+    message: err.message || 'Internal server error',
+  });
 });
-process.on('SIGINT', async () => {
-    //...
-});
-process.on('SIGTERM', async () => {
-    //...
-});
-app.listen(PORT, () => {
-    //...
-});
+
+async function startServer() {
+  try {
+    await ensurePropertySchema(prisma);
+
+    const server = app.listen(PORT, () => {
+      console.log(`✅ AgentFM backend listening on port ${PORT}`);
+    });
+
+    let shuttingDown = false;
+    const shutdown = async (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+
+      console.log(`Received ${signal}. Shutting down gracefully...`);
+
+      const closeServer = new Promise((resolve) => {
+        server.close(() => {
+          resolve();
+        });
+      });
+
+      try {
+        await Promise.allSettled([closeServer, prisma.$disconnect()]);
+        console.log('Shutdown complete. Goodbye!');
+        process.exit(0);
+      } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+  } catch (error) {
+    console.error('❌ Failed to start AgentFM backend:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

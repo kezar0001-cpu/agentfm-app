@@ -39,6 +39,7 @@ describe('ES Module Imports', () => {
     const jobsRouter = await import('../src/routes/jobs.js');
     const unitsRouter = await import('../src/routes/units.js');
     const uploadsRouter = await import('../src/routes/uploads.js');
+    const billingRouter = await import('../src/routes/billing.js');
 
     assert.ok(subscriptionsRouter.default);
     assert.ok(reportsRouter.default);
@@ -50,6 +51,7 @@ describe('ES Module Imports', () => {
     assert.ok(jobsRouter.default);
     assert.ok(unitsRouter.default);
     assert.ok(uploadsRouter.default);
+    assert.ok(billingRouter.default);
   });
 
   it('should compute PCI correctly', async () => {

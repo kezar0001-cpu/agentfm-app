@@ -6,7 +6,8 @@ import {
   IconButton, InputAdornment
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { API_BASE, api, saveTokenFromUrl } from '../lib/auth';
+import { saveTokenFromUrl } from '../lib/auth';
+import { api } from '../api.js';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -25,9 +26,9 @@ export default function SignIn() {
   }, [navigate]);
 
   const googleUrl = useMemo(() => {
-    if (!API_BASE) return null;
-    // Backend expects role, not "action"
-    const url = new URL('/api/auth/google', API_BASE);
+    const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    if (!BASE) return null;
+    const url = new URL('/api/auth/google', BASE + '/');
     url.searchParams.set('role', 'PROPERTY_MANAGER');
     return url.toString();
   }, []);
@@ -47,14 +48,10 @@ export default function SignIn() {
     setError('');
     setLoading(true);
     try {
-      const res = await api('/api/auth/login', {
-        method: 'POST',
-        json: {
-          email: formData.email.trim().toLowerCase(),
-          password: formData.password,
-          // (optional) role hint; backend supports it but not required:
-          // role: 'PROPERTY_MANAGER',
-        },
+      const res = await api.post('/api/auth/login', {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        // role: 'PROPERTY_MANAGER', // optional hint
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
@@ -63,6 +60,7 @@ export default function SignIn() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Login error:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -83,14 +81,18 @@ export default function SignIn() {
       <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%', borderRadius: 2 }}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h3" component="h1" sx={{
-              fontWeight: 700,
-              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              mb: 1
-            }}>
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1
+              }}
+            >
               AgentFM
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -149,8 +151,10 @@ export default function SignIn() {
               </Button>
             </Box>
 
-            <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}
-              sx={{ mt: 1, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
+            <Button
+              type="submit" fullWidth variant="contained" size="large" disabled={loading}
+              sx={{ mt: 1, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}
+            >
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
 
