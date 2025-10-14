@@ -1,3 +1,4 @@
+// frontend/src/useApiMutation.js
 import { useState } from 'react';
 import { api } from '../api.js';
 
@@ -12,38 +13,25 @@ export default function useApiMutation({ url, method = 'post', invalidateKeys = 
     setError(null);
 
     try {
-      // Extract URL override if provided
       const requestUrl = variables.url || url;
-      const requestMethod = variables.method || method;
+      const requestMethod = String(variables.method || method).toLowerCase();
       const requestData = variables.data;
+      const requestHeaders = variables.headers;
+      const requestParams = variables.params;
 
-      console.log('useApiMutation:', requestMethod.toUpperCase(), requestUrl, requestData);
+      // Single path via api.request to allow extra options consistently
+      const resp = await api.request({
+        url: requestUrl,
+        method: requestMethod.toUpperCase(),
+        data: requestData,
+        headers: requestHeaders,
+        params: requestParams,
+      });
 
-      let response;
-      switch (requestMethod.toLowerCase()) {
-        case 'post':
-          response = await api.post(requestUrl, requestData);
-          break;
-        case 'put':
-          response = await api.put(requestUrl, requestData);
-          break;
-        case 'patch':
-          response = await api.patch(requestUrl, requestData);
-          break;
-        case 'delete':
-          response = await api.delete(requestUrl);
-          break;
-        default:
-          throw new Error(`Unsupported method: ${requestMethod}`);
-      }
-
-      // Call onSuccess callback if provided
-      if (onSuccess) {
-        onSuccess(response, variables);
-      }
-
-      return response;
+      if (onSuccess) onSuccess(resp, variables);
+      return resp;
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('useApiMutation error:', err);
       setIsError(true);
       setError(err);

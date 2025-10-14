@@ -1,3 +1,4 @@
+// frontend/src/pages/PropertiesPage.jsx
 import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
