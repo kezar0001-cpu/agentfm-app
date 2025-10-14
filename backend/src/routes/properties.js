@@ -10,12 +10,12 @@ import fs from 'fs';
 
 const router = Router();
 
-// --- Paths / FS helpers ---
+// --- FS helpers ---
 const uploadPath = path.join(process.cwd(), 'uploads');
 const absoluteUploadPath = path.resolve(uploadPath);
 const fsp = fs.promises;
 
-// --- Org helper ---
+// --- Org helper (unchanged) ---
 const ensureUserOrg = async (user, prismaClient = prisma) => {
   if (!user) throw new Error('User context is required');
 
@@ -63,7 +63,7 @@ const ensureUserOrg = async (user, prismaClient = prisma) => {
   return orgId;
 };
 
-// --- Payload utils ---
+// --- Payload utils (unchanged) ---
 const normalizePropertyPayload = (payload = {}) => {
   const normalized = {};
   Object.entries(payload).forEach(([key, value]) => {
@@ -160,7 +160,7 @@ const dedupeImages = (images = []) => {
   return result;
 };
 
-// --- Auth / Role gates ---
+// --- Auth / Roles (unchanged) ---
 const requireAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -180,7 +180,7 @@ const requireAuth = async (req, res, next) => {
 router.use(requireAuth);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 
-// --- Multer uploads ---
+// --- Multer uploads (unchanged) ---
 if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadPath),
@@ -188,7 +188,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// --- Zod schemas ---
+// --- Zod schemas (unchanged) ---
 const optionalStringField = z.preprocess(
   (v) => {
     if (v === undefined || v === null) return v;
@@ -259,55 +259,58 @@ const unitSchema = z.object({
   status: z.string().optional(),
 });
 
-// --- Routes ---
+// ================= Routes =================
 
-// LIST /api/properties
+// LIST — **SAFE QUERY** (no selects/counts)
 router.get('/', async (req, res) => {
   try {
     const orgId = await ensureUserOrg(req.user);
+
+    // Return all columns as-is to avoid referencing non-existent fields.
     const properties = await prisma.property.findMany({
       where: { orgId },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        city: true,
-        postcode: true,
-        country: true,
-        type: true,
-        status: true,
-        images: true,
-        orgId: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: { select: { units: true } }, // keep safe
-      },
       orderBy: { createdAt: 'desc' },
     });
+
     return res.json({ success: true, properties });
   } catch (error) {
-    console.error('Get properties error:', { message: error?.message, code: error?.code, meta: error?.meta });
+    console.error('Get properties error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack,
+    });
     return res.status(500).json({ success: false, message: 'Failed to fetch properties' });
   }
 });
 
-// CREATE /api/properties
+// CREATE
 router.post('/', upload.array('images', 10), async (req, res) => {
   const uploadedImagePaths = req.files ? req.files.map((f) => `/uploads/${f.filename}`) : [];
   try {
     const orgId = await ensureUserOrg(req.user);
     const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
+
+    const payload = normalizePropertyPayload({
+      name, address, city, postcode, country, type, status, coverImage, images,
+    });
+
     const validatedData = propertySchema.parse(payload);
     const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validatedData;
 
     const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
     const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
-    const imagesToPersist = dedupeImages([...(coverImagePath ? [coverImagePath] : []), ...bodyImageList, ...uploadedImagePaths]);
+
+    const imagesToPersist = dedupeImages([
+      ...(coverImagePath ? [coverImagePath] : []),
+      ...bodyImageList,
+      ...uploadedImagePaths,
+    ]);
 
     const property = await prisma.property.create({
       data: { ...propertyData, images: imagesToPersist, orgId },
     });
+
     return res.status(201).json({ success: true, property });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -320,28 +323,15 @@ router.post('/', upload.array('images', 10), async (req, res) => {
   }
 });
 
-// DETAIL /api/properties/:id
+// DETAIL
 router.get('/:id', async (req, res) => {
   try {
     const orgId = await ensureUserOrg(req.user);
     const property = await prisma.property.findFirst({
       where: { id: req.params.id, orgId },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        city: true,
-        postcode: true,
-        country: true,
-        type: true,
-        status: true,
-        images: true,
-        orgId: true,
-        createdAt: true,
-        updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
-      },
+      // Keep a conservative selection here if needed; returning full property is also fine.
     });
+
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
     return res.json({ success: true, property });
   } catch (error) {
@@ -350,7 +340,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// UPDATE /api/properties/:id
+// UPDATE
 router.patch('/:id', upload.array('images', 10), async (req, res) => {
   const uploadedImagePaths = req.files ? req.files.map((f) => `/uploads/${f.filename}`) : [];
   try {
@@ -363,7 +353,10 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
     }
 
     const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
+    const payload = normalizePropertyPayload({
+      name, address, city, postcode, country, type, status, coverImage, images,
+    });
+
     const validatedData = propertyUpdateSchema.parse(payload);
     const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validatedData;
 
@@ -391,25 +384,7 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
     const removedImages = existingProperty.images.filter((img) => !keepImages.includes(img));
     await removeImageFiles(removedImages);
 
-    const property = await prisma.property.findFirst({
-      where: { id: updatedPropertyRecord.id, orgId },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        city: true,
-        postcode: true,
-        country: true,
-        type: true,
-        status: true,
-        images: true,
-        orgId: true,
-        createdAt: true,
-        updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
-      },
-    });
-
+    const property = await prisma.property.findFirst({ where: { id: updatedPropertyRecord.id, orgId } });
     return res.json({ success: true, property });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -422,7 +397,7 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
   }
 });
 
-// DELETE /api/properties/:id
+// DELETE
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -439,7 +414,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// CREATE UNIT /api/properties/:propertyId/units
+// CREATE UNIT
 router.post('/:propertyId/units', async (req, res) => {
   try {
     const { propertyId } = req.params;
@@ -448,7 +423,6 @@ router.post('/:propertyId/units', async (req, res) => {
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
 
     const parsedBody = unitSchema.parse(req.body);
-
     const unit = await prisma.unit.create({
       data: {
         propertyId: property.id,
