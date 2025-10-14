@@ -1,11 +1,8 @@
 // backend/src/config/prismaClient.js
-// Shared Prisma client instance for the backend.
-
 import { PrismaClient } from '@prisma/client';
 
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
-});
+// Single shared Prisma instance for the whole app
+export const prisma = new PrismaClient();
 
+// Allow both: `import prisma from ...` and `import { prisma } from ...`
 export default prisma;
-
