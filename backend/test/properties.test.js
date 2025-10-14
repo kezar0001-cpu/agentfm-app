@@ -1,7 +1,8 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
+import test from 'node:test';
+import assert from 'node:assert/strict';
 
-const propertiesRouter = require('../src/routes/properties');
+import propertiesRouter from '../src/routes/properties.js';
+
 const {
   propertySchema,
   normaliseSingleImage,
@@ -10,7 +11,7 @@ const {
 
 test('properties router enforces authentication middleware', () => {
   const hasAuthGuard = propertiesRouter.stack.some(
-    (layer) => layer.handle && layer.handle.name === 'requireAuth'
+    (layer) => layer.handle && layer.handle.name === 'requireAuth',
   );
   assert.equal(hasAuthGuard, true);
 });
