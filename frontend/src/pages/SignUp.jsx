@@ -6,7 +6,8 @@ import {
   IconButton, InputAdornment
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { API_BASE, api, saveTokenFromUrl } from '../lib/auth';
+import { saveTokenFromUrl } from '../lib/auth';
+import { api } from '../api.js';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -25,9 +26,10 @@ export default function SignUp() {
   }, [navigate]);
 
   const googleUrl = useMemo(() => {
-    if (!API_BASE) return null;
-    const url = new URL('/api/auth/google', API_BASE);
-    // Backend allows Google for PROPERTY_MANAGER (and ADMIN). We want PM.
+    const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    if (!BASE) return null;
+    const url = new URL('/api/auth/google', BASE + '/');
+    // PROPERTY_MANAGER for this portal
     url.searchParams.set('role', 'PROPERTY_MANAGER');
     return url.toString();
   }, []);
@@ -71,21 +73,14 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      // IMPORTANT: match backend Zod schema:
-      // - role must be 'PROPERTY_MANAGER'
-      // - company is required
-      // - subscriptionPlan defaults to FREE_TRIAL (we’ll send it explicitly)
-      const res = await api('/api/auth/register', {
-        method: 'POST',
-        json: {
-          name: formData.name.trim(),
-          email: formData.email.trim().toLowerCase(),
-          password: formData.password,
-          phone: formData.phone.trim(),
-          company: formData.company.trim(),
-          role: 'PROPERTY_MANAGER',
-          subscriptionPlan: 'FREE_TRIAL',
-        },
+      const res = await api.post('/api/auth/register', {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        phone: formData.phone.trim(),
+        company: formData.company.trim(),
+        role: 'PROPERTY_MANAGER',
+        subscriptionPlan: 'FREE_TRIAL',
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
@@ -94,8 +89,8 @@ export default function SignUp() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Registration error:', err);
-      // If backend returns Zod details, surface the first message if present
       const msg =
         err?.response?.errors?.[0]?.message ||
         err?.message ||
@@ -168,7 +163,7 @@ export default function SignUp() {
               type="email" autoComplete="email" value={formData.email} onChange={handleChange} disabled={loading}
             />
 
-            {/* NEW: Company (required by backend) */}
+            {/* Company (required by backend) */}
             <TextField
               margin="normal" required fullWidth id="company" label="Company / Organization" name="company"
               autoComplete="organization" value={formData.company} onChange={handleChange} disabled={loading}

@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
 
 const router = Router();
 

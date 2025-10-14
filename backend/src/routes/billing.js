@@ -1,10 +1,15 @@
 import express from 'express';
-import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
+import {
+  createStripeClient,
+  isStripeClientConfigured,
+  StripeNotConfiguredError,
+} from '../utils/stripeClient.js';
 
 const router = express.Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = createStripeClient();
+const stripeAvailable = isStripeClientConfigured(stripe);
 
 // POST /api/billing/checkout
 router.post('/checkout', async (req, res) => {
@@ -25,6 +30,10 @@ router.post('/checkout', async (req, res) => {
     const { plan = 'STARTER', successUrl, cancelUrl } = req.body || {};
 
     // Map plan -> Price ID (env)
+    if (!stripeAvailable) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
     const planMap = {
       STARTER: process.env.STRIPE_PRICE_ID_STARTER,
       PROFESSIONAL: process.env.STRIPE_PRICE_ID_PROFESSIONAL,
@@ -55,6 +64,9 @@ router.post('/checkout', async (req, res) => {
 
     return res.json({ id: session.id, url: session.url });
   } catch (err) {
+    if (err instanceof StripeNotConfiguredError) {
+      return res.status(503).json({ error: err.message });
+    }
     console.error('Stripe checkout error:', err);
     return res.status(500).json({ error: 'Checkout failed' });
   }
@@ -66,6 +78,10 @@ router.post('/checkout', async (req, res) => {
  */
 router.post('/confirm', async (req, res) => {
   try {
+    if (!stripeAvailable) {
+      return res.status(503).json({ error: 'Stripe is not configured' });
+    }
+
     const { sessionId } = req.body || {};
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
 
@@ -98,6 +114,9 @@ router.post('/confirm', async (req, res) => {
 
     return res.json({ ok: true });
   } catch (err) {
+    if (err instanceof StripeNotConfiguredError) {
+      return res.status(503).json({ error: err.message });
+    }
     console.error('Stripe confirm error:', err);
     return res.status(500).json({ error: 'Confirm failed' });
   }
@@ -111,12 +130,19 @@ export async function webhook(req, res) {
   let event;
 
   try {
+    if (!stripeAvailable) {
+      throw new StripeNotConfiguredError();
+    }
     event = stripe.webhooks.constructEvent(
       req.body,                 // raw body (index.js mounts express.raw)
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
+    if (err instanceof StripeNotConfiguredError) {
+      console.error('Stripe webhook received but Stripe is not configured.');
+      return res.status(503).send(`Stripe Error: ${err.message}`);
+    }
     console.error('❌ Webhook signature verify failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
