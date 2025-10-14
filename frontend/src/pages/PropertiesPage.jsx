@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import useApiQuery from '../hooks/useApiQuery';
 import DataState from '../components/DataState';
 import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
-import PropertyWizard from '../components/PropertyWizard.jsx';
+import PropertyDialog from '../components/PropertyDialog.jsx';
 
 const typeIcons = {
   residential: { icon: Apartment, color: 'primary.main' },
@@ -208,7 +208,11 @@ export default function PropertiesPage() {
         </Grid>
       </DataState>
 
-      <PropertyWizard open={openWizard} onClose={() => setOpenWizard(false)} onCreated={() => refetch()} />
+      <PropertyDialog 
+        open={openWizard} 
+        onClose={() => setOpenWizard(false)} 
+        onSuccess={() => refetch()} 
+      />
     </Box>
   );
 }

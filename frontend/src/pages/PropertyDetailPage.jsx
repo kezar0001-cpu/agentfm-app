@@ -1,10 +1,11 @@
 // frontend/src/pages/PropertyDetailPage.jsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box, Stack, Typography, Paper, Button, Chip, Divider, Grid, Alert, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
-import { Edit, ArrowBack, Domain, LocationOn } from '@mui/icons-material';
+import { Edit, ArrowBack, Domain, LocationOn, Delete } from '@mui/icons-material';
 import { api } from '../api.js';
 import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
 
@@ -18,6 +19,8 @@ export default function PropertyDetailPage() {
     notFound: false,
     property: null,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setState((s) => ({ ...s, loading: true, error: null, notFound: false }));
@@ -36,6 +39,19 @@ export default function PropertyDetailPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/api/properties/${id}`);
+      navigate('/properties');
+    } catch (err) {
+      setState((s) => ({ ...s, error: err?.message || 'Failed to delete property' }));
+      setDeleteDialogOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (state.loading) {
     return (
@@ -79,9 +95,9 @@ export default function PropertyDetailPage() {
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Button startIcon={<ArrowBack />} onClick={() => navigate('/properties')}>Back</Button>
-        <Stack direction="row" spacing={1}>
-          <Chip label={p.status || 'Active'} />
-          {p.type && <Chip label={p.type} color="primary" variant="outlined" />}
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip label={p.status || 'Active'} color={p.status === 'Active' ? 'success' : 'default'} />
+          {p.type && <Chip label={p.type.charAt(0).toUpperCase() + p.type.slice(1)} color="primary" variant="outlined" />}
           <Button
             component={RouterLink}
             to={`/properties/${p.id}/edit`}
@@ -89,6 +105,14 @@ export default function PropertyDetailPage() {
             variant="contained"
           >
             Edit
+          </Button>
+          <Button
+            startIcon={<Delete />}
+            variant="outlined"
+            color="error"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            Delete
           </Button>
         </Stack>
       </Stack>
@@ -137,6 +161,31 @@ export default function PropertyDetailPage() {
           </Grid>
         </Grid>
       </Paper>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deleting && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Delete Property</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete &quot;{p.name}&quot;? This action cannot be undone.
+            {p.units && p.units.length > 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                This property has {p.units.length} unit(s). Deleting it may affect related data.
+              </Alert>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
