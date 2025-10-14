@@ -28,21 +28,35 @@ async function apiCall(url, options = {}) {
   try {
     // Build full URL with proper /api prefix
     let fullUrl = url;
-    
+
     if (!url.startsWith('http')) {
-      const path = url.startsWith('/api') 
-        ? url 
+      const path = url.startsWith('/api')
+        ? url
         : `/api${url.startsWith('/') ? url : '/' + url}`;
       fullUrl = `${API_BASE_URL}${path}`;
     }
-    
+
+    // Only send cookies when explicitly requested or when making a
+    // same-origin request.  Some hosting providers reject cross-origin
+    // requests that include credentials, which previously surfaced as a
+    // generic "Failed to fetch" error in the UI.
+    let shouldSendCredentials = options.credentials;
+    if (shouldSendCredentials === undefined && typeof window !== 'undefined') {
+      try {
+        const requestOrigin = new URL(fullUrl, window.location.href).origin;
+        shouldSendCredentials = requestOrigin === window.location.origin ? 'include' : 'omit';
+      } catch {
+        shouldSendCredentials = 'omit';
+      }
+    }
+
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
         ...headers,
         ...options.headers,
       },
-      credentials: 'include',
+      credentials: shouldSendCredentials ?? 'omit',
     });
 
     // Handle 401 Unauthorized - redirect to signin
