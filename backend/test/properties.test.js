@@ -7,6 +7,7 @@ const {
   propertySchema,
   normaliseSingleImage,
   normaliseImageList,
+  ensureUserOrg,
 } = propertiesRouter._test;
 
 test('properties router enforces authentication middleware', () => {
@@ -55,5 +56,61 @@ test('normaliseImageList handles undefined, null and arrays', () => {
       '/uploads/b.png',
     ]),
     ['/uploads/a.png', '/uploads/b.png'],
+  );
+});
+
+test('ensureUserOrg recreates an organisation when the stored one is missing', async () => {
+  const user = {
+    id: 'user-1',
+    orgId: 'missing-org',
+    company: 'Acme Facilities',
+    name: 'Alex Manager',
+  };
+
+  const callLog = [];
+
+  const fakePrisma = {
+    org: {
+      findUnique: async (args) => {
+        callLog.push({ method: 'org.findUnique', args });
+        return null;
+      },
+    },
+    $transaction: async (callback) =>
+      callback({
+        user: {
+          findUnique: async () => ({
+            id: user.id,
+            orgId: user.orgId,
+            company: user.company,
+            name: user.name,
+          }),
+          update: async ({ data }) => {
+            callLog.push({ method: 'user.update', args: data });
+            user.orgId = data.orgId;
+            return { id: user.id, orgId: data.orgId };
+          },
+        },
+        org: {
+          findUnique: async (args) => {
+            callLog.push({ method: 'tx.org.findUnique', args });
+            return null;
+          },
+          create: async ({ data, select }) => {
+            callLog.push({ method: 'org.create', args: data });
+            const record = { id: 'org-new-id', name: data.name };
+            return select ? { id: record.id } : record;
+          },
+        },
+      }),
+  };
+
+  const orgId = await ensureUserOrg(user, fakePrisma);
+
+  assert.equal(orgId, 'org-new-id');
+  assert.equal(user.orgId, 'org-new-id');
+  assert.equal(
+    callLog.filter((entry) => entry.method === 'org.create').length,
+    1,
   );
 });
