@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
 import jwt from 'jsonwebtoken';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import multer from 'multer';
@@ -112,6 +112,52 @@ const removeImageFiles = async (imagePaths = []) => {
   );
 };
 
+const normaliseSingleImage = (value, { defaultToNull = false } = {}) => {
+  if (value === undefined) {
+    return defaultToNull ? null : undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return defaultToNull ? null : undefined;
+    }
+    return trimmed;
+  }
+
+  if (value && typeof value === 'object' && typeof value.url === 'string') {
+    const trimmed = value.url.trim();
+    if (!trimmed) {
+      return defaultToNull ? null : undefined;
+    }
+    return trimmed;
+  }
+
+  return defaultToNull ? null : undefined;
+};
+
+const normaliseImageList = (value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => normaliseSingleImage(item, { defaultToNull: false }))
+    .filter((item) => typeof item === 'string' && item.trim().length > 0);
+};
+
 const parseExistingImages = (value, fallback = []) => {
   if (value === undefined || value === null) return Array.isArray(fallback) ? fallback : [];
 
@@ -137,9 +183,24 @@ const parseExistingImages = (value, fallback = []) => {
   throw new Error('Invalid existingImages payload');
 };
 
+const dedupeImages = (images = []) => {
+  const seen = new Set();
+  const result = [];
+
+  images.forEach((image) => {
+    if (typeof image !== 'string') return;
+    const trimmed = image.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    result.push(trimmed);
+  });
+
+  return result;
+};
+
 // --- Middleware ---
 
-const authenticate = async (req, res, next) => {
+const requireAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -157,7 +218,7 @@ const authenticate = async (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
-router.use(authenticate);
+router.use(requireAuth);
 
 // All property routes require at least a PROPERTY_MANAGER or ADMIN role.
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
@@ -188,6 +249,16 @@ const optionalStringField = z
     return trimmed === '' ? null : trimmed;
   }, z.string().min(1).nullable().optional());
 
+const imageField = z.preprocess(
+  (value) => normaliseSingleImage(value),
+  z.string().min(1).nullable().optional(),
+);
+
+const imageListField = z.preprocess(
+  (value) => normaliseImageList(value),
+  z.array(z.string().min(1)).nullable().optional(),
+);
+
 const propertyFieldSchemas = {
   name: z.preprocess(
     (value) => (typeof value === 'string' ? value.trim() : value),
@@ -198,6 +269,8 @@ const propertyFieldSchemas = {
   postcode: optionalStringField,
   country: optionalStringField,
   type: optionalStringField,
+  coverImage: imageField,
+  images: imageListField,
   status: z
     .preprocess((value) => {
       if (value === undefined || value === null) return value;
@@ -210,6 +283,8 @@ const propertyFieldSchemas = {
 const propertySchema = z.object({
   ...propertyFieldSchemas,
   status: propertyFieldSchemas.status.default('Active'),
+  coverImage: propertyFieldSchemas.coverImage.nullish(),
+  images: propertyFieldSchemas.images.default([]),
 });
 
 const propertyUpdateSchema = z.object({
@@ -220,6 +295,8 @@ const propertyUpdateSchema = z.object({
   country: propertyFieldSchemas.country,
   type: propertyFieldSchemas.type,
   status: propertyFieldSchemas.status,
+  coverImage: propertyFieldSchemas.coverImage,
+  images: propertyFieldSchemas.images,
 });
 
 const unitSchema = z.object({
@@ -279,13 +356,47 @@ router.post('/', upload.array('images', 10), async (req, res) => {
   const uploadedImagePaths = (req.files ? req.files.map((file) => `/uploads/${file.filename}`) : []);
   try {
     const orgId = await ensureUserOrg(req.user);
-    const { name, address, city, postcode, country, type, status } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status });
+    const {
+      name,
+      address,
+      city,
+      postcode,
+      country,
+      type,
+      status,
+      coverImage,
+      images,
+    } = req.body;
+    const payload = normalizePropertyPayload({
+      name,
+      address,
+      city,
+      postcode,
+      country,
+      type,
+      status,
+      coverImage,
+      images,
+    });
     const validatedData = propertySchema.parse(payload);
+    const {
+      coverImage: coverImageInput,
+      images: bodyImages,
+      ...propertyData
+    } = validatedData;
+
+    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
+    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
+    const imagesToPersist = dedupeImages([
+      ...(coverImagePath ? [coverImagePath] : []),
+      ...bodyImageList,
+      ...uploadedImagePaths,
+    ]);
+
     const property = await prisma.property.create({
       data: {
-        ...validatedData,
-        images: uploadedImagePaths,
+        ...propertyData,
+        images: imagesToPersist,
         orgId,
       },
     });
@@ -351,9 +462,34 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }
 
-    const { name, address, city, postcode, country, type, status } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status });
+    const {
+      name,
+      address,
+      city,
+      postcode,
+      country,
+      type,
+      status,
+      coverImage,
+      images,
+    } = req.body;
+    const payload = normalizePropertyPayload({
+      name,
+      address,
+      city,
+      postcode,
+      country,
+      type,
+      status,
+      coverImage,
+      images,
+    });
     const validatedData = propertyUpdateSchema.parse(payload);
+    const {
+      coverImage: coverImageInput,
+      images: bodyImages,
+      ...propertyData
+    } = validatedData;
 
     let keepImages;
     try {
@@ -363,10 +499,18 @@ router.patch('/:id', upload.array('images', 10), async (req, res) => {
       return res.status(400).json({ success: false, message: parseError.message });
     }
 
-    const images = [...keepImages, ...uploadedImagePaths];
+    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
+    let nextImages = [...keepImages, ...bodyImageList, ...uploadedImagePaths];
+
+    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
+    if (coverImagePath) {
+      nextImages = [coverImagePath, ...nextImages.filter((image) => image !== coverImagePath)];
+    }
+
+    const imagesToPersist = dedupeImages(nextImages);
     const updateData = {
-      ...validatedData,
-      images,
+      ...propertyData,
+      images: imagesToPersist,
     };
 
     const updatedPropertyRecord = await prisma.property.update({
@@ -469,5 +613,11 @@ router.post('/:propertyId/units', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to create unit' });
   }
 });
+
+router._test = {
+  propertySchema,
+  normaliseSingleImage,
+  normaliseImageList,
+};
 
 export default router;
