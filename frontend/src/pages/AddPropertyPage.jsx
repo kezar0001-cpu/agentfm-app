@@ -1,179 +1,274 @@
 // frontend/src/pages/AddPropertyPage.jsx
 import { useState } from 'react';
 import {
-  Box, Card, CardContent, Typography, TextField, Button, Stack, MenuItem, Grid, Stepper, Step, StepLabel, Alert, CircularProgress, IconButton
+  Box,
+  Container,
+  Paper,
+  Typography,
+  Grid,
+  TextField,
+  MenuItem,
+  Button,
+  Stack,
+  Alert,
 } from '@mui/material';
-import { Save, ArrowBack, CloudUpload, Delete } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import useApiMutation from '../hooks/useApiMutation';
-import { api } from '../api';
-import { API_BASE } from '../lib/auth';
-import * as Yup from 'yup';
 
-const steps = ['Basic Information', 'Upload Images', 'Review & Submit'];
-
-const validationSchema = Yup.object({
-  name: Yup.string().required('Property name is required'),
-  address: Yup.string(),
-  city: Yup.string(),
-  postcode: Yup.string().matches(/^\d{4}$/, 'Must be a 4-digit postcode'),
-  type: Yup.string().oneOf(['Commercial', 'Residential', 'Retail', 'Industrial', 'Mixed Use']),
-  description: Yup.string(),
-  images: Yup.array().of(Yup.string()).nullable(),
-});
+const PROPERTY_TYPES = [
+  'residential',
+  'commercial',
+  'industrial',
+  'retail',
+  'hospitality',
+  'office',
+];
 
 export default function AddPropertyPage() {
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [errors, setErrors] = useState({});
-  const [formData, setFormData] = useState({
+  const { mutateAsync, isPending, isError, error } = useApiMutation({
+    url: '/api/properties',
+    method: 'post',
+  });
+
+  const [form, setForm] = useState({
     name: '',
     address: '',
     city: '',
     postcode: '',
-    type: 'Residential',
-    description: '',
-    images: [],
+    country: '',
+    type: '',
+    status: 'Active',
   });
+  const [images, setImages] = useState([]); // FileList -> Array<File>
+  const [coverImage, setCoverImage] = useState(null); // File | null
+  const [formError, setFormError] = useState('');
 
-  const mutation = useApiMutation({ url: '/api/properties', method: 'post' });
-
-  const handleInputChange = (field) => (event) => {
-    setFormData(prev => ({ ...prev, [field]: event.target.value }));
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    setFormError('');
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
-
-    if (files.some(file => file.size > 5 * 1024 * 1024)) {
-      setUploadError('Files must be under 5MB');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadError('');
-    const uploadFormData = new FormData();
-    files.forEach(file => uploadFormData.append('files', file));
-
-    try {
-      const res = await api.post('/api/uploads/multiple', uploadFormData);
-      setFormData(prev => ({ ...prev, images: [...prev.images, ...res.urls] }));
-      alert(`Successfully uploaded ${res.urls.length} image(s)`);
-    } catch (err) {
-      setUploadError(err.message || 'File upload failed.');
-    } finally {
-      setIsUploading(false);
-      event.target.value = null;
-    }
+  const onFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    setImages(files);
   };
 
-  const handleDeleteImage = (indexToDelete) => {
-    setFormData(prev => ({
-      ...prev, images: prev.images.filter((_, index) => index !== indexToDelete),
-    }));
+  const onCoverFile = (e) => {
+    const files = Array.from(e.target.files || []);
+    setCoverImage(files[0] || null);
   };
 
-  const handleNext = () => setActiveStep((prev) => prev + 1);
-  const handleBack = () => setActiveStep((prev) => prev - 1);
-
-  const validateForm = async () => {
-    try {
-      await validationSchema.validate(formData, { abortEarly: false });
-      setErrors({});
-      return true;
-    } catch (err) {
-      const newErrors = err.inner.reduce((acc, { path, message }) => ({ ...acc, [path]: message }), {});
-      setErrors(newErrors);
+  const validate = () => {
+    if (!form.name.trim()) {
+      setFormError('Name is required');
       return false;
     }
+    return true;
   };
 
-  const handleSubmit = async () => {
-    if (await validateForm()) {
-      try {
-        const response = await mutation.mutateAsync({ data: formData });
-        alert('Property added successfully!');
-        navigate('/properties');
-      } catch (error) {
-        setErrors({ submit: error.message || 'Failed to add property' });
-      }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    if (!validate()) return;
+
+    const fd = new FormData();
+    fd.append('name', form.name.trim());
+    if (form.address) fd.append('address', form.address.trim());
+    if (form.city) fd.append('city', form.city.trim());
+    if (form.postcode) fd.append('postcode', form.postcode.trim());
+    if (form.country) fd.append('country', form.country.trim());
+    if (form.type) fd.append('type', form.type.trim());
+    if (form.status) fd.append('status', form.status);
+
+    // Cover image: backend accepts in the same "images" array or as coverImage string.
+    if (coverImage) fd.append('images', coverImage);
+
+    // Additional images
+    images.forEach((file) => fd.append('images', file));
+
+    try {
+      await mutateAsync({ data: fd, headers: { /* let browser set Content-Type */ } });
+      navigate('/properties');
+    } catch {
+      // errors are shown via isError/error alert
     }
   };
 
-  const propertyTypes = ['Commercial', 'Residential', 'Retail', 'Industrial', 'Mixed Use'];
-
   return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>Add New Property</Typography>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/properties')}>Back</Button>
-      </Stack>
+    <Container maxWidth="md" component="main" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+        <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
+          Add Property
+        </Typography>
 
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Stepper activeStep={activeStep} alternativeLabel>
-            {steps.map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
-          </Stepper>
-        </CardContent>
-      </Card>
+        {formError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {formError}
+          </Alert>
+        )}
+        {isError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error?.message || 'Failed to create property'}
+          </Alert>
+        )}
 
-      <Card>
-        <CardContent>
-          {activeStep === 0 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12}><Typography variant="h6">Basic Information</Typography></Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Property Name"
-                  value={formData.name}
-                  onChange={handleInputChange('name')}
-                  error={!!errors.name}
-                  helperText={errors.name}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Street Address"
-                  value={formData.address}
-                  onChange={handleInputChange('address')}
-                  error={!!errors.address}
-                  helperText={errors.address}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="City"
-                  value={formData.city}
-                  onChange={handleInputChange('city')}
-                  error={!!errors.city}
-                  helperText={errors.city}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Postcode"
-                  value={formData.postcode}
-                  onChange={handleInputChange('postcode')}
-                  error={!!errors.postcode}
-                  helperText={errors.postcode}
-                />
-              </Grid>
+        <Box component="form" onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                name="name"
+                label="Property Name"
+                value={form.name}
+                onChange={onChange}
+                disabled={isPending}
+              />
             </Grid>
-          )}
 
-          {activeStep === 1 && (
-            <Grid container spacing={3}>
-              <Grid item xs={12}><Typography variant="h6">Property Details & Image</Typography></Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  select
-                  label="Property
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                name="address"
+                label="Address"
+                value={form.address}
+                onChange={onChange}
+                disabled={isPending}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                name="city"
+                label="City"
+                value={form.city}
+                onChange={onChange}
+                disabled={isPending}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                name="postcode"
+                label="Postcode"
+                value={form.postcode}
+                onChange={onChange}
+                disabled={isPending}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                name="country"
+                label="Country"
+                value={form.country}
+                onChange={onChange}
+                disabled={isPending}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                fullWidth
+                name="type"
+                label="Property Type"
+                value={form.type}
+                onChange={onChange}
+                disabled={isPending}
+              >
+                {PROPERTY_TYPES.map((t) => (
+                  <MenuItem key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                fullWidth
+                name="status"
+                label="Status"
+                value={form.status}
+                onChange={onChange}
+                disabled={isPending}
+              >
+                {['Active', 'Inactive'].map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Cover Image (optional)
+                </Typography>
+                <Button variant="outlined" component="label" disabled={isPending}>
+                  Choose File
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={onCoverFile}
+                  />
+                </Button>
+                {coverImage && (
+                  <Typography variant="caption">{coverImage.name}</Typography>
+                )}
+              </Stack>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Additional Images
+                </Typography>
+                <Button variant="outlined" component="label" disabled={isPending}>
+                  Choose Files
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={onFiles}
+                  />
+                </Button>
+                {images.length > 0 && (
+                  <Typography variant="caption">
+                    {images.length} file{images.length > 1 ? 's' : ''} selected
+                  </Typography>
+                )}
+              </Stack>
+            </Grid>
+          </Grid>
+
+          <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={isPending}
+            >
+              {isPending ? 'Saving…' : 'Save Property'}
+            </Button>
+            <Button
+              type="button"
+              variant="outlined"
+              disabled={isPending}
+              onClick={() => navigate('/properties')}
+            >
+              Cancel
+            </Button>
+          </Stack>
+        </Box>
+      </Paper>
+    </Container>
+  );
+}
