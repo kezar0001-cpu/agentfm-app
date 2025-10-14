@@ -1,368 +1,188 @@
 // frontend/src/pages/EditPropertyPage.jsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Divider,
-  Grid,
-  IconButton,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
+  Box, Stack, Paper, Typography, TextField, Button, Grid, Alert, CircularProgress, Chip,
+  ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
-import { ArrowBack, Delete, Close } from '@mui/icons-material';
-import { useForm } from 'react-hook-form';
-import useApiQuery from '../hooks/useApiQuery';
-import useApiMutation from '../hooks/useApiMutation.js';
-import DataState from '../components/DataState';
-import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
+import { Save, ArrowBack } from '@mui/icons-material';
+import { api } from '../api.js';
 
-const propertyTypes = [
-  { label: 'Residential', value: 'Residential' },
-  { label: 'Commercial', value: 'Commercial' },
-  { label: 'Industrial', value: 'Industrial' },
-];
-
-const statusOptions = [
-  { label: 'Active', value: 'Active' },
-  { label: 'Inactive', value: 'Inactive' },
-];
+const TYPES = ['residential', 'commercial', 'industrial', 'retail', 'hospitality', 'office'];
 
 export default function EditPropertyPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [existingImages, setExistingImages] = useState([]);
-  const [newImages, setNewImages] = useState([]);
-  const [previewImages, setPreviewImages] = useState([]);
 
-  const { data, isLoading, isError, error, refetch } = useApiQuery({
-    queryKey: ['property', id],
-    url: `/api/properties/${id}`,
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState({
+    name: '',
+    address: '',
+    city: '',
+    postcode: '',
+    country: '',
+    type: '',
+    status: 'Active',
+    images: [],
   });
 
-  const property = data?.property;
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      name: '',
-      address: '',
-      city: '',
-      postcode: '',
-      country: '',
-      type: '',
-      status: 'Active',
-    },
-  });
-
-  useEffect(() => {
-    if (property) {
-      reset({
-        name: property.name || '',
-        address: property.address || '',
-        city: property.city || '',
-        postcode: property.postcode || '',
-        country: property.country || '',
-        type: property.type || '',
-        status: property.status || 'Active',
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    setNotFound(false);
+    try {
+      const res = await api.get(`/api/properties/${id}`);
+      const p = res?.property ?? res;
+      if (!p) throw new Error('Unexpected response');
+      setForm({
+        name: p.name || '',
+        address: p.address || '',
+        city: p.city || '',
+        postcode: p.postcode || '',
+        country: p.country || '',
+        type: p.type || '',
+        status: p.status || 'Active',
+        images: Array.isArray(p.images) ? p.images : [],
       });
-      setExistingImages(property.images || []);
-    }
-  }, [property, reset]);
-
-  useEffect(() => {
-    const urls = newImages.map((file) => ({ file, url: URL.createObjectURL(file) }));
-    setPreviewImages(urls);
-    return () => {
-      urls.forEach(({ url }) => URL.revokeObjectURL(url));
-    };
-  }, [newImages]);
-
-  const updatePropertyMutation = useApiMutation({
-    url: `/api/properties/${id}`,
-    method: 'patch',
-    onSuccess: (response) => {
-      const updated = response?.property;
-      if (updated) {
-        reset({
-          name: updated.name || '',
-          address: updated.address || '',
-          city: updated.city || '',
-          postcode: updated.postcode || '',
-          country: updated.country || '',
-          type: updated.type || '',
-          status: updated.status || 'Active',
-        });
-        setExistingImages(updated.images || []);
+    } catch (err) {
+      const msg = err?.message || 'Failed to fetch property';
+      if (/404|not found/i.test(msg)) {
+        setNotFound(true);
+      } else {
+        setError(msg);
       }
-      setNewImages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
+  };
+
+  const handleTypeChange = (_e, v) => {
+    if (v !== null) setForm((s) => ({ ...s, type: v }));
+  };
+
+  const canSave = useMemo(() => form.name.trim().length > 0, [form.name]);
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      // We’re editing metadata only here; if you add image file editing later,
+      // switch to FormData and include existingImages similar to your POST.
+      const payload = {
+        name: form.name.trim(),
+        address: form.address || null,
+        city: form.city || null,
+        postcode: form.postcode || null,
+        country: form.country || null,
+        type: form.type || null,
+        status: form.status || 'Active',
+        images: form.images || [],
+        // If you later keep some and upload new:
+        // existingImages: JSON.stringify(form.images || []),
+      };
+      const res = await api.patch(`/api/properties/${id}`, payload);
+      const ok = res?.success !== false;
+      if (!ok) throw new Error(res?.message || 'Update failed');
       navigate(`/properties/${id}`);
-    },
-  });
-
-  const deletePropertyMutation = useApiMutation({
-    url: `/api/properties/${id}`,
-    method: 'delete',
-    onSuccess: () => {
-      navigate('/properties');
-    },
-  });
-
-  const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-    setNewImages((prev) => [...prev, ...files]);
-    event.target.value = '';
-  };
-
-  const handleRemoveExisting = (index) => {
-    setExistingImages((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleRemoveNew = (index) => {
-    setNewImages((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const onSubmit = async (values) => {
-    try {
-      const formData = new FormData();
-      formData.append('name', values.name || '');
-      formData.append('address', values.address || '');
-      formData.append('city', values.city || '');
-      formData.append('postcode', values.postcode || '');
-      formData.append('country', values.country || '');
-      formData.append('type', values.type || '');
-      formData.append('status', values.status || '');
-      formData.append('existingImages', JSON.stringify(existingImages));
-      newImages.forEach((file) => formData.append('images', file));
-      await updatePropertyMutation.mutateAsync({ data: formData });
-    } catch (mutationError) {
-      console.error('Update property error:', mutationError);
+    } catch (err) {
+      setError(err?.message || 'Failed to save changes');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteProperty = async () => {
-    if (!window.confirm('Are you sure you want to delete this property? This action cannot be undone.')) {
-      return;
-    }
-    try {
-      await deletePropertyMutation.mutateAsync();
-    } catch (mutationError) {
-      console.error('Delete property error:', mutationError);
-    }
-  };
+  if (loading) {
+    return (
+      <Box sx={{ p: 4, display: 'grid', placeItems: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  const existingImagePreviews = useMemo(() => existingImages || [], [existingImages]);
+  if (notFound) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Stack spacing={2}>
+          <Typography variant="h5">Property not found</Typography>
+          <Button variant="contained" onClick={() => navigate('/properties')}>Back to Properties</Button>
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Button startIcon={<ArrowBack />} onClick={() => navigate('/properties')} sx={{ mb: 3 }}>
-        Back to Properties
-      </Button>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 900, mx: 'auto' }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 3 }}>
+        <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)}>Back</Button>
+        <Stack direction="row" spacing={1}>
+          <Chip label={form.status || 'Active'} />
+          {form.type && <Chip label={form.type} variant="outlined" />}
+        </Stack>
+      </Stack>
 
-      <DataState isLoading={isLoading} isError={isError} error={error} onRetry={refetch}>
-        {property && (
-          <Card>
-            <CardContent>
-              <Typography variant="h5" sx={{ mb: 3 }}>Edit Property</Typography>
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <Stack spacing={3}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Name"
-                        fullWidth
-                        {...register('name', { required: 'Name is required' })}
-                        error={!!errors.name}
-                        helperText={errors.name?.message}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Type"
-                        select
-                        fullWidth
-                        defaultValue=""
-                        {...register('type')}
-                      >
-                        <MenuItem value="">Select type</MenuItem>
-                        {propertyTypes.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Status"
-                        select
-                        fullWidth
-                        defaultValue="Active"
-                        {...register('status')}
-                      >
-                        {statusOptions.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Address"
-                        fullWidth
-                        {...register('address')}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        label="City"
-                        fullWidth
-                        {...register('city')}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        label="Postcode"
-                        fullWidth
-                        {...register('postcode')}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        label="Country"
-                        fullWidth
-                        {...register('country')}
-                      />
-                    </Grid>
-                  </Grid>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>Edit Property</Typography>
 
-                  <Divider />
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                  <Stack spacing={1}>
-                    <Typography variant="subtitle1">Existing Images</Typography>
-                    {existingImagePreviews.length > 0 ? (
-                      <Grid container spacing={2}>
-                        {existingImagePreviews.map((image, index) => (
-                          <Grid item xs={12} sm={6} md={4} key={`${image}-${index}`}>
-                            <Box
-                              sx={{
-                                position: 'relative',
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                                height: 180,
-                                boxShadow: 1,
-                              }}
-                            >
-                              <Box
-                                component="img"
-                                src={resolvePropertyImageUrl(image, property.name, '400x240')}
-                                alt={`Property image ${index + 1}`}
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                              <IconButton
-                                size="small"
-                                onClick={() => handleRemoveExisting(index)}
-                                sx={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
-                                aria-label="Remove image"
-                              >
-                                <Close fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    ) : (
-                      <Typography color="text.secondary">No images uploaded yet.</Typography>
-                    )}
-                  </Stack>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <TextField
+              label="Name" name="name" value={form.name} onChange={onChange}
+              required fullWidth
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="Address" name="address" value={form.address} onChange={onChange}
+              fullWidth
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="City" name="city" value={form.city} onChange={onChange} fullWidth />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Postcode" name="postcode" value={form.postcode} onChange={onChange} fullWidth />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Country" name="country" value={form.country} onChange={onChange} fullWidth />
+          </Grid>
 
-                  <Stack spacing={1}>
-                    <Typography variant="subtitle1">Add Images</Typography>
-                    <Button variant="contained" component="label" sx={{ alignSelf: 'flex-start' }}>
-                      Upload Images
-                      <input type="file" hidden multiple accept="image/*" onChange={handleImageUpload} />
-                    </Button>
-                    {previewImages.length > 0 && (
-                      <Grid container spacing={2}>
-                        {previewImages.map(({ url, file }, index) => (
-                          <Grid item xs={12} sm={6} md={4} key={`${file.name}-${index}`}>
-                            <Box
-                              sx={{
-                                position: 'relative',
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                                height: 180,
-                                boxShadow: 1,
-                              }}
-                            >
-                              <Box
-                                component="img"
-                                src={url}
-                                alt={file.name}
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                              <IconButton
-                                size="small"
-                                onClick={() => handleRemoveNew(index)}
-                                sx={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
-                                aria-label="Remove new image"
-                              >
-                                <Close fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    )}
-                    {newImages.length > 0 && (
-                      <Typography variant="body2" color="text.secondary">
-                        {newImages.length} new file{newImages.length === 1 ? '' : 's'} selected
-                      </Typography>
-                    )}
-                  </Stack>
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Type</Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={form.type || ''}
+              onChange={handleTypeChange}
+              size="small"
+            >
+              {TYPES.map((t) => (
+                <ToggleButton key={t} value={t} aria-label={t}>
+                  {t}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Grid>
+        </Grid>
 
-                  {updatePropertyMutation.isError && (
-                    <Alert severity="error">
-                      {updatePropertyMutation.error?.message || 'Failed to update property'}
-                    </Alert>
-                  )}
-
-                  <Stack direction="row" spacing={2}>
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={updatePropertyMutation.isPending}
-                    >
-                      {updatePropertyMutation.isPending ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<Delete />}
-                      onClick={handleDeleteProperty}
-                      disabled={deletePropertyMutation.isPending}
-                    >
-                      {deletePropertyMutation.isPending ? 'Deleting...' : 'Delete Property'}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-      </DataState>
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button variant="contained" startIcon={<Save />} onClick={save} disabled={!canSave || saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button variant="text" onClick={() => navigate(`/properties/${id}`)}>Cancel</Button>
+        </Stack>
+      </Paper>
     </Box>
   );
 }
-
