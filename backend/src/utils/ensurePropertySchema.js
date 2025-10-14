@@ -8,6 +8,10 @@ export const PROPERTY_SCHEMA_STATEMENTS = [
   "UPDATE \"Property\" SET \"status\" = 'Active' WHERE \"status\" IS NULL",
   "ALTER TABLE \"Property\" ALTER COLUMN \"status\" SET DEFAULT 'Active'",
   'ALTER TABLE "Property" ALTER COLUMN "status" SET NOT NULL',
+  'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3)',
+  'ALTER TABLE "Property" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP',
+  'UPDATE "Property" SET "createdAt" = CURRENT_TIMESTAMP WHERE "createdAt" IS NULL',
+  'ALTER TABLE "Property" ALTER COLUMN "createdAt" SET NOT NULL',
   'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
 ];
 
