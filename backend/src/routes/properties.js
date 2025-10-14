@@ -15,29 +15,42 @@ const uploadPath = path.join(process.cwd(), 'uploads');
 const absoluteUploadPath = path.resolve(uploadPath);
 const fsp = fs.promises;
 
-const ensureUserOrg = async (user) => {
+const ensureUserOrg = async (user, prismaClient = prisma) => {
   if (!user) throw new Error('User context is required');
 
   const hasOrgId = typeof user.orgId === 'string' && user.orgId.trim().length > 0;
   if (hasOrgId) {
-    const existingOrg = await prisma.org.findUnique({
+    const existingOrg = await prismaClient.org.findUnique({
       where: { id: user.orgId },
       select: { id: true },
     });
 
     if (existingOrg) {
+      if (user.orgId !== existingOrg.id) {
+        user.orgId = existingOrg.id;
+      }
       return existingOrg.id;
     }
   }
 
-  const orgId = await prisma.$transaction(async (tx) => {
+  const orgId = await prismaClient.$transaction(async (tx) => {
     const freshUser = await tx.user.findUnique({
       where: { id: user.id },
       select: { orgId: true, company: true, name: true },
     });
 
     if (freshUser?.orgId) {
-      return freshUser.orgId;
+      const verifiedOrg = await tx.org.findUnique({
+        where: { id: freshUser.orgId },
+        select: { id: true },
+      });
+
+      if (verifiedOrg) {
+        if (user.orgId !== verifiedOrg.id) {
+          user.orgId = verifiedOrg.id;
+        }
+        return verifiedOrg.id;
+      }
     }
 
     const orgName =
@@ -55,6 +68,7 @@ const ensureUserOrg = async (user) => {
       data: { orgId: newOrg.id },
     });
 
+    user.orgId = newOrg.id;
     return newOrg.id;
   });
 
@@ -618,6 +632,7 @@ router._test = {
   propertySchema,
   normaliseSingleImage,
   normaliseImageList,
+  ensureUserOrg,
 };
 
 export default router;
