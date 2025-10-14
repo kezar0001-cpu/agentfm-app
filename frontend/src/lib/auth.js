@@ -1,52 +1,72 @@
+// frontend/src/lib/auth.js
+
 // Authentication utility functions
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://agentfm-backend.onrender.com';
+// Use env base only (no stale fallbacks)
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
 /**
- * Make API request with proper error handling
+ * Make API request with proper error handling.
+ * - Always sends cookies (cross-site auth).
+ * - Builds absolute URL against API_BASE.
+ * - Handles JSON and non-JSON responses safely.
  */
 export async function api(endpoint, options = {}) {
   const { json, ...fetchOptions } = options;
-  
-  // Build URL with proper /api prefix
+
+  // Build URL with proper /api prefix when a relative path is given
   let url = endpoint;
-  if (!endpoint.startsWith('http')) {
-    const path = endpoint.startsWith('/api') 
-      ? endpoint 
+  if (!endpoint?.startsWith('http')) {
+    const path = endpoint.startsWith('/api')
+      ? endpoint
       : `/api${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-    url = `${API_BASE}${path}`;
+    url = API_BASE ? `${API_BASE}${path}` : path;
   }
-  
+
+  // Headers
   const headers = {
-    'Content-Type': 'application/json',
-    ...fetchOptions.headers,
+    ...(fetchOptions.headers || {}),
   };
 
-  // Add auth token if it exists
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // JSON body handling (keep FormData untouched)
+  if (json !== undefined) {
+    headers['Content-Type'] = 'application/json';
   }
+
+  // Add auth token if it exists
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const config = {
     ...fetchOptions,
     headers,
+    credentials: 'include', // required for cookie auth across domains
   };
 
-  if (json) {
+  if (json !== undefined) {
     config.body = JSON.stringify(json);
   }
 
   try {
     const response = await fetch(url, config);
-    
+
+    // Robust parse
+    const text = await response.text();
+    const tryJson = () => {
+      try { return text ? JSON.parse(text) : undefined; } catch { return undefined; }
+    };
+    const data = tryJson();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
-      throw new Error(errorMessage);
+      const message =
+        (data && (data.message || data.error)) ||
+        (text || `HTTP ${response.status}`);
+      throw new Error(message);
     }
 
-    return await response.json();
+    // Prefer JSON if possible, otherwise return text
+    return data !== undefined ? data : text;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('API Error:', error);
     throw error;
   }
@@ -66,36 +86,43 @@ export function portalPathForRole(role) {
 
 /**
  * Save token from URL (for OAuth redirects)
+ * - Persists token
+ * - Best-effort fetch of user profile
+ * - Cleans query params from the URL bar
+ * - Optional auto-redirect to `next`
  */
 export function saveTokenFromUrl(autoRedirect = true) {
   try {
-    const url = new URL(window.location.href);
-    const token = url.searchParams.get('token');
-    const next = url.searchParams.get('next') || '/dashboard';
-    const userParam = url.searchParams.get('user');
+    const u = new URL(window.location.href);
+    const token = u.searchParams.get('token');
+    const next = u.searchParams.get('next') || '/dashboard';
+    const userParam = u.searchParams.get('user');
 
     if (!token) return false;
 
-    // persist token
+    // Persist token
     localStorage.setItem('auth_token', token);
-    localStorage.setItem('token', token); // keep old key for compatibility
+    localStorage.setItem('token', token); // legacy key
 
-    // if backend ever sends a user payload, store it
+    // If backend sends user payload inline
     if (userParam) {
       try { localStorage.setItem('user', decodeURIComponent(userParam)); } catch {}
     } else if (!localStorage.getItem('user')) {
-      // best-effort: populate user in background so pages that read localStorage still work
-      fetch(`${API_BASE}/api/auth/me`, {
+      // Populate user in background
+      const meUrl = API_BASE ? `${API_BASE}/api/auth/me` : '/api/auth/me';
+      fetch(meUrl, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       })
-        .then(r => (r.ok ? r.json() : null))
-        .then(data => {
-          if (data?.user) {
-            localStorage.setItem('user', JSON.stringify(data.user));
-
-            // NEW: if we’re on the wrong portal after the first redirect, correct it
-            const target = portalPathForRole(data.user.role);
+        .then(r => (r.ok ? r.text() : null))
+        .then(t => {
+          if (!t) return;
+          let payload;
+          try { payload = JSON.parse(t); } catch { return; }
+          if (payload?.user) {
+            localStorage.setItem('user', JSON.stringify(payload.user));
+            // Correct portal after first redirect if needed
+            const target = portalPathForRole(payload.user.role);
             const here = window.location.pathname;
             if (autoRedirect && !here.startsWith(target)) {
               window.location.replace(target);
@@ -105,14 +132,14 @@ export function saveTokenFromUrl(autoRedirect = true) {
         .catch(() => {});
     }
 
-    // clean URL (remove token/next/user from the bar)
-    url.searchParams.delete('token');
-    url.searchParams.delete('next');
-    url.searchParams.delete('user');
-    const cleaned = `${url.pathname}${url.search ? `?${url.searchParams.toString()}` : ''}${url.hash || ''}`;
+    // Clean URL (remove token/next/user)
+    u.searchParams.delete('token');
+    u.searchParams.delete('next');
+    u.searchParams.delete('user');
+    const cleanedQuery = u.searchParams.toString();
+    const cleaned = `${u.pathname}${cleanedQuery ? `?${cleanedQuery}` : ''}${u.hash || ''}`;
     window.history.replaceState({}, '', cleaned);
 
-    // keep your immediate redirect behaviour
     if (autoRedirect) window.location.replace(next);
     return true;
   } catch {
@@ -125,17 +152,16 @@ export function isAuthenticated() {
   return !!getAuthToken();
 }
 
-
 /**
- * Get current user data
+ * Get current user data from localStorage
  */
 export function getCurrentUser() {
   const userStr = localStorage.getItem('user');
   if (!userStr) return null;
-  
   try {
     return JSON.parse(userStr);
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.error('Error parsing user data:', e);
     return null;
   }
@@ -143,26 +169,27 @@ export function getCurrentUser() {
 
 /**
  * Logout user
+ * - Best-effort server logout (cookie session)
+ * - Always clears client state
  */
 export async function logout() {
-  // Best-effort: clear the server-side passport session cookie
   try {
-    await fetch(`${API_BASE}/api/auth/logout`, {
+    const url = API_BASE ? `${API_BASE}/api/auth/logout` : '/api/auth/logout';
+    await fetch(url, {
       method: 'POST',
-      credentials: 'include',   // IMPORTANT so the cookie is sent
+      credentials: 'include', // send cookie to invalidate server session
     });
   } catch (e) {
-    // ignore — we still clear client state below
+    // ignore — client state cleared below
+    // eslint-disable-next-line no-console
     console.warn('Server logout failed (continuing):', e);
   }
 
-  // Always clear client auth state
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
   localStorage.removeItem('token'); // legacy key
   sessionStorage.clear();
 }
-
 
 /**
  * Get auth token
@@ -170,5 +197,3 @@ export async function logout() {
 export function getAuthToken() {
   return localStorage.getItem('auth_token') || localStorage.getItem('token');
 }
-
-

@@ -1,10 +1,24 @@
 // frontend/src/api.js
-// Production-ready API client
-import { API_BASE } from './lib/auth.js';
+// Production-ready API client (absolute base + credentials included)
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || API_BASE;
+// 1) REMOVE any import of API_BASE; we derive it from Vite env
+//    import { API_BASE } from './lib/auth.js';  <-- delete this if present
 
-// Get auth token from localStorage
+// Base URL from env, sanitized (no trailing slash)
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+if (!API_BASE) {
+  // Visible warning if misconfigured in prod
+  // eslint-disable-next-line no-console
+  console.warn('VITE_API_BASE_URL is not set; API calls will fail in prod.');
+}
+
+// Safe URL join: accepts '/api/...'(preferred) or 'api/...'
+function joinUrl(path) {
+  const p = path.startsWith('/') ? path.slice(1) : path;
+  return new URL(p, API_BASE + '/').toString();
+}
+
+// Read bearer token if you still use it anywhere (cookies are primary)
 function getAuthToken() {
   return localStorage.getItem('auth_token') || localStorage.getItem('token');
 }
@@ -12,51 +26,25 @@ function getAuthToken() {
 // Main API call function
 async function apiCall(url, options = {}) {
   const token = getAuthToken();
-  
-  const headers = {
-    // This will be populated below
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
 
-  // 👇 MINIMAL CHANGE START: Conditionally set Content-Type
-  // Do NOT set Content-Type for FormData; the browser must handle it to include the boundary.
+  // Headers: set JSON by default; let browser set multipart boundaries for FormData
+  const headers = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
-  // 👆 MINIMAL CHANGE END
 
   try {
-    // Build full URL with proper /api prefix
-    let fullUrl = url;
+    // Build absolute URL against API_BASE
+    const path = url.startsWith('/api') || url.startsWith('api') ? url : `/api${url.startsWith('/') ? url : '/' + url}`;
+    const fullUrl = url.startsWith('http') ? url : joinUrl(path);
 
-    if (!url.startsWith('http')) {
-      const path = url.startsWith('/api')
-        ? url
-        : `/api${url.startsWith('/') ? url : '/' + url}`;
-      fullUrl = `${API_BASE_URL}${path}`;
-    }
-
-    // Only send cookies when explicitly requested or when making a
-    // same-origin request.  Some hosting providers reject cross-origin
-    // requests that include credentials, which previously surfaced as a
-    // generic "Failed to fetch" error in the UI.
-    let shouldSendCredentials = options.credentials;
-    if (shouldSendCredentials === undefined && typeof window !== 'undefined') {
-      try {
-        const requestOrigin = new URL(fullUrl, window.location.href).origin;
-        shouldSendCredentials = requestOrigin === window.location.origin ? 'include' : 'omit';
-      } catch {
-        shouldSendCredentials = 'omit';
-      }
-    }
-
+    // Always include credentials for cross-site cookie auth
     const response = await fetch(fullUrl, {
       ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-      credentials: shouldSendCredentials ?? 'omit',
+      headers: { ...headers, ...(options.headers || {}) },
+      credentials: 'include', // <<< required for auth cookies on https://api.buildstate.com.au
     });
 
     // Handle 401 Unauthorized - redirect to signin
@@ -64,64 +52,79 @@ async function apiCall(url, options = {}) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/signin';
+      if (typeof window !== 'undefined') window.location.href = '/signin';
       throw new Error('Unauthorized - please sign in again');
     }
 
-    // 👇 MINIMAL CHANGE START: Better error handling for non-JSON server responses
+    // Robust body parsing (works for JSON and non-JSON)
     const text = await response.text();
-    let responseData;
+    let data;
     try {
-        responseData = JSON.parse(text);
-    } catch (e) {
-        // If parsing fails, it's not a valid JSON response.
-        if (!response.ok) {
-            throw new Error(text || `HTTP ${response.status} Error`);
-        }
-        // It could be a non-JSON success response, which we don't expect but handle gracefully.
-        return text; 
+      data = text ? JSON.parse(text) : undefined;
+    } catch {
+      if (!response.ok) throw new Error(text || `HTTP ${response.status} Error`);
+      return text; // non-JSON success (rare)
     }
-    // 👆 MINIMAL CHANGE END
 
     if (!response.ok) {
-      const errorMessage = responseData.message || responseData.error || `HTTP ${response.status}`;
-      throw new Error(errorMessage);
+      const msg = data?.message || data?.error || `HTTP ${response.status}`;
+      const err = new Error(msg);
+      err.status = response.status;
+      err.body = data;
+      throw err;
     }
 
-    return responseData;
+    return data;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('API call failed:', error);
     throw error;
   }
 }
 
-// 👇 MINIMAL CHANGE START: Pass FormData directly without stringifying
+// Thin helpers (support FormData or JSON seamlessly)
 export const api = {
   get: (url) => apiCall(url, { method: 'GET' }),
-  
-  post: (url, data) => apiCall(url, {
-    method: 'POST',
-    body: data instanceof FormData ? data : JSON.stringify(data),
-  }),
 
-  put: (url, data) => apiCall(url, {
-    method: 'PUT',
-    body: data instanceof FormData ? data : JSON.stringify(data),
-  }),
+  post: (url, data) =>
+    apiCall(url, {
+      method: 'POST',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
 
-  patch: (url, data) => apiCall(url, {
-    method: 'PATCH',
-    body: data instanceof FormData ? data : JSON.stringify(data),
-  }),
-  
-  delete: (url) => apiCall(url, {
-    method: 'DELETE',
-  }),
+  put: (url, data) =>
+    apiCall(url, {
+      method: 'PUT',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
 
+  patch: (url, data) =>
+    apiCall(url, {
+      method: 'PATCH',
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+
+  delete: (url) => apiCall(url, { method: 'DELETE' }),
+
+  // Optional generic request shape; keep if callers use it
   request: ({ url, method = 'GET', data, params, headers }) => {
-    // ... (rest of your existing request function)
+    const p = params
+      ? url +
+        (url.includes('?') ? '&' : '?') +
+        new URLSearchParams(params).toString()
+      : url;
+
+    return apiCall(p, {
+      method,
+      headers,
+      body:
+        data instanceof FormData
+          ? data
+          : data !== undefined
+          ? JSON.stringify(data)
+          : undefined,
+    });
   },
 };
-// 👆 MINIMAL CHANGE END
 
 export default api;
