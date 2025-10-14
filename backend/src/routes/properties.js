@@ -337,6 +337,9 @@ const unitSchema = z.object({
 router.get('/', async (req, res) => {
   try {
     const orgId = await ensureUserOrg(req.user);
+
+    // If your schema has no maintenanceRequests relation, selecting it will 500.
+    // Keep selection minimal and safe.
     const properties = await prisma.property.findMany({
       where: { orgId },
       select: {
@@ -353,15 +356,26 @@ router.get('/', async (req, res) => {
         createdAt: true,
         updatedAt: true,
         _count: {
-          select: { units: true, maintenanceRequests: true },
+          select: { units: true }, // <-- removed maintenanceRequests
         },
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ success: true, properties });
+
+    return res.json({ success: true, properties });
   } catch (error) {
-    console.error('Get properties error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch properties' });
+    // more helpful server-side logging
+    console.error('Get properties error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error?.stack,
+    });
+
+    // return clear JSON to FE
+    return res
+      .status(500)
+      .json({ success: false, message: 'Failed to fetch properties' });
   }
 });
 
