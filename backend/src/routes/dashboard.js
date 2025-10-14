@@ -1,6 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
 import { getDashboardSummary } from '../data/memoryStore.js';
 
 const router = express.Router();

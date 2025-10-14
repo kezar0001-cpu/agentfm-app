@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../config/prismaClient.js';
 import { listPlans, addPlan } from '../data/memoryStore.js';
 
 const router = express.Router();
