@@ -1,23 +1,30 @@
-import { Box, CircularProgress, Stack, Typography, Alert, Button } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import { Box, CircularProgress, Alert, Button, Typography, Stack } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import InboxIcon from '@mui/icons-material/Inbox';
 
+/**
+ * DataState Component
+ * 
+ * Handles loading, error, and empty states consistently across the app
+ * 
+ * @param {boolean} isLoading - Show loading state
+ * @param {boolean} isError - Show error state
+ * @param {Error} error - Error object with message
+ * @param {boolean} isEmpty - Show empty state
+ * @param {string} emptyMessage - Message to show when empty
+ * @param {function} onRetry - Function to call when retry button clicked
+ * @param {ReactNode} children - Content to show when data is loaded
+ */
 export default function DataState({
   isLoading,
   isError,
   error,
   isEmpty,
+  emptyMessage = 'No data available',
   onRetry,
   children,
-  emptyMessage,
-  onResetFilters,
-  onAddProperty,
-  resetButtonLabel = 'Reset Filters',
-  addButtonLabel = 'Add a Property',
-  showResetButton = true,
-  showAddButton = true,
 }) {
-  const { t } = useTranslation();
-
+  // Loading State
   if (isLoading) {
     return (
       <Box
@@ -25,67 +32,64 @@ export default function DataState({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          py: 4,
+          minHeight: 300,
         }}
-        aria-live="polite"
-        role="status"
-        aria-busy="true"
       >
-        <CircularProgress size={40} color="primary" aria-label={t('feedback.loading')} />
-        <Typography sx={{ ml: 2 }}>
-          {t('feedback.loadingProperties', 'Loading Properties...')}
-        </Typography>
+        <CircularProgress />
       </Box>
     );
   }
 
+  // Error State
   if (isError) {
     return (
-      <Alert
-        severity="error"
-        action={
-          onRetry && (
-            <Button color="inherit" onClick={onRetry} size="small">
-              {t('feedback.retry')}
-            </Button>
-          )
-        }
-        sx={{ my: 2 }}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 300,
+        }}
       >
-        {error?.message || t('feedback.error')}
-      </Alert>
-    );
-  }
-
-  if (isEmpty) {
-    return (
-      <Box sx={{ py: 6, textAlign: 'center' }}>
-        <Typography color="text.secondary">
-          {emptyMessage || t('feedback.empty')}
-        </Typography>
-        {(onResetFilters || onAddProperty) && (
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={2}
-            justifyContent="center"
-            alignItems="center"
-            sx={{ mt: 3 }}
-          >
-            {onResetFilters && showResetButton && (
-              <Button variant="outlined" onClick={onResetFilters}>
-                {resetButtonLabel}
-              </Button>
-            )}
-            {onAddProperty && showAddButton && (
-              <Button variant="contained" onClick={onAddProperty}>
-                {addButtonLabel}
-              </Button>
-            )}
-          </Stack>
-        )}
+        <Stack spacing={2} alignItems="center" sx={{ maxWidth: 500 }}>
+          <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main' }} />
+          <Typography variant="h6" color="error">
+            Something went wrong
+          </Typography>
+          <Alert severity="error" sx={{ width: '100%' }}>
+            {error?.message || 'An unexpected error occurred'}
+          </Alert>
+          {onRetry && (
+            <Button variant="contained" onClick={onRetry}>
+              Try Again
+            </Button>
+          )}
+        </Stack>
       </Box>
     );
   }
 
+  // Empty State
+  if (isEmpty) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 300,
+        }}
+      >
+        <Stack spacing={2} alignItems="center" sx={{ maxWidth: 400, textAlign: 'center' }}>
+          <InboxIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
+          <Typography variant="h6" color="text.secondary">
+            {emptyMessage}
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // Success State - Show Children
   return <>{children}</>;
 }
