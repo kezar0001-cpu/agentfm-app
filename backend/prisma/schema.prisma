@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // keep your -pooler URL here for the app
+  directUrl = env("DIRECT_URL")     // non-pooled URL used by Prisma Migrate
 }
 
 model Org {

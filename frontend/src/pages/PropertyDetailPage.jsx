@@ -1,188 +1,560 @@
-// frontend/src/pages/PropertyDetailPage.jsx
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Stack, Typography, Paper, Button, Chip, Divider, Grid, Alert, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  Button,
+  Chip,
+  Stack,
+  Card,
+  CardContent,
+  IconButton,
+  Tabs,
+  Tab,
+  Alert,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
 } from '@mui/material';
-import { Edit, ArrowBack, Domain, LocationOn, Delete } from '@mui/icons-material';
-import { api } from '../api.js';
-import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
+import {
+  ArrowBack as ArrowBackIcon,
+  Edit as EditIcon,
+  LocationOn as LocationIcon,
+  Home as HomeIcon,
+  CalendarToday as CalendarIcon,
+  SquareFoot as AreaIcon,
+  MoreVert as MoreVertIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  PersonAdd as PersonAddIcon,
+} from '@mui/icons-material';
+import useApiQuery from '../hooks/useApiQuery';
+import useApiMutation from '../hooks/useApiMutation';
+import DataState from '../components/DataState';
+import PropertyForm from '../components/PropertyForm';
+import UnitForm from '../components/UnitForm';
+import { normaliseArray } from '../utils/error';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [state, setState] = useState({
-    loading: true,
-    error: null,
-    notFound: false,
-    property: null,
+  const [currentTab, setCurrentTab] = useState(0);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [unitDialogOpen, setUnitDialogOpen] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [unitMenuAnchor, setUnitMenuAnchor] = useState(null);
+  const [deleteUnitDialogOpen, setDeleteUnitDialogOpen] = useState(false);
+
+  // Fetch property details
+  const propertyQuery = useApiQuery({
+    queryKey: ['property', id],
+    url: `/api/properties/${id}`,
   });
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
-  const load = async () => {
-    setState((s) => ({ ...s, loading: true, error: null, notFound: false }));
+  // Fetch units for this property
+  const unitsQuery = useApiQuery({
+    queryKey: ['units', id],
+    url: `/api/units?propertyId=${id}`,
+  });
+
+  // Delete unit mutation
+  const deleteUnitMutation = useApiMutation({
+    method: 'delete',
+    invalidateKeys: [['units', id], ['property', id]],
+  });
+
+  const property = propertyQuery.data;
+  const units = normaliseArray(unitsQuery.data);
+
+  const handleBack = () => {
+    navigate('/properties');
+  };
+
+  const handleEditProperty = () => {
+    setEditDialogOpen(true);
+  };
+
+  const handleAddUnit = () => {
+    setSelectedUnit(null);
+    setUnitDialogOpen(true);
+  };
+
+  const handleUnitMenuOpen = (event, unit) => {
+    event.stopPropagation();
+    setUnitMenuAnchor(event.currentTarget);
+    setSelectedUnit(unit);
+  };
+
+  const handleUnitMenuClose = () => {
+    setUnitMenuAnchor(null);
+  };
+
+  const handleEditUnit = () => {
+    setUnitDialogOpen(true);
+    handleUnitMenuClose();
+  };
+
+  const handleDeleteUnit = () => {
+    setDeleteUnitDialogOpen(true);
+    handleUnitMenuClose();
+  };
+
+  const confirmDeleteUnit = async () => {
+    if (!selectedUnit) return;
+
     try {
-      const res = await api.get(`/api/properties/${id}`);
-      // backend returns { success, property }
-      const property = res?.property ?? res;
-      if (!property) throw new Error('Unexpected response');
-      setState({ loading: false, error: null, notFound: false, property });
-    } catch (err) {
-      // differentiate 404 vs 500 when possible
-      const msg = err?.message || 'Failed to fetch property';
-      const notFound = /404|not found/i.test(msg);
-      setState({ loading: false, error: notFound ? null : msg, notFound, property: null });
+      await deleteUnitMutation.mutateAsync({
+        url: `/api/units/${selectedUnit.id}`,
+      });
+      setDeleteUnitDialogOpen(false);
+      setSelectedUnit(null);
+    } catch (error) {
+      // Error shown via mutation
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      await api.delete(`/api/properties/${id}`);
-      navigate('/properties');
-    } catch (err) {
-      setState((s) => ({ ...s, error: err?.message || 'Failed to delete property' }));
-      setDeleteDialogOpen(false);
-    } finally {
-      setDeleting(false);
-    }
+  const getStatusColor = (status) => {
+    const colors = {
+      ACTIVE: 'success',
+      INACTIVE: 'default',
+      UNDER_MAINTENANCE: 'warning',
+      AVAILABLE: 'success',
+      OCCUPIED: 'info',
+      MAINTENANCE: 'warning',
+      VACANT: 'default',
+    };
+    return colors[status] || 'default';
   };
-
-  if (state.loading) {
-    return (
-      <Box sx={{ p: 4, display: 'grid', placeItems: 'center' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (state.notFound) {
-    return (
-      <Box sx={{ p: 4 }}>
-        <Stack spacing={2} alignItems="flex-start">
-          <Typography variant="h5">Property not found</Typography>
-          <Button variant="contained" onClick={() => navigate('/properties')}>
-            Back to Properties
-          </Button>
-        </Stack>
-      </Box>
-    );
-  }
-
-  if (state.error) {
-    return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {state.error}
-        </Alert>
-        <Stack direction="row" spacing={2}>
-          <Button onClick={load} variant="outlined">Retry</Button>
-          <Button onClick={() => navigate('/properties')} variant="contained">Back</Button>
-        </Stack>
-      </Box>
-    );
-  }
-
-  const p = state.property;
-  const images = Array.isArray(p.images) ? p.images : [];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/properties')}>Back</Button>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Chip label={p.status || 'Active'} color={p.status === 'Active' ? 'success' : 'default'} />
-          {p.type && <Chip label={p.type.charAt(0).toUpperCase() + p.type.slice(1)} color="primary" variant="outlined" />}
-          <Button
-            component={RouterLink}
-            to={`/properties/${p.id}/edit`}
-            startIcon={<Edit />}
-            variant="contained"
-          >
-            Edit
-          </Button>
-          <Button
-            startIcon={<Delete />}
-            variant="outlined"
-            color="error"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            Delete
-          </Button>
-        </Stack>
-      </Stack>
-
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <PropertyImageCarousel images={images} fallbackText={p.name} height={340} />
-      </Paper>
-
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          <Domain sx={{ mr: 1, verticalAlign: 'bottom' }} />
-          {p.name}
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Stack spacing={1.2}>
-              <Typography variant="body1">
-                <LocationOn sx={{ mr: 1, verticalAlign: 'bottom' }} />
-                {p.address || '—'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {p.city || '—'} {p.postcode || ''} {p.country || ''}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Created: {new Date(p.createdAt).toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Updated: {new Date(p.updatedAt).toLocaleString()}
-              </Typography>
-            </Stack>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Units</Typography>
-            <Divider sx={{ mb: 1 }} />
-            {Array.isArray(p.units) && p.units.length > 0 ? (
-              <Stack spacing={0.5}>
-                {p.units.map((u) => (
-                  <Typography key={u.id} variant="body2">
-                    • {u.unitCode} {u.address ? `— ${u.address}` : ''} {u.bedrooms != null ? `(${u.bedrooms} br)` : ''}
-                  </Typography>
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No units yet.</Typography>
-            )}
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => !deleting && setDeleteDialogOpen(false)}
+    <Box sx={{ py: 3 }}>
+      <DataState
+        isLoading={propertyQuery.isLoading}
+        isError={propertyQuery.isError}
+        error={propertyQuery.error}
+        onRetry={propertyQuery.refetch}
       >
-        <DialogTitle>Delete Property</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete &quot;{p.name}&quot;? This action cannot be undone.
-            {p.units && p.units.length > 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                This property has {p.units.length} unit(s). Deleting it may affect related data.
-              </Alert>
+        {property && (
+          <Stack spacing={3}>
+            {/* Header with Back Button */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton onClick={handleBack} size="large">
+                <ArrowBackIcon />
+              </IconButton>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {property.name}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                  <LocationIcon fontSize="small" color="action" />
+                  <Typography variant="body2" color="text.secondary">
+                    {property.address}, {property.city}, {property.state} {property.zipCode}
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={handleEditProperty}
+              >
+                Edit Property
+              </Button>
+            </Box>
+
+            {/* Property Image */}
+            {property.imageUrl ? (
+              <Box
+                component="img"
+                src={property.imageUrl}
+                alt={property.name}
+                sx={{
+                  width: '100%',
+                  height: 400,
+                  objectFit: 'cover',
+                  borderRadius: 2,
+                }}
+              />
+            ) : (
+              <Paper
+                sx={{
+                  height: 400,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'grey.100',
+                  borderRadius: 2,
+                }}
+              >
+                <HomeIcon sx={{ fontSize: 120, color: 'grey.400' }} />
+              </Paper>
             )}
-          </DialogContentText>
+
+            {/* Quick Stats */}
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Status
+                    </Typography>
+                    <Chip
+                      label={property.status.replace('_', ' ')}
+                      color={getStatusColor(property.status)}
+                      size="small"
+                    />
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Total Units
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                      {property.totalUnits || 0}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Property Type
+                    </Typography>
+                    <Typography variant="h6">
+                      {property.propertyType}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Year Built
+                    </Typography>
+                    <Typography variant="h6">
+                      {property.yearBuilt || 'N/A'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Tabs */}
+            <Paper>
+              <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
+                <Tab label="Overview" />
+                <Tab label={`Units (${units.length})`} />
+                <Tab label="Owners" />
+                <Tab label="Activity" />
+              </Tabs>
+            </Paper>
+
+            {/* Tab Content */}
+            {currentTab === 0 && (
+              <Paper sx={{ p: 3 }}>
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                      Property Details
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Address
+                        </Typography>
+                        <Typography variant="body1">
+                          {property.address}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          City, State, ZIP
+                        </Typography>
+                        <Typography variant="body1">
+                          {property.city}, {property.state} {property.zipCode}
+                        </Typography>
+                      </Grid>
+                      {property.totalArea && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Area
+                          </Typography>
+                          <Typography variant="body1">
+                            {property.totalArea.toLocaleString()} sq ft
+                          </Typography>
+                        </Grid>
+                      )}
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">
+                          Description
+                        </Typography>
+                        <Typography variant="body1">
+                          {property.description || 'No description provided'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                      Property Manager
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="body1">
+                      {property.manager.firstName} {property.manager.lastName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {property.manager.email}
+                    </Typography>
+                    {property.manager.phone && (
+                      <Typography variant="body2" color="text.secondary">
+                        {property.manager.phone}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              </Paper>
+            )}
+
+            {currentTab === 1 && (
+              <Paper sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Units
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleAddUnit}
+                  >
+                    Add Unit
+                  </Button>
+                </Box>
+
+                {deleteUnitMutation.isError && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {deleteUnitMutation.error?.message || 'Failed to delete unit'}
+                  </Alert>
+                )}
+
+                <DataState
+                  isLoading={unitsQuery.isLoading}
+                  isError={unitsQuery.isError}
+                  error={unitsQuery.error}
+                  isEmpty={units.length === 0}
+                  emptyMessage="No units yet. Add your first unit to get started!"
+                  onRetry={unitsQuery.refetch}
+                >
+                  <Grid container spacing={2}>
+                    {units.map((unit) => (
+                      <Grid item xs={12} sm={6} md={4} key={unit.id}>
+                        <Card>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                Unit {unit.unitNumber}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleUnitMenuOpen(e, unit)}
+                              >
+                                <MoreVertIcon />
+                              </IconButton>
+                            </Box>
+
+                            <Stack spacing={1}>
+                              <Chip
+                                label={unit.status}
+                                color={getStatusColor(unit.status)}
+                                size="small"
+                              />
+
+                              {unit.bedrooms && (
+                                <Typography variant="body2" color="text.secondary">
+                                  {unit.bedrooms} bed • {unit.bathrooms} bath
+                                </Typography>
+                              )}
+
+                              {unit.area && (
+                                <Typography variant="body2" color="text.secondary">
+                                  {unit.area} sq ft
+                                </Typography>
+                              )}
+
+                              {unit.rentAmount && (
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  ${unit.rentAmount.toLocaleString()}/mo
+                                </Typography>
+                              )}
+
+                              {unit.tenants && unit.tenants.length > 0 && (
+                                <Box>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Tenant:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </DataState>
+              </Paper>
+            )}
+
+            {currentTab === 2 && (
+              <Paper sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Property Owners
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PersonAddIcon />}
+                    disabled
+                  >
+                    Add Owner
+                  </Button>
+                </Box>
+
+                {property.owners && property.owners.length > 0 ? (
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Ownership %</TableCell>
+                        <TableCell>Since</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {property.owners.map((po) => (
+                        <TableRow key={po.id}>
+                          <TableCell>
+                            {po.owner.firstName} {po.owner.lastName}
+                          </TableCell>
+                          <TableCell>{po.owner.email}</TableCell>
+                          <TableCell>{po.ownershipPercentage}%</TableCell>
+                          <TableCell>
+                            {new Date(po.startDate).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Typography color="text.secondary">
+                    No owners assigned yet
+                  </Typography>
+                )}
+              </Paper>
+            )}
+
+            {currentTab === 3 && (
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                  Recent Activity
+                </Typography>
+                <Typography color="text.secondary">
+                  Activity log coming soon...
+                </Typography>
+              </Paper>
+            )}
+          </Stack>
+        )}
+      </DataState>
+
+      {/* Unit Menu */}
+      <Menu
+        anchorEl={unitMenuAnchor}
+        open={Boolean(unitMenuAnchor)}
+        onClose={handleUnitMenuClose}
+      >
+        <MenuItem onClick={handleEditUnit}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          Edit
+        </MenuItem>
+        <MenuItem onClick={handleDeleteUnit} sx={{ color: 'error.main' }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete
+        </MenuItem>
+      </Menu>
+
+      {/* Edit Property Dialog */}
+      <PropertyForm
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        property={property}
+        onSuccess={() => {
+          setEditDialogOpen(false);
+          propertyQuery.refetch();
+        }}
+      />
+
+      {/* Unit Form Dialog */}
+      <UnitForm
+        open={unitDialogOpen}
+        onClose={() => {
+          setUnitDialogOpen(false);
+          setSelectedUnit(null);
+        }}
+        propertyId={id}
+        unit={selectedUnit}
+        onSuccess={() => {
+          setUnitDialogOpen(false);
+          setSelectedUnit(null);
+          unitsQuery.refetch();
+        }}
+      />
+
+      {/* Delete Unit Dialog */}
+      <Dialog open={deleteUnitDialogOpen} onClose={() => setDeleteUnitDialogOpen(false)}>
+        <DialogTitle>Delete Unit</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete Unit {selectedUnit?.unitNumber}?
+            This action cannot be undone.
+          </Typography>
+          {selectedUnit?.tenants && selectedUnit.tenants.length > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This unit has active tenant(s). Please remove tenants before deleting.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
-            {deleting ? 'Deleting...' : 'Delete'}
+          <Button onClick={() => setDeleteUnitDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={confirmDeleteUnit}
+            color="error"
+            variant="contained"
+            disabled={deleteUnitMutation.isPending}
+          >
+            {deleteUnitMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
