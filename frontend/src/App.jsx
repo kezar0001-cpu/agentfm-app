@@ -5,8 +5,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import GlobalGuard from './components/GlobalGuard.jsx';
 import AuthGate from './authGate';
 import Layout from './components/Layout';
-import PropertiesPage from './pages/PropertiesPage';
-import PropertyDetailPage from './pages/PropertyDetailPage';
 
 // Simple fallback
 function RouteFallback() {
