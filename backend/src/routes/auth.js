@@ -8,6 +8,30 @@ import { prisma } from '../config/prismaClient.js';
 const router = Router();
 
 // ========================================
+// AUTH MIDDLEWARE (add this around line 13)
+// ========================================
+const requireAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,   // ← include role here
+      orgId: decoded.orgId,
+    };
+    next();
+  } catch {
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+};
+
+// ========================================
 // VALIDATION SCHEMAS
 // ========================================
 
@@ -343,56 +367,43 @@ router.get('/google/callback',
 // GET /api/auth/me
 // Get current authenticated user
 // ========================================
-router.get('/me', async (req, res) => {
+// Replace that entire first line with this:
+router.get('/me', requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'No token provided'
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-
     const user = await prisma.user.findUnique({
-  where: { id: decoded.id },
-  select: {
-    id: true,
-    email: true,
-    name: true,
-    role: true,
-    phone: true,
-    company: true,
-    emailVerified: true,
-    subscriptionPlan: true,
-    subscriptionStatus: true,
-    trialEndDate: true,
-    orgId: true,
-
-    // relations (true returns the whole related record)
-    org: true,
-    propertyManagerProfile: true,
-    ownerProfile: true,
-    technicianProfile: true,
-    tenantProfile: true,
-
-    createdAt: true,
-    updatedAt: true,
-  },
-});
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        company: true,
+        emailVerified: true,
+        subscriptionPlan: true,
+        subscriptionStatus: true,
+        trialEndDate: true,
+        orgId: true,
+        org: true,
+        propertyManagerProfile: true,
+        ownerProfile: true,
+        technicianProfile: true,
+        tenantProfile: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Calculate trial days remaining if applicable
     let trialDaysRemaining = null;
-    if (user.role === 'PROPERTY_MANAGER' && user.subscriptionStatus === 'TRIAL' && user.trialEndDate) {
+    if (
+      user.role === 'PROPERTY_MANAGER' &&
+      user.subscriptionStatus === 'TRIAL' &&
+      user.trialEndDate
+    ) {
       const now = new Date();
       const daysLeft = Math.ceil((user.trialEndDate - now) / (1000 * 60 * 60 * 24));
       trialDaysRemaining = Math.max(0, daysLeft);
@@ -400,24 +411,11 @@ router.get('/me', async (req, res) => {
 
     res.json({
       success: true,
-      user: {
-        ...user,
-        trialDaysRemaining
-      }
+      user: { ...user, trialDaysRemaining },
     });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-
     console.error('Get user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get user'
-    });
+    res.status(500).json({ success: false, message: 'Failed to get user' });
   }
 });
 
