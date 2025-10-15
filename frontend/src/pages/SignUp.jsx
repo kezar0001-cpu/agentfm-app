@@ -29,48 +29,26 @@ export default function SignUp() {
     const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
     if (!BASE) return null;
     const url = new URL('/api/auth/google', BASE + '/');
-    // PROPERTY_MANAGER for this portal
     url.searchParams.set('role', 'PROPERTY_MANAGER');
     return url.toString();
   }, []);
 
-  const handleChange = (e) => {
-    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
-    setError('');
-  };
+  const handleChange = (e) => { setFormData((p) => ({ ...p, [e.target.name]: e.target.value })); setError(''); };
 
   const validateForm = () => {
     const { name, email, password, confirmPassword, phone, company } = formData;
-    if (!name || !email || !password || !phone || !company) {
-      setError('Please fill in all required fields');
-      return false;
-    }
+    if (!name || !email || !password || !phone || !company) { setError('Please fill in all required fields'); return false; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return false;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return false;
-    }
+    if (!emailRegex.test(email)) { setError('Please enter a valid email address'); return false; }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return false; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return false; }
     const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-    if (!phoneRegex.test(phone)) {
-      setError('Please enter a valid phone number');
-      return false;
-    }
+    if (!phoneRegex.test(phone)) { setError('Please enter a valid phone number'); return false; }
     return true;
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!validateForm()) return;
-
+    e.preventDefault(); setError(''); if (!validateForm()) return;
     setLoading(true);
     try {
       const res = await api.post('/api/auth/register', {
@@ -89,23 +67,14 @@ export default function SignUp() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Registration error:', err);
-      const msg =
-        err?.response?.errors?.[0]?.message ||
-        err?.message ||
-        'Registration failed. Please try again.';
+      const msg = err?.response?.errors?.[0]?.message || err?.message || 'Registration failed. Please try again.';
       setError(msg);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleGoogle = () => {
-    if (!googleUrl) {
-      setError('Google sign-up is not configured');
-      return;
-    }
+    if (!googleUrl) { setError('Google sign-up is not configured'); return; }
     window.location.href = googleUrl;
   };
 
@@ -124,26 +93,17 @@ export default function SignUp() {
             }}>
               AgentFM
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-              Create Account
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Join AgentFM to streamline your property management
-            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>Create Account</Typography>
+            <Typography variant="body2" color="text.secondary">Join AgentFM to streamline your property management</Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
           <Button
-            fullWidth
-            variant="outlined"
-            onClick={handleGoogle}
-            disabled={loading || !googleUrl}
-            startIcon={<GoogleIcon />}
-            sx={{
-              mb: 2, textTransform: 'none', borderColor: '#e0e0e0', color: '#757575',
-              '&:hover': { borderColor: '#bdbdbd', backgroundColor: '#f5f5f5' }
-            }}
+            fullWidth variant="outlined" onClick={handleGoogle}
+            disabled={loading || !googleUrl} startIcon={<GoogleIcon />}
+            sx={{ mb: 2, textTransform: 'none', borderColor: '#e0e0e0', color: '#757575',
+              '&:hover': { borderColor: '#bdbdbd', backgroundColor: '#f5f5f5' } }}
           >
             Continue with Google
           </Button>
@@ -153,65 +113,41 @@ export default function SignUp() {
           </Divider>
 
           <Box component="form" onSubmit={handleSubmit}>
-            <TextField
-              margin="normal" required fullWidth id="name" label="Full Name" name="name"
-              autoComplete="name" autoFocus value={formData.name} onChange={handleChange} disabled={loading}
-            />
-
-            <TextField
-              margin="normal" required fullWidth id="email" label="Email Address" name="email"
-              type="email" autoComplete="email" value={formData.email} onChange={handleChange} disabled={loading}
-            />
-
-            {/* Company (required by backend) */}
-            <TextField
-              margin="normal" required fullWidth id="company" label="Company / Organization" name="company"
-              autoComplete="organization" value={formData.company} onChange={handleChange} disabled={loading}
-            />
-
-            <TextField
-              margin="normal" required fullWidth id="phone" label="Phone Number" name="phone"
+            <TextField margin="normal" required fullWidth id="name" label="Full Name" name="name"
+              autoComplete="name" autoFocus value={formData.name} onChange={handleChange} disabled={loading} />
+            <TextField margin="normal" required fullWidth id="email" label="Email Address" name="email"
+              type="email" autoComplete="email" value={formData.email} onChange={handleChange} disabled={loading} />
+            <TextField margin="normal" required fullWidth id="company" label="Company / Organization" name="company"
+              autoComplete="organization" value={formData.company} onChange={handleChange} disabled={loading} />
+            <TextField margin="normal" required fullWidth id="phone" label="Phone Number" name="phone"
               type="tel" autoComplete="tel" placeholder="+61 400 000 000"
-              value={formData.phone} onChange={handleChange} disabled={loading}
-            />
-
-            <TextField
-              margin="normal" required fullWidth name="password" label="Password"
+              value={formData.phone} onChange={handleChange} disabled={loading} />
+            <TextField margin="normal" required fullWidth name="password" label="Password"
               type={showPassword ? 'text' : 'password'} id="password" autoComplete="new-password"
               value={formData.password} onChange={handleChange} disabled={loading} helperText="Minimum 8 characters"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
+              InputProps={{ endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )}}
             />
-
-            <TextField
-              margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
+            <TextField margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
               type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" autoComplete="new-password"
               value={formData.confirmPassword} onChange={handleChange} disabled={loading}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" disabled={loading}>
-                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
+              InputProps={{ endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" disabled={loading}>
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )}}
             />
-
-            <Button
-              type="submit" fullWidth variant="contained" size="large" disabled={loading}
-              sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}
-            >
+            <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}
+              sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
               {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
-
             <Box sx={{ textAlign: 'center', mt: 2 }}>
               <Typography variant="body2" color="text.secondary">
                 Already have an account?{' '}

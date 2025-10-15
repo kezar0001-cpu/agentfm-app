@@ -1,4 +1,4 @@
-// frontend/src/useApiMutation.js
+// frontend/src/hooks/useApiMutation.js
 import { useState } from 'react';
 import { api } from '../api.js';
 
@@ -13,25 +13,17 @@ export default function useApiMutation({ url, method = 'post', invalidateKeys = 
     setError(null);
 
     try {
-      const requestUrl = variables.url || url;
-      const requestMethod = String(variables.method || method).toLowerCase();
-      const requestData = variables.data;
-      const requestHeaders = variables.headers;
-      const requestParams = variables.params;
-
-      // Single path via api.request to allow extra options consistently
       const resp = await api.request({
-        url: requestUrl,
-        method: requestMethod.toUpperCase(),
-        data: requestData,
-        headers: requestHeaders,
-        params: requestParams,
+        url: variables.url || url,
+        method: String(variables.method || method).toUpperCase(),
+        data: variables.data,
+        headers: variables.headers,
+        params: variables.params,
       });
 
       if (onSuccess) onSuccess(resp, variables);
       return resp;
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('useApiMutation error:', err);
       setIsError(true);
       setError(err);
@@ -41,10 +33,5 @@ export default function useApiMutation({ url, method = 'post', invalidateKeys = 
     }
   };
 
-  return {
-    mutateAsync,
-    isPending,
-    isError,
-    error,
-  };
+  return { mutateAsync, isPending, isError, error };
 }

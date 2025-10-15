@@ -37,7 +37,7 @@ router.get('/', authenticate, async (req, res) => {
     const tenants = await prisma.user.findMany({
       where: {
         orgId: req.user.orgId,
-        role: 'tenant'
+        role: 'TENANT'
       },
       include: {
         tenantProfile: true,
@@ -76,7 +76,7 @@ router.get('/:id', authenticate, async (req, res) => {
       where: {
         id: req.params.id,
         orgId: req.user.orgId,
-        role: 'tenant'
+        role: 'TENANT'
       },
       include: {
         tenantProfile: true,
