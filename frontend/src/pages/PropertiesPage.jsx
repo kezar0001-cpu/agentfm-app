@@ -280,8 +280,8 @@ export default function PropertiesPage() {
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Chip
                           size="small"
-                          label={(property.status ?? '').replace('_', ' ')}
-                          color={getStatusColor(property.status ?? '')}
+                          label={property.status?.replace('_', ' ') || ''}
+                          color={getStatusColor(property.status || '')}
                         />
                         <Chip
                           size="small"
