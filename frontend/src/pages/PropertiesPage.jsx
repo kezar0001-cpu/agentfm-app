@@ -67,15 +67,16 @@ export default function PropertiesPage() {
 
   // Filter properties
   const filteredProperties = properties.filter((property) => {
-    const matchesSearch =
-      property.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.city.toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesSearch =
+    (property.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (property.address || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (property.city || '').toLowerCase().includes((searchTerm || '').toLowerCase());
 
-    const matchesStatus = filterStatus === 'all' || property.status === filterStatus;
+  const matchesStatus =
+    filterStatus === 'all' || (property.status || '') === filterStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+  return matchesSearch && matchesStatus;
+});
 
   const handleMenuOpen = (event, property) => {
     event.stopPropagation();
