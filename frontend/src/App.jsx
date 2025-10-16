@@ -5,7 +5,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import GlobalGuard from './components/GlobalGuard.jsx';
 import AuthGate from './authGate';
 import Layout from './components/Layout';
-import AppRouter from './routes/AppRouter.jsx';
 
 // Simple fallback
 function RouteFallback() {
