@@ -1,458 +1,373 @@
-import { useEffect, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState, useEffect } from 'react';
 import {
-  Box,
-  Grid,
-  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Button,
+  TextField,
+  Grid,
   MenuItem,
-  Typography,
   Alert,
-  Stack,
-  IconButton,
-  Card,
-  CardMedia,
-  CardActions,
-  FormHelperText,
-  Chip,
+  Box,
 } from '@mui/material';
-import {
-  CloudUpload,
-  Delete,
-  Image as ImageIcon,
-  Save,
-  Cancel,
-} from '@mui/icons-material';
+import useApiMutation from '../hooks/useApiMutation';
 
 const PROPERTY_TYPES = [
-  { value: 'residential', label: 'Residential' },
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'industrial', label: 'Industrial' },
-  { value: 'retail', label: 'Retail' },
-  { value: 'hospitality', label: 'Hospitality' },
-  { value: 'office', label: 'Office' },
+  'Residential',
+  'Commercial',
+  'Mixed-Use',
+  'Industrial',
+  'Retail',
+  'Office',
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'Active', label: 'Active' },
-  { value: 'Inactive', label: 'Inactive' },
+const PROPERTY_STATUSES = [
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
 ];
 
-const propertySchema = z.object({
-  name: z.string().min(1, 'Property name is required').max(200, 'Name is too long'),
-  address: z.string().max(500, 'Address is too long').optional().or(z.literal('')),
-  city: z.string().max(100, 'City name is too long').optional().or(z.literal('')),
-  postcode: z.string().max(20, 'Postcode is too long').optional().or(z.literal('')),
-  country: z.string().max(100, 'Country name is too long').optional().or(z.literal('')),
-  type: z.string().optional().or(z.literal('')),
-  status: z.string().default('Active'),
-});
+const STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+];
 
-export default function PropertyForm({
-  initialData = null,
-  onSubmit,
-  onCancel,
-  isSubmitting = false,
-  submitError = null,
-  mode = 'create',
-}) {
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
-  const [existingImages, setExistingImages] = useState([]);
+export default function PropertyForm({ open, onClose, property, onSuccess }) {
+  const isEdit = !!property;
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isDirty },
-    reset,
-  } = useForm({
-    resolver: zodResolver(propertySchema),
-    defaultValues: {
-      name: initialData?.name || '',
-      address: initialData?.address || '',
-      city: initialData?.city || '',
-      postcode: initialData?.postcode || '',
-      country: initialData?.country || '',
-      type: initialData?.type || '',
-      status: initialData?.status || 'Active',
-    },
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA',
+    propertyType: '',
+    yearBuilt: '',
+    totalUnits: '0',
+    totalArea: '',
+    status: 'ACTIVE',
+    description: '',
+    imageUrl: '',
   });
 
+  const [errors, setErrors] = useState({});
+
+  // Create/Update mutation
+  const mutation = useApiMutation({
+    url: isEdit ? `/api/properties/${property?.id}` : '/api/properties',
+    method: isEdit ? 'patch' : 'post',
+    invalidateKeys: [['properties']],
+  });
+
+  // Initialize form with property data if editing
   useEffect(() => {
-    if (initialData?.images && Array.isArray(initialData.images)) {
-      setExistingImages(initialData.images);
+    if (property) {
+      setFormData({
+        name: property.name || '',
+        address: property.address || '',
+        city: property.city || '',
+        state: property.state || '',
+        zipCode: property.zipCode || '',
+        country: property.country || 'USA',
+        propertyType: property.propertyType || '',
+        yearBuilt: property.yearBuilt?.toString() || '',
+        totalUnits: property.totalUnits?.toString() || '0',
+        totalArea: property.totalArea?.toString() || '',
+        status: property.status || 'ACTIVE',
+        description: property.description || '',
+        imageUrl: property.imageUrl || '',
+      });
+    } else {
+      // Reset form for new property
+      setFormData({
+        name: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: 'USA',
+        propertyType: '',
+        yearBuilt: '',
+        totalUnits: '0',
+        totalArea: '',
+        status: 'ACTIVE',
+        description: '',
+        imageUrl: '',
+      });
     }
-  }, [initialData]);
+    setErrors({});
+  }, [property, open]);
 
-  useEffect(() => {
-    return () => {
-      imagePreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
-    };
-  }, [imagePreviews]);
-
-  const handleImageSelect = (event) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const validFiles = files.filter((file) => {
-      if (!file.type.startsWith('image/')) {
-        return false;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        return false;
-      }
-      return true;
-    });
-
-    const newPreviews = validFiles.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-      name: file.name,
+  const handleChange = (field) => (event) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: event.target.value,
     }));
-
-    setImageFiles((prev) => [...prev, ...validFiles]);
-    setImagePreviews((prev) => [...prev, ...newPreviews]);
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: null }));
+    }
   };
 
-  const handleRemoveNewImage = (index) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => {
-      const removed = prev[index];
-      if (removed) URL.revokeObjectURL(removed.url);
-      return prev.filter((_, i) => i !== index);
-    });
-  };
+  const validate = () => {
+    const newErrors = {};
 
-  const handleRemoveExistingImage = (index) => {
-    setExistingImages((prev) => prev.filter((_, i) => i !== index));
-  };
+    if (!formData.name.trim()) newErrors.name = 'Property name is required';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state) newErrors.state = 'State is required';
+    if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
+    if (!formData.propertyType) newErrors.propertyType = 'Property type is required';
 
-  const onFormSubmit = async (data) => {
-    const formData = new FormData();
-    
-    formData.append('name', data.name.trim());
-    if (data.address) formData.append('address', data.address.trim());
-    if (data.city) formData.append('city', data.city.trim());
-    if (data.postcode) formData.append('postcode', data.postcode.trim());
-    if (data.country) formData.append('country', data.country.trim());
-    if (data.type) formData.append('type', data.type);
-    formData.append('status', data.status);
-
-    if (mode === 'edit') {
-      formData.append('existingImages', JSON.stringify(existingImages));
+    // Validate year built if provided
+    if (formData.yearBuilt) {
+      const year = parseInt(formData.yearBuilt);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1800 || year > currentYear) {
+        newErrors.yearBuilt = `Year must be between 1800 and ${currentYear}`;
+      }
     }
 
-    imageFiles.forEach((file) => {
-      formData.append('images', file);
-    });
-
-    await onSubmit(formData);
-  };
-
-  const handleCancel = () => {
-    reset();
-    setImageFiles([]);
-    setImagePreviews([]);
-    if (initialData?.images) {
-      setExistingImages(initialData.images);
+    // Validate numbers
+    if (formData.totalUnits && isNaN(parseInt(formData.totalUnits))) {
+      newErrors.totalUnits = 'Must be a valid number';
     }
-    onCancel?.();
+    if (formData.totalArea && isNaN(parseFloat(formData.totalArea))) {
+      newErrors.totalArea = 'Must be a valid number';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const totalImages = existingImages.length + imagePreviews.length;
+  const handleSubmit = async () => {
+    if (!validate()) return;
+
+    try {
+      await mutation.mutateAsync({
+        data: {
+          name: formData.name.trim(),
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          state: formData.state,
+          zipCode: formData.zipCode.trim(),
+          country: formData.country,
+          propertyType: formData.propertyType,
+          yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : null,
+          totalUnits: parseInt(formData.totalUnits) || 0,
+          totalArea: formData.totalArea ? parseFloat(formData.totalArea) : null,
+          status: formData.status,
+          description: formData.description.trim() || null,
+          imageUrl: formData.imageUrl.trim() || null,
+        },
+      });
+
+      onSuccess();
+    } catch (error) {
+      // Error is shown via mutation.error
+    }
+  };
 
   return (
-    <Box component="form" onSubmit={handleSubmit(onFormSubmit)} noValidate>
-      {submitError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {submitError}
-        </Alert>
-      )}
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        {isEdit ? 'Edit Property' : 'Add New Property'}
+      </DialogTitle>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Typography variant="h6" gutterBottom>
-            Basic Information
-          </Typography>
-        </Grid>
+      <DialogContent>
+        <Box sx={{ mt: 2 }}>
+          {mutation.isError && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {mutation.error?.message || 'Failed to save property'}
+            </Alert>
+          )}
 
-        <Grid item xs={12}>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => (
+          <Grid container spacing={2}>
+            {/* Property Name */}
+            <Grid item xs={12}>
               <TextField
-                {...field}
-                label="Property Name"
                 fullWidth
                 required
+                label="Property Name"
+                value={formData.name}
+                onChange={handleChange('name')}
                 error={!!errors.name}
-                helperText={errors.name?.message}
-                disabled={isSubmitting}
-                autoFocus
+                helperText={errors.name}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Controller
-            name="type"
-            control={control}
-            render={({ field }) => (
+            {/* Address */}
+            <Grid item xs={12}>
               <TextField
-                {...field}
-                select
-                label="Property Type"
                 fullWidth
-                error={!!errors.type}
-                helperText={errors.type?.message}
-                disabled={isSubmitting}
+                required
+                label="Street Address"
+                value={formData.address}
+                onChange={handleChange('address')}
+                error={!!errors.address}
+                helperText={errors.address}
+              />
+            </Grid>
+
+            {/* City, State, ZIP */}
+            <Grid item xs={12} sm={5}>
+              <TextField
+                fullWidth
+                required
+                label="City"
+                value={formData.city}
+                onChange={handleChange('city')}
+                error={!!errors.city}
+                helperText={errors.city}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                required
+                select
+                label="State"
+                value={formData.state}
+                onChange={handleChange('state')}
+                error={!!errors.state}
+                helperText={errors.state}
               >
-                <MenuItem value="">
-                  <em>Select type</em>
-                </MenuItem>
-                {PROPERTY_TYPES.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    {type.label}
+                {STATES.map((state) => (
+                  <MenuItem key={state} value={state}>
+                    {state}
                   </MenuItem>
                 ))}
               </TextField>
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Controller
-            name="status"
-            control={control}
-            render={({ field }) => (
+            </Grid>
+            <Grid item xs={12} sm={3}>
               <TextField
-                {...field}
+                fullWidth
+                required
+                label="ZIP Code"
+                value={formData.zipCode}
+                onChange={handleChange('zipCode')}
+                error={!!errors.zipCode}
+                helperText={errors.zipCode}
+              />
+            </Grid>
+
+            {/* Property Type & Status */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                select
+                label="Property Type"
+                value={formData.propertyType}
+                onChange={handleChange('propertyType')}
+                error={!!errors.propertyType}
+                helperText={errors.propertyType}
+              >
+                {PROPERTY_TYPES.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
                 select
                 label="Status"
-                fullWidth
-                error={!!errors.status}
-                helperText={errors.status?.message}
-                disabled={isSubmitting}
+                value={formData.status}
+                onChange={handleChange('status')}
               >
-                {STATUS_OPTIONS.map((status) => (
+                {PROPERTY_STATUSES.map((status) => (
                   <MenuItem key={status.value} value={status.value}>
                     {status.label}
                   </MenuItem>
                 ))}
               </TextField>
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        <Grid item xs={12}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-            Location Details
-          </Typography>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Controller
-            name="address"
-            control={control}
-            render={({ field }) => (
+            {/* Year Built & Total Units */}
+            <Grid item xs={12} sm={4}>
               <TextField
-                {...field}
-                label="Address"
                 fullWidth
-                error={!!errors.address}
-                helperText={errors.address?.message}
-                disabled={isSubmitting}
+                label="Year Built"
+                type="number"
+                value={formData.yearBuilt}
+                onChange={handleChange('yearBuilt')}
+                error={!!errors.yearBuilt}
+                helperText={errors.yearBuilt}
               />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Controller
-            name="city"
-            control={control}
-            render={({ field }) => (
+            </Grid>
+            <Grid item xs={12} sm={4}>
               <TextField
-                {...field}
-                label="City"
                 fullWidth
-                error={!!errors.city}
-                helperText={errors.city?.message}
-                disabled={isSubmitting}
+                label="Total Units"
+                type="number"
+                value={formData.totalUnits}
+                onChange={handleChange('totalUnits')}
+                error={!!errors.totalUnits}
+                helperText={errors.totalUnits}
               />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Controller
-            name="postcode"
-            control={control}
-            render={({ field }) => (
+            </Grid>
+            <Grid item xs={12} sm={4}>
               <TextField
-                {...field}
-                label="Postcode"
                 fullWidth
-                error={!!errors.postcode}
-                helperText={errors.postcode?.message}
-                disabled={isSubmitting}
+                label="Total Area (sq ft)"
+                type="number"
+                value={formData.totalArea}
+                onChange={handleChange('totalArea')}
+                error={!!errors.totalArea}
+                helperText={errors.totalArea}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        <Grid item xs={12} md={4}>
-          <Controller
-            name="country"
-            control={control}
-            render={({ field }) => (
+            {/* Description */}
+            <Grid item xs={12}>
               <TextField
-                {...field}
-                label="Country"
                 fullWidth
-                error={!!errors.country}
-                helperText={errors.country?.message}
-                disabled={isSubmitting}
+                multiline
+                rows={3}
+                label="Description"
+                value={formData.description}
+                onChange={handleChange('description')}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        <Grid item xs={12}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-            Images
-          </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Upload property images (max 5MB per image, up to 10 images)
-          </Typography>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Button
-            variant="outlined"
-            component="label"
-            startIcon={<CloudUpload />}
-            disabled={isSubmitting || totalImages >= 10}
-            fullWidth
-            sx={{ py: 2 }}
-          >
-            Upload Images
-            <input
-              type="file"
-              hidden
-              multiple
-              accept="image/*"
-              onChange={handleImageSelect}
-              disabled={isSubmitting || totalImages >= 10}
-            />
-          </Button>
-          {totalImages >= 10 && (
-            <FormHelperText>Maximum 10 images allowed</FormHelperText>
-          )}
-        </Grid>
-
-        {(existingImages.length > 0 || imagePreviews.length > 0) && (
-          <Grid item xs={12}>
-            <Stack spacing={2}>
-              {existingImages.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Existing Images
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {existingImages.map((image, index) => (
-                      <Grid item xs={6} sm={4} md={3} key={`existing-${index}`}>
-                        <Card>
-                          <CardMedia
-                            component="img"
-                            height="140"
-                            image={image}
-                            alt={`Property image ${index + 1}`}
-                            sx={{ objectFit: 'cover' }}
-                          />
-                          <CardActions>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveExistingImage(index)}
-                              disabled={isSubmitting}
-                              aria-label="Remove image"
-                            >
-                              <Delete />
-                            </IconButton>
-                            {index === 0 && (
-                              <Chip label="Cover" size="small" color="primary" />
-                            )}
-                          </CardActions>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-
-              {imagePreviews.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    New Images
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {imagePreviews.map((preview, index) => (
-                      <Grid item xs={6} sm={4} md={3} key={`new-${index}`}>
-                        <Card>
-                          <CardMedia
-                            component="img"
-                            height="140"
-                            image={preview.url}
-                            alt={preview.name}
-                            sx={{ objectFit: 'cover' }}
-                          />
-                          <CardActions>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveNewImage(index)}
-                              disabled={isSubmitting}
-                              aria-label="Remove image"
-                            >
-                              <Delete />
-                            </IconButton>
-                          </CardActions>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-            </Stack>
+            {/* Image URL */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Image URL (optional)"
+                value={formData.imageUrl}
+                onChange={handleChange('imageUrl')}
+                helperText="Enter a URL to an image of the property"
+              />
+            </Grid>
           </Grid>
-        )}
+        </Box>
+      </DialogContent>
 
-        <Grid item xs={12}>
-          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<Cancel />}
-              onClick={handleCancel}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={<Save />}
-              disabled={isSubmitting || (!isDirty && imageFiles.length === 0 && mode === 'edit')}
-            >
-              {isSubmitting ? 'Saving...' : mode === 'create' ? 'Create Property' : 'Save Changes'}
-            </Button>
-          </Stack>
-        </Grid>
-      </Grid>
-    </Box>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} disabled={mutation.isPending}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending
+            ? 'Saving...'
+            : isEdit
+            ? 'Update Property'
+            : 'Create Property'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -1,9 +1,8 @@
-// frontend/src/pages/SignUp.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
-  IconButton, InputAdornment
+  IconButton, InputAdornment, Grid
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
 import { saveTokenFromUrl } from '../lib/auth';
@@ -12,7 +11,7 @@ import { api } from '../api.js';
 export default function SignUp() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', confirmPassword: '', phone: '', company: ''
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,33 +32,45 @@ export default function SignUp() {
     return url.toString();
   }, []);
 
-  const handleChange = (e) => { setFormData((p) => ({ ...p, [e.target.name]: e.target.value })); setError(''); };
+  const handleChange = (e) => {
+    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+    setError('');
+  };
 
   const validateForm = () => {
-    const { name, email, password, confirmPassword, phone, company } = formData;
-    if (!name || !email || !password || !phone || !company) { setError('Please fill in all required fields'); return false; }
+    const { firstName, lastName, email, password, confirmPassword, phone } = formData;
+    if (!firstName || !lastName || !email || !password) {
+      setError('Please fill in all required fields');
+      return false;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) { setError('Please enter a valid email address'); return false; }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return false; }
     if (password !== confirmPassword) { setError('Passwords do not match'); return false; }
     const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-    if (!phoneRegex.test(phone)) { setError('Please enter a valid phone number'); return false; }
+    if (phone && !phoneRegex.test(phone)) { setError('Please enter a valid phone number'); return false; }
     return true;
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setError(''); if (!validateForm()) return;
+    e.preventDefault();
+    setError('');
+    if (!validateForm()) return;
+
     setLoading(true);
     try {
-      const res = await api.post('/api/auth/register', {
-        name: formData.name.trim(),
+      // Aligns with your Prisma schema: firstName + lastName
+      const payload = {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        phone: formData.phone.trim(),
-        company: formData.company.trim(),
-        role: 'PROPERTY_MANAGER',
-        subscriptionPlan: 'FREE_TRIAL',
-      });
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: formData.phone.trim() || undefined,
+        role: 'PROPERTY_MANAGER',          // self-signup role
+        // company: formData.company.trim() // optional: send only if you’ll store it server-side
+      };
+
+      const res = await api.post('/api/auth/register', payload);
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
@@ -67,10 +78,18 @@ export default function SignUp() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
-      console.error('Registration error:', err);
-      const msg = err?.response?.errors?.[0]?.message || err?.message || 'Registration failed. Please try again.';
+      // Try to pick the first Zod error message if available
+      const msg =
+        err?.response?.data?.errors?.[0]?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Registration failed. Please try again.';
       setError(msg);
-    } finally { setLoading(false); }
+      // eslint-disable-next-line no-console
+      console.error('Registration error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogle = () => {
@@ -113,16 +132,44 @@ export default function SignUp() {
           </Divider>
 
           <Box component="form" onSubmit={handleSubmit}>
-            <TextField margin="normal" required fullWidth id="name" label="Full Name" name="name"
-              autoComplete="name" autoFocus value={formData.name} onChange={handleChange} disabled={loading} />
-            <TextField margin="normal" required fullWidth id="email" label="Email Address" name="email"
-              type="email" autoComplete="email" value={formData.email} onChange={handleChange} disabled={loading} />
-            <TextField margin="normal" required fullWidth id="company" label="Company / Organization" name="company"
-              autoComplete="organization" value={formData.company} onChange={handleChange} disabled={loading} />
-            <TextField margin="normal" required fullWidth id="phone" label="Phone Number" name="phone"
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  margin="normal" required fullWidth id="firstName" label="First Name" name="firstName"
+                  autoComplete="given-name" autoFocus value={formData.firstName}
+                  onChange={handleChange} disabled={loading}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  margin="normal" required fullWidth id="lastName" label="Last Name" name="lastName"
+                  autoComplete="family-name" value={formData.lastName}
+                  onChange={handleChange} disabled={loading}
+                />
+              </Grid>
+            </Grid>
+
+            <TextField
+              margin="normal" required fullWidth id="email" label="Email Address" name="email"
+              type="email" autoComplete="email" value={formData.email}
+              onChange={handleChange} disabled={loading}
+            />
+
+            <TextField
+              margin="normal" fullWidth id="phone" label="Phone Number" name="phone"
               type="tel" autoComplete="tel" placeholder="+61 400 000 000"
-              value={formData.phone} onChange={handleChange} disabled={loading} />
-            <TextField margin="normal" required fullWidth name="password" label="Password"
+              value={formData.phone} onChange={handleChange} disabled={loading}
+            />
+
+            {/* Optional field for your UI — not required by schema */}
+            <TextField
+              margin="normal" fullWidth id="company" label="Company / Organization" name="company"
+              autoComplete="organization" value={formData.company}
+              onChange={handleChange} disabled={loading}
+            />
+
+            <TextField
+              margin="normal" required fullWidth name="password" label="Password"
               type={showPassword ? 'text' : 'password'} id="password" autoComplete="new-password"
               value={formData.password} onChange={handleChange} disabled={loading} helperText="Minimum 8 characters"
               InputProps={{ endAdornment: (
@@ -133,7 +180,9 @@ export default function SignUp() {
                 </InputAdornment>
               )}}
             />
-            <TextField margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
+
+            <TextField
+              margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
               type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" autoComplete="new-password"
               value={formData.confirmPassword} onChange={handleChange} disabled={loading}
               InputProps={{ endAdornment: (
@@ -144,10 +193,14 @@ export default function SignUp() {
                 </InputAdornment>
               )}}
             />
-            <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}
-              sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
+
+            <Button
+              type="submit" fullWidth variant="contained" size="large" disabled={loading}
+              sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}
+            >
               {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
+
             <Box sx={{ textAlign: 'center', mt: 2 }}>
               <Typography variant="body2" color="text.secondary">
                 Already have an account?{' '}

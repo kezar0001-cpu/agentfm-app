@@ -1,218 +1,386 @@
-// frontend/src/pages/PropertiesPage.jsx
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  Box, Grid, Card, CardContent, Typography, Button, Stack, Chip, TextField, InputAdornment,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  Box,
+  Typography,
+  Button,
+  Paper,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Stack,
+  TextField,
+  InputAdornment,
+  IconButton,
+  Menu,
+  MenuItem,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
-  Add, Search, LocationOn, Apartment, Business, Factory, Storefront, Hotel, Domain, Edit, Visibility,
+  Add as AddIcon,
+  Search as SearchIcon,
+  MoreVert as MoreVertIcon,
+  Home as HomeIcon,
+  LocationOn as LocationIcon,
+  Apartment as ApartmentIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { debounce } from 'lodash';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery';
+import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
-import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
-import PropertyDialog from '../components/PropertyDialog.jsx';
+import PropertyForm from '../components/PropertyForm';
+import { normaliseArray } from '../utils/error';
 
-const typeIcons = {
-  residential: { icon: Apartment, color: 'primary.main' },
-  commercial: { icon: Business, color: 'secondary.main' },
-  industrial: { icon: Factory, color: 'warning.main' },
-  retail: { icon: Storefront, color: 'success.main' },
-  hospitality: { icon: Hotel, color: 'info.main' },
-  office: { icon: Domain, color: 'secondary.main' },
-};
+export default function PropertiesPage() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
-const formatTypeName = (type) =>
-  !type ? 'N/A' : type.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  // Fetch properties
+  const query = useApiQuery({
+    queryKey: ['properties'],
+    url: '/api/properties',
+  });
 
-const PropertyCard = ({ property, onView, onEdit }) => {
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const images = Array.isArray(property.images) && property.images.length > 0 ? property.images : [];
-  const typeKey = property.type?.toLowerCase().trim();
-  const { icon: TypeIcon = Apartment, color: typeColor = 'primary.main' } = (typeKey && typeIcons[typeKey]) || {};
-  const formattedType = formatTypeName(property.type);
+  // Delete mutation
+  const deleteMutation = useApiMutation({
+    method: 'delete',
+    invalidateKeys: [['properties']],
+  });
+
+  const properties = normaliseArray(query.data);
+
+  // Filter properties
+  const filteredProperties = properties.filter((property) => {
+  const matchesSearch =
+    (property.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (property.address || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (property.city || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+
+  const matchesStatus =
+    filterStatus === 'all' || (property.status || '') === filterStatus;
+
+  return matchesSearch && matchesStatus;
+});
+
+  const handleMenuOpen = (event, property) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedProperty(property);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleCreate = () => {
+    setEditMode(false);
+    setSelectedProperty(null);
+    setDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleEdit = () => {
+    setEditMode(true);
+    setDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleDelete = () => {
+    setDeleteDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedProperty) return;
+
+    try {
+      await deleteMutation.mutateAsync({
+        url: `/api/properties/${selectedProperty.id}`,
+      });
+      setDeleteDialogOpen(false);
+      setSelectedProperty(null);
+    } catch (error) {
+      // Error is shown via mutation.error
+    }
+  };
+
+  const handleCardClick = (propertyId) => {
+    navigate(`/properties/${propertyId}`);
+  };
+
+  const handleFormSuccess = () => {
+    setDialogOpen(false);
+    setSelectedProperty(null);
+    setEditMode(false);
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      ACTIVE: 'success',
+      INACTIVE: 'default',
+      UNDER_MAINTENANCE: 'warning',
+    };
+    return colors[status] || 'default';
+  };
 
   return (
-    <>
-      <Card
-        sx={{
-          height: '100%', display: 'flex', flexDirection: 'column',
-          borderRadius: 2, boxShadow: 2, transition: 'transform 0.2s, box-shadow 0.2s',
-          '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
-        }}
-      >
-        <Box sx={{ position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-          <PropertyImageCarousel
-            images={images}
-            fallbackText={property.name}
-            placeholderSize="300x200"
-            height={200}
-            containerSx={{ borderRadius: '8px 8px 0 0' }}
-          />
+    <Box sx={{ py: 3 }}>
+      <Stack spacing={3}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              Properties
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Manage your property portfolio
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreate}
+            size="large"
+          >
+            Add Property
+          </Button>
         </Box>
-        <CardContent sx={{ flexGrow: 1, p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{property.name}</Typography>
-          <Stack spacing={1.5}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <LocationOn fontSize="small" color="primary" />
-              <Typography variant="body2" color="text.secondary">{property.address || 'No address'}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <TypeIcon fontSize="small" sx={{ color: typeColor }} />
-              <Typography variant="body2" color="text.secondary">{formattedType}</Typography>
-            </Box>
-          </Stack>
-        </CardContent>
-        <Stack direction="row" spacing={1} sx={{ p: 2, pb: 2 }}>
-          <Button size="small" variant="outlined" startIcon={<Visibility />} onClick={() => onView(property.id)} fullWidth>
-            View
-          </Button>
-          <Button size="small" variant="outlined" startIcon={<Edit />} onClick={() => setIsConfirmOpen(true)} fullWidth>
-            Edit
-          </Button>
-        </Stack>
-      </Card>
 
-      <Dialog open={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} aria-labelledby="edit-confirmation-title">
-        <DialogTitle id="edit-confirmation-title">Confirm Edit</DialogTitle>
+        {/* Search and Filter */}
+        <Paper sx={{ p: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={8}>
+              <TextField
+                fullWidth
+                placeholder="Search properties by name, address, or city..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                select
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <MenuItem value="all">All Statuses</MenuItem>
+                <MenuItem value="ACTIVE">Active</MenuItem>
+                <MenuItem value="INACTIVE">Inactive</MenuItem>
+                <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {/* Error Alert */}
+        {deleteMutation.isError && (
+          <Alert severity="error" onClose={() => deleteMutation.reset()}>
+            {deleteMutation.error?.message || 'Failed to delete property'}
+          </Alert>
+        )}
+
+        {/* Properties Grid */}
+        <DataState
+          isLoading={query.isLoading}
+          isError={query.isError}
+          error={query.error}
+          isEmpty={filteredProperties.length === 0}
+          emptyMessage={searchTerm || filterStatus !== 'all' 
+            ? 'No properties match your filters' 
+            : 'No properties yet. Add your first property to get started!'}
+          onRetry={query.refetch}
+        >
+          <Grid container spacing={3}>
+            {filteredProperties.map((property) => (
+              <Grid item xs={12} sm={6} md={4} key={property.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                    },
+                  }}
+                  onClick={() => handleCardClick(property.id)}
+                >
+                  {property.imageUrl ? (
+                    <Box
+                      component="img"
+                      src={property.imageUrl}
+                      alt={property.name}
+                      sx={{
+                        height: 200,
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        height: 200,
+                        bgcolor: 'grey.100',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <HomeIcon sx={{ fontSize: 80, color: 'grey.400' }} />
+                    </Box>
+                  )}
+
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {property.name}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, property)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <LocationIcon fontSize="small" color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          {property.address}, {property.city}, {property.state}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip
+                          size="small"
+                          label={property.status?.replace('_', ' ') || ''}
+                          color={getStatusColor(property.status || '')}
+                        />
+                        <Chip
+                          size="small"
+                          icon={<ApartmentIcon />}
+                          label={`${property.totalUnits} units`}
+                          variant="outlined"
+                        />
+                      </Box>
+
+                      {property.description && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {property.description}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </CardContent>
+
+                  <CardActions sx={{ px: 2, pb: 2 }}>
+                    <Stack spacing={0.5} sx={{ width: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Type: {property.propertyType}
+                      </Typography>
+                      {property._count && (
+                        <Typography variant="caption" color="text.secondary">
+                          {property._count.jobs} active jobs • {property._count.inspections} inspections
+                        </Typography>
+                      )}
+                    </Stack>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </DataState>
+      </Stack>
+
+      {/* Action Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={handleEdit}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          Edit
+        </MenuItem>
+        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete
+        </MenuItem>
+      </Menu>
+
+      {/* Property Form Dialog */}
+      <PropertyForm
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedProperty(null);
+          setEditMode(false);
+        }}
+        property={editMode ? selectedProperty : null}
+        onSuccess={handleFormSuccess}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Property</DialogTitle>
         <DialogContent>
-          <DialogContentText>Are you sure you want to edit this property?</DialogContentText>
+          <Typography>
+            Are you sure you want to delete <strong>{selectedProperty?.name}</strong>?
+            This action cannot be undone.
+          </Typography>
+          {selectedProperty?.totalUnits > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This property has {selectedProperty.totalUnits} unit(s). Make sure to remove all units and tenants before deleting.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsConfirmOpen(false)}>Cancel</Button>
-          <Button onClick={() => { setIsConfirmOpen(false); onEdit(property.id); }} variant="contained" autoFocus>
-            Confirm
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={confirmDelete}
+            color="error"
+            variant="contained"
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
-    </>
-  );
-};
-
-export default function PropertiesPage() {
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [openWizard, setOpenWizard] = useState(false);
-
-  const debouncedSearch = useMemo(() => debounce((v) => setSearchTerm(v), 300), []);
-  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
-
-  const handleSearchChange = (e) => { const v = e.target.value; setSearchInput(v); debouncedSearch(v); };
-
-  const { data, isLoading, isError, error, refetch } =
-    useApiQuery({ queryKey: ['properties'], url: '/api/properties' });
-
-  const properties = data?.properties || [];
-
-  const filteredProperties = useMemo(() => {
-    return properties.filter((p) => {
-      const q = searchTerm.toLowerCase();
-      const matchesSearch = p.name?.toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q);
-      const matchesFilter = filterType === 'all' || (p.type && p.type.toLowerCase() === filterType);
-      return matchesSearch && matchesFilter;
-    });
-  }, [searchTerm, filterType, properties]);
-
-  const propertyTypes = useMemo(() => {
-    const types = new Set(properties.map((p) => p.type?.toLowerCase()).filter(Boolean));
-    return ['all', ...Array.from(types)];
-  }, [properties]);
-
-  const resetFilters = () => {
-    debouncedSearch.cancel();
-    setSearchTerm(''); setSearchInput(''); setFilterType('all');
-  };
-
-  const hasFiltersApplied = searchTerm.trim() !== '' || filterType !== 'all';
-  const isPropertiesEmpty = !isLoading && properties.length === 0;
-  const isFilteredEmpty = !isLoading && filteredProperties.length === 0 && properties.length > 0;
-  const emptyMessage = isFilteredEmpty
-    ? 'No properties match your filters. Try resetting or adding a new property.'
-    : 'No properties available yet. Try adding a new property to get started.';
-
-  return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1200px', margin: '0 auto' }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4, flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary' }}>Properties</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setOpenWizard(true)}
-          sx={{ px: 3, py: 1, borderRadius: 2, '&:hover': { backgroundColor: 'primary.dark' } }}
-        >
-          Add Property
-        </Button>
-      </Stack>
-
-      <Card sx={{ p: 3, mb: 4, borderRadius: 2, boxShadow: 1 }}>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth placeholder="Search by name or address..."
-              value={searchInput} onChange={handleSearchChange}
-              InputProps={{
-                startAdornment: (<InputAdornment position="start"><Search sx={{ color: 'grey.500' }} /></InputAdornment>),
-                sx: { borderRadius: 2 },
-              }}
-              inputProps={{ 'aria-label': 'Search properties by name or address' }}
-              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setSearchInput(''); setSearchTerm(''); } }}
-              sx={{ '& .MuiOutlinedInput-root': { '&:hover fieldset': { borderColor: 'primary.main' } } }}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-              {propertyTypes.map((type) => {
-                const chipLabel = type === 'all' ? 'All Properties' : type.charAt(0).toUpperCase() + type.slice(1);
-                const chipFilterTarget = type === 'all' ? 'all properties' : type;
-                return (
-                  <Chip
-                    key={type}
-                    label={chipLabel}
-                    variant={filterType === type ? 'filled' : 'outlined'}
-                    onClick={() => setFilterType(type)}
-                    color={filterType === type ? 'primary' : 'default'}
-                    sx={{ fontWeight: filterType === type ? 600 : 400 }}
-                    aria-label={`Filter by ${chipFilterTarget}`}
-                  />
-                );
-              })}
-            </Stack>
-          </Grid>
-        </Grid>
-      </Card>
-
-      <DataState
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        onRetry={refetch}
-        isEmpty={isPropertiesEmpty || isFilteredEmpty}
-        emptyMessage={emptyMessage}
-        onResetFilters={resetFilters}
-        onAddProperty={() => setOpenWizard(true)}
-        showResetButton={hasFiltersApplied}
-      >
-        <Grid container spacing={4}>
-          {filteredProperties.map((property) => (
-            <Grid item xs={12} sm={6} md={4} key={property.id}>
-              <PropertyCard
-                property={property}
-                onView={(id) => navigate(`/properties/${id}`)}
-                onEdit={(id) => navigate(`/properties/${id}/edit`)}
-              />
-            </Grid>
-          ))}
-        </Grid>
-      </DataState>
-
-      <PropertyDialog 
-        open={openWizard} 
-        onClose={() => setOpenWizard(false)} 
-        onSuccess={() => refetch()} 
-      />
     </Box>
   );
 }

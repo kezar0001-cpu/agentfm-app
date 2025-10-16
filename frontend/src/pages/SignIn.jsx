@@ -1,4 +1,3 @@
-// frontend/src/pages/SignIn.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -17,10 +16,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Catch ?token= from Google callback and store it
     saveTokenFromUrl?.();
-
-    // If already logged in, go to dashboard
     const token = localStorage.getItem('auth_token');
     if (token) navigate('/dashboard');
   }, [navigate]);
@@ -44,14 +40,12 @@ export default function SignIn() {
       setError('Please enter both email and password');
       return;
     }
-
-    setError('');
     setLoading(true);
+    setError('');
     try {
       const res = await api.post('/api/auth/login', {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        // role: 'PROPERTY_MANAGER', // optional hint
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
@@ -60,9 +54,14 @@ export default function SignIn() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
+      // Try to extract server message
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Login failed. Please try again.';
+      setError(msg);
       // eslint-disable-next-line no-console
       console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -44,6 +44,10 @@ function NavBar() {
     setMobileMenuAnchor(null);
   };
 
+  // Helper to mark active links (works with nested paths)
+  const isActive = (href) =>
+    location.pathname === href || location.pathname.startsWith(`${href}/`);
+
   return (
     <AppBar
       position="static"
@@ -91,8 +95,8 @@ function NavBar() {
               sx={{
                 textTransform: 'none',
                 fontSize: '0.875rem',
-                fontWeight: location.pathname === item.href ? 'bold' : 'normal',
-                borderBottom: location.pathname === item.href ? '2px solid #1976d2' : 'none',
+                fontWeight: isActive(item.href) ? 'bold' : 'normal',
+                borderBottom: isActive(item.href) ? '2px solid #1976d2' : 'none',
                 borderRadius: 0,
                 minWidth: 'auto',
                 px: 2,
@@ -103,6 +107,7 @@ function NavBar() {
           ))}
         </Box>
 
+        {/* Mobile menu button */}
         <Box sx={{ display: { xs: 'flex', md: 'none' }, marginLeft: 'auto' }}>
           <IconButton
             size="large"
@@ -132,7 +137,7 @@ function NavBar() {
               <MenuItem
                 key={item.name}
                 onClick={() => handleNavigation(item.href)}
-                selected={location.pathname === item.href}
+                selected={isActive(item.href)}
               >
                 {item.name}
               </MenuItem>
@@ -150,6 +155,7 @@ function NavBar() {
           </Menu>
         </Box>
 
+        {/* Desktop logout button */}
         <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
           <LogoutButton
             variant="outlined"

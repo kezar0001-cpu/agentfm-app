@@ -16,15 +16,15 @@ const uploadPath = path.join(process.cwd(), 'uploads');
 const absoluteUploadPath = path.resolve(uploadPath);
 const fsp = fs.promises;
 
-const ensureUserOrg = async (user) => {
+const ensureUserOrg = async (user, client = prisma) => {
   if (!user) throw new Error('User context is required');
 
   if (user.orgId && typeof user.orgId === 'string') {
-    const found = await prisma.org.findUnique({ where: { id: user.orgId }, select: { id: true } });
+    const found = await client.org.findUnique({ where: { id: user.orgId }, select: { id: true } });
     if (found) return found.id;
   }
 
-  const orgId = await prisma.$transaction(async (tx) => {
+  const orgId = await client.$transaction(async (tx) => {
     const fresh = await tx.user.findUnique({ where: { id: user.id }, select: { orgId: true, company: true, name: true } });
     if (fresh?.orgId) {
       const chk = await tx.org.findUnique({ where: { id: fresh.orgId }, select: { id: true } });
@@ -387,5 +387,10 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router._test = { ensureUserOrg };
+router._test = {
+  ensureUserOrg,
+  propertySchema,
+  normaliseSingleImage,
+  normaliseImageList,
+};
 export default router;
