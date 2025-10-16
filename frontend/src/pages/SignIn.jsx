@@ -1,4 +1,3 @@
-// frontend/src/pages/SignIn.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -17,27 +16,17 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Catch ?token= from Google callback and store it
     saveTokenFromUrl?.();
-
-    // If already logged in, go to dashboard
     const token = localStorage.getItem('auth_token');
     if (token) navigate('/dashboard');
   }, [navigate]);
 
-  // Build Google OAuth URL (support either VITE_API_BASE_URL or VITE_API_BASE; fallback to same origin)
   const googleUrl = useMemo(() => {
-    const BASE =
-      (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || window.location.origin)
-        .toString()
-        .replace(/\/+$/, '');
-    try {
-      const url = new URL('/api/auth/google', BASE + '/');
-      url.searchParams.set('role', 'PROPERTY_MANAGER');
-      return url.toString();
-    } catch {
-      return null;
-    }
+    const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    if (!BASE) return null;
+    const url = new URL('/api/auth/google', BASE + '/');
+    url.searchParams.set('role', 'PROPERTY_MANAGER');
+    return url.toString();
   }, []);
 
   const handleChange = (e) => {
@@ -51,14 +40,12 @@ export default function SignIn() {
       setError('Please enter both email and password');
       return;
     }
-
-    setError('');
     setLoading(true);
+    setError('');
     try {
       const res = await api.post('/api/auth/login', {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        // role: 'PROPERTY_MANAGER', // optional hint
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
@@ -67,14 +54,14 @@ export default function SignIn() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
-      // Prefer server message if available
+      // Try to extract server message
       const msg =
         err?.response?.data?.message ||
-        err?.response?.data?.error ||
         err?.message ||
         'Login failed. Please try again.';
-      console.error('Login error:', err);
       setError(msg);
+      // eslint-disable-next-line no-console
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
