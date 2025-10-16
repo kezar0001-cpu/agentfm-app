@@ -1,10 +1,24 @@
 // frontend/src/api.js
 // Production-ready API client (absolute base + credentials included)
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+// Determine an appropriate API base URL. Use the environment variable when
+// available; otherwise fall back to a sensible default. In development we
+// assume a local backend on port 3000; in production we point to the
+// hosted API subdomain. Without this fallback, API_BASE would be an empty
+// string and fetch calls would incorrectly target the front-end domain.
+const defaultBase =
+  import.meta.env.MODE === 'development'
+    ? 'http://localhost:3000'
+    : 'https://api.buildstate.com.au';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || defaultBase).replace(
+  /\/+$/,
+  ''
+);
 if (!API_BASE) {
   // eslint-disable-next-line no-console
-  console.warn('VITE_API_BASE_URL is not set; API calls may fail.');
+  console.warn(
+    'Neither VITE_API_BASE_URL nor a default API_BASE could be determined; API calls may fail.'
+  );
 }
 
 function joinUrl(path) {
