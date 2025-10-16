@@ -39,10 +39,17 @@ if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
   'http://localhost:5173',
   'http://localhost:3000',
 ].forEach((o) => allowlist.add(o));
+const dynamicOriginMatchers = [
+  /https:\/\/.+\.vercel\.app$/,
+];
+
 const corsOptions = {
   origin(origin, cb) {
     if (!origin) return cb(null, true);
     if (allowlist.has(origin)) return cb(null, true);
+    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+      return cb(null, true);
+    }
     return cb(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
