@@ -62,7 +62,11 @@ if (!fs.existsSync(uploadPath)) {
 app.use('/uploads', express.static(uploadPath));
 
 // ---- Session
-// ... (your existing session configuration remains the same)
+// Session configuration for cross-domain authentication
+// - secure: true in production (HTTPS only)
+// - httpOnly: true prevents XSS attacks
+// - sameSite: 'none' in production allows cross-domain cookies (required for api.buildstate.com.au → www.buildstate.com.au)
+// - maxAge: 7 days
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'replace-this-session-secret',
