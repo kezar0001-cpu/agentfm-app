@@ -1,6 +1,8 @@
-// Complete AgentFM MVP Schema
-// This extends the previous schema with all remaining modules
+// Complete AgentFM MVP Schema (updated)
 
+// ======================================================
+// GENERATOR & DATASOURCE
+// ======================================================
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,6 +12,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ======================================================
+// ENUMS
+// ======================================================
 enum Role {
   PROPERTY_MANAGER
   OWNER
@@ -23,6 +28,14 @@ enum SubscriptionStatus {
   PENDING
   SUSPENDED
   CANCELLED
+}
+
+// NEW: user-level plan (used by your auth logic)
+enum SubscriptionPlan {
+  FREE_TRIAL
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
 }
 
 enum PropertyStatus {
@@ -115,10 +128,52 @@ enum NotificationType {
   SYSTEM
 }
 
-// ============================================
-// USER & AUTHENTICATION
-// ============================================
+// ======================================================
+// NEW: ORG & PROFILES (used by your auth code)
+// ======================================================
+model Org {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
 
+  users     User[]
+}
+
+model PropertyManagerProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Your code writes arrays/objects here — store as JSON
+  managedProperties Json?
+  permissions       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Simple shells so selecting them in /me won’t break if you keep them
+model OwnerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TechnicianProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TenantProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ======================================================
+// USER & AUTHENTICATION
+// ======================================================
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
@@ -132,31 +187,50 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // Relationships by role
+  // NEW: org relation used throughout your auth code
+  orgId         String?
+  org           Org?     @relation(fields: [orgId], references: [id])
+
+  // NEW: optional company (you show this in the Sign Up UI)
+  company       String?
+
+  // NEW: user-level subscription fields (checked in /login & OAuth)
+  subscriptionPlan   SubscriptionPlan   @default(FREE_TRIAL)
+  subscriptionStatus SubscriptionStatus  @default(TRIAL)
+  trialEndDate       DateTime?
+  emailVerified      Boolean            @default(false)
+
+  // NEW: profiles referenced by /me
+  propertyManagerProfile PropertyManagerProfile?
+  ownerProfile          OwnerProfile?
+  technicianProfile     TechnicianProfile?
+  tenantProfile         TenantProfile?
+
+  // Relationships by role / existing app models
   managedProperties   Property[]       @relation("PropertyManager")
   subscriptions       Subscription[]
   ownedProperties     PropertyOwner[]
   tenantUnits         UnitTenant[]
-  
-  // Work assignments
-  assignedInspections Inspection[]     @relation("AssignedTechnician")
+
+  assignedInspections  Inspection[]    @relation("AssignedTechnician")
   completedInspections Inspection[]    @relation("CompletedBy")
-  assignedJobs        Job[]            @relation("AssignedTechnician")
-  
-  // Communications
+  assignedJobs         Job[]           @relation("AssignedTechnician")
+
   sentInvites         Invite[]         @relation("InvitedBy")
   receivedInvite      Invite?          @relation("InvitedUser")
   notifications       Notification[]
   serviceRequests     ServiceRequest[]
-  
-  // Activity
-  createdRecommendations Recommendation[] @relation("CreatedBy")
+
+  createdRecommendations  Recommendation[] @relation("CreatedBy")
   approvedRecommendations Recommendation[] @relation("ApprovedBy")
 
   @@index([email])
   @@index([role])
 }
 
+// ======================================================
+// INVITES
+// ======================================================
 model Invite {
   id            String       @id @default(cuid())
   email         String
@@ -165,16 +239,16 @@ model Invite {
   status        InviteStatus @default(PENDING)
   expiresAt     DateTime
   createdAt     DateTime     @default(now())
-  
+
   invitedById   String
   invitedBy     User         @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
-  
+
   invitedUserId String?      @unique
   invitedUser   User?        @relation("InvitedUser", fields: [invitedUserId], references: [id])
-  
+
   propertyId    String?
   property      Property?    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   unitId        String?
   unit          Unit?        @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
@@ -183,43 +257,41 @@ model Invite {
   @@index([status])
 }
 
-// ============================================
-// SUBSCRIPTION & BILLING
-// ============================================
-
+// ======================================================
+// SUBSCRIPTION & BILLING (keep existing model)
+// ======================================================
 model Subscription {
-  id                String             @id @default(cuid())
-  userId            String
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  planId            String
-  planName          String
-  status            SubscriptionStatus @default(TRIAL)
-  
+  id                    String             @id @default(cuid())
+  userId                String
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId                String
+  planName              String
+  status                SubscriptionStatus @default(TRIAL)
+
   // Stripe data
-  stripeCustomerId      String?    @unique
-  stripeSubscriptionId  String?    @unique
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
   stripeCurrentPeriodEnd DateTime?
-  
+
   // Trial
-  trialStartDate    DateTime       @default(now())
-  trialEndDate      DateTime?
-  
-  startDate         DateTime       @default(now())
-  endDate           DateTime?
-  cancelledAt       DateTime?
-  
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  trialStartDate        DateTime @default(now())
+  trialEndDate          DateTime?
+
+  startDate             DateTime @default(now())
+  endDate               DateTime?
+  cancelledAt           DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
 }
 
-// ============================================
+// ======================================================
 // PROPERTIES & UNITS
-// ============================================
-
+// ======================================================
 model Property {
   id              String         @id @default(cuid())
   name            String
@@ -228,23 +300,23 @@ model Property {
   state           String
   zipCode         String
   country         String         @default("USA")
-  
+
   propertyType    String
   yearBuilt       Int?
   totalUnits      Int            @default(0)
   totalArea       Float?
-  
+
   status          PropertyStatus @default(ACTIVE)
-  
+
   description     String?        @db.Text
   imageUrl        String?
-  
+
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  
+
   managerId       String
   manager         User           @relation("PropertyManager", fields: [managerId], references: [id], onDelete: Cascade)
-  
+
   units           Unit[]
   owners          PropertyOwner[]
   inspections     Inspection[]
@@ -260,17 +332,17 @@ model Property {
 
 model PropertyOwner {
   id                  String   @id @default(cuid())
-  
+
   propertyId          String
   property            Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   ownerId             String
   owner               User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  
+
   ownershipPercentage Float    @default(100.0)
   startDate           DateTime @default(now())
   endDate             DateTime?
-  
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -282,24 +354,24 @@ model PropertyOwner {
 model Unit {
   id              String     @id @default(cuid())
   unitNumber      String
-  
+
   propertyId      String
   property        Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   floor           Int?
   bedrooms        Int?
   bathrooms       Float?
   area            Float?
-  
+
   rentAmount      Float?
   status          UnitStatus @default(AVAILABLE)
-  
+
   description     String?    @db.Text
   imageUrl        String?
-  
+
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
-  
+
   tenants         UnitTenant[]
   inspections     Inspection[]
   jobs            Job[]
@@ -313,20 +385,20 @@ model Unit {
 
 model UnitTenant {
   id            String   @id @default(cuid())
-  
+
   unitId        String
   unit          Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  
+
   tenantId      String
   tenant        User     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
+
   leaseStart    DateTime
   leaseEnd      DateTime
   rentAmount    Float
   depositAmount Float?
-  
+
   isActive      Boolean  @default(true)
-  
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -335,39 +407,37 @@ model UnitTenant {
   @@index([isActive])
 }
 
-// ============================================
+// ======================================================
 // INSPECTIONS
-// ============================================
-
+// ======================================================
 model Inspection {
   id              String           @id @default(cuid())
   title           String
   type            InspectionType
   scheduledDate   DateTime
   completedDate   DateTime?
-  
+
   propertyId      String?
   property        Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   unitId          String?
   unit            Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  
+
   assignedToId    String?
   assignedTo      User?            @relation("AssignedTechnician", fields: [assignedToId], references: [id], onDelete: SetNull)
-  
+
   completedById   String?
   completedBy     User?            @relation("CompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  
+
   status          InspectionStatus @default(SCHEDULED)
   notes           String?          @db.Text
   findings        String?          @db.Text
-  
-  // Photos as JSON array of URLs
+
   photos          Json?
-  
+
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  
+
   report          Report?
 
   @@index([propertyId])
@@ -377,43 +447,39 @@ model Inspection {
   @@index([scheduledDate])
 }
 
-// ============================================
+// ======================================================
 // JOBS
-// ============================================
-
+// ======================================================
 model Job {
   id              String      @id @default(cuid())
   title           String
   description     String      @db.Text
   priority        JobPriority @default(MEDIUM)
   status          JobStatus   @default(OPEN)
-  
+
   propertyId      String?
   property        Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   unitId          String?
   unit            Unit?       @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  
+
   assignedToId    String?
   assignedTo      User?       @relation("AssignedTechnician", fields: [assignedToId], references: [id], onDelete: SetNull)
-  
-  // Linked from service request
+
   serviceRequestId String?
   serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
-  
-  // Linked from maintenance plan
+
   maintenancePlanId String?
   maintenancePlan   MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id], onDelete: SetNull)
-  
+
   scheduledDate   DateTime?
   completedDate   DateTime?
   estimatedCost   Float?
   actualCost      Float?
-  
-  // Evidence/photos as JSON
+
   evidence        Json?
   notes           String?     @db.Text
-  
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -425,29 +491,26 @@ model Job {
   @@index([scheduledDate])
 }
 
-// ============================================
+// ======================================================
 // MAINTENANCE PLANS
-// ============================================
-
+// ======================================================
 model MaintenancePlan {
   id                String   @id @default(cuid())
   name              String
   description       String?  @db.Text
-  
+
   propertyId        String
   property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
-  frequency         String   // daily, weekly, monthly, quarterly, annually
+
+  frequency         String
   nextDueDate       DateTime
   lastCompletedDate DateTime?
-  
-  // Auto-create jobs
+
   autoCreateJobs    Boolean  @default(false)
-  
   isActive          Boolean  @default(true)
-  
+
   jobs              Job[]
-  
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -456,10 +519,9 @@ model MaintenancePlan {
   @@index([nextDueDate])
 }
 
-// ============================================
+// ======================================================
 // SERVICE REQUESTS
-// ============================================
-
+// ======================================================
 model ServiceRequest {
   id              String               @id @default(cuid())
   title           String
@@ -467,25 +529,23 @@ model ServiceRequest {
   category        ServiceRequestCategory
   priority        JobPriority          @default(MEDIUM)
   status          ServiceRequestStatus @default(SUBMITTED)
-  
+
   propertyId      String
   property        Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  
+
   unitId          String?
   unit            Unit?                @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  
+
   requestedById   String
   requestedBy     User                 @relation(fields: [requestedById], references: [id], onDelete: Cascade)
-  
-  // Photos as JSON array
+
   photos          Json?
-  
-  // Manager response
+
   reviewNotes     String?              @db.Text
   reviewedAt      DateTime?
-  
+
   jobs            Job[]
-  
+
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -496,28 +556,24 @@ model ServiceRequest {
   @@index([category])
 }
 
-// ============================================
+// ======================================================
 // REPORTS
-// ============================================
-
+// ======================================================
 model Report {
   id              String   @id @default(cuid())
   title           String
-  
+
   inspectionId    String   @unique
   inspection      Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  
+
   summary         String   @db.Text
   findings        String   @db.Text
-  
-  // PDF file URL
+
   pdfUrl          String?
-  
-  // Report data as JSON
   data            Json?
-  
+
   recommendations Recommendation[]
-  
+
   generatedDate   DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -526,33 +582,32 @@ model Report {
   @@index([generatedDate])
 }
 
-// ============================================
+// ======================================================
 // RECOMMENDATIONS
-// ============================================
-
+// ======================================================
 model Recommendation {
   id              String               @id @default(cuid())
   title           String
   description     String               @db.Text
-  
+
   reportId        String
   report          Report               @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  
+
   estimatedCost   Float?
   priority        JobPriority          @default(MEDIUM)
   status          RecommendationStatus @default(DRAFT)
-  
+
   createdById     String
   createdBy       User                 @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
-  
+
   approvedById    String?
   approvedBy      User?                @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  
+
   approvedAt      DateTime?
   implementedAt   DateTime?
-  
+
   rejectionReason String?              @db.Text
-  
+
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -561,27 +616,25 @@ model Recommendation {
   @@index([createdById])
 }
 
-// ============================================
+// ======================================================
 // NOTIFICATIONS
-// ============================================
-
+// ======================================================
 model Notification {
-  id              String           @id @default(cuid())
-  userId          String
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type            NotificationType
-  title           String
-  message         String           @db.Text
-  
-  isRead          Boolean          @default(false)
-  readAt          DateTime?
-  
-  // Link to related entity
-  entityType      String?          // 'inspection', 'job', 'service_request', etc.
-  entityId        String?
-  
-  createdAt       DateTime         @default(now())
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type       NotificationType
+  title      String
+  message    String     @db.Text
+
+  isRead     Boolean    @default(false)
+  readAt     DateTime?
+
+  entityType String?
+  entityId   String?
+
+  createdAt  DateTime   @default(now())
 
   @@index([userId])
   @@index([isRead])
