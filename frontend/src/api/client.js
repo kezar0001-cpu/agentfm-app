@@ -1,17 +1,16 @@
-// frontend/src/api/client.js
 import axios from 'axios';
 
-// Determine the backend base URL
+// Choose your API base URL (env wins; fallback to same-origin /api)
 const baseURL =
   import.meta.env.VITE_API_BASE ||
   `${window.location.origin.replace(/\/$/, '')}/api`;
 
-const client = axios.create({
+const apiClient = axios.create({
   baseURL,
   withCredentials: false,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-export default client;
+// Export BOTH ways so all imports work
+export default apiClient;
+export { apiClient };
