@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prismaClient.js';
-import jwt from 'jsonwebtoken';
+import { requireAuth as authMiddleware } from '../middleware/auth.js';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import multer from 'multer';
 import path from 'path';
@@ -136,28 +136,7 @@ const dedupeImages = (images = []) => {
 };
 
 // --- Auth/Role ---
-const requireAuth = async (req, res, next) => {
-  try {
-    const h = req.headers.authorization;
-    if (!h?.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'No token provided' });
-    const token = h.split(' ')[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    } catch (e) {
-      console.error('JWT verify failed:', { name: e?.name, message: e?.message, code: e?.code });
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
-    }
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) return res.status(401).json({ success: false, message: 'User not found' });
-    req.user = user;
-    next();
-  } catch (e) {
-    console.error('Auth middleware error:', e?.message);
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  }
-};
-router.use(requireAuth);
+router.use(authMiddleware);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 
 // --- Multer ---

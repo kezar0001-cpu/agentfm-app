@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
+import { signToken, verifyToken } from '../utils/jwt.js';
 
 const router = Router();
 
@@ -98,16 +98,12 @@ router.post('/register', async (req, res) => {
     });
 
     // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        orgId: user.orgId
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
-    );
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      orgId: user.orgId
+    });
 
     // Return user data (exclude password hash)
     const { passwordHash: _, ...userWithoutPassword } = user;
@@ -201,16 +197,12 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        orgId: user.orgId
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
-    );
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      orgId: user.orgId
+    });
 
     // Update last login
     await prisma.user.update({
@@ -306,16 +298,12 @@ router.get('/google/callback',
       }
 
       // Generate JWT token
-      const token = jwt.sign(
-        {
-          id: user.id, 
-          email: user.email,
-          role: user.role,
-          orgId: user.orgId
-        },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
+      const token = signToken({
+        id: user.id, 
+        email: user.email,
+        role: user.role,
+        orgId: user.orgId
+      });
 
       // Determine redirect based on role
       const dashboardRoutes = {
@@ -354,7 +342,7 @@ router.get('/me', async (req, res) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = verifyToken(token);
 
     const user = await prisma.user.findUnique({
   where: { id: decoded.id },
