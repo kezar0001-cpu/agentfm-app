@@ -25,12 +25,19 @@ export default function SignUp() {
     if (token) navigate('/dashboard');
   }, [navigate]);
 
+  // Build Google OAuth URL (supports both env names; fallback to same origin)
   const googleUrl = useMemo(() => {
-    const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-    if (!BASE) return null;
-    const url = new URL('/api/auth/google', BASE + '/');
-    url.searchParams.set('role', 'PROPERTY_MANAGER');
-    return url.toString();
+    const BASE =
+      (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || window.location.origin)
+        .toString()
+        .replace(/\/+$/, '');
+    try {
+      const url = new URL('/api/auth/google', BASE + '/');
+      url.searchParams.set('role', 'PROPERTY_MANAGER');
+      return url.toString();
+    } catch {
+      return null;
+    }
   }, []);
 
   const handleChange = (e) => { setFormData((p) => ({ ...p, [e.target.name]: e.target.value })); setError(''); };
@@ -51,14 +58,17 @@ export default function SignUp() {
     e.preventDefault(); setError(''); if (!validateForm()) return;
     setLoading(true);
     try {
+      // payload adjusted to current backend: name + subscription via separate table
       const res = await api.post('/api/auth/register', {
-        name: formData.name.trim(),
+        name: formData.name.trim(),                 // backend will split into first/last
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         phone: formData.phone.trim(),
-        company: formData.company.trim(),
         role: 'PROPERTY_MANAGER',
-        subscriptionPlan: 'FREE_TRIAL',
+        // Subscription model fields (backend creates TRIAL row):
+        planId: 'free',
+        planName: 'FREE_TRIAL',
+        // `company` is currently unused on backend — it can be ignored there
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
@@ -68,7 +78,11 @@ export default function SignUp() {
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
-      const msg = err?.response?.errors?.[0]?.message || err?.message || 'Registration failed. Please try again.';
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Registration failed. Please try again.';
       setError(msg);
     } finally { setLoading(false); }
   };

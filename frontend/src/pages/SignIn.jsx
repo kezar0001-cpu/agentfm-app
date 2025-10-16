@@ -25,12 +25,19 @@ export default function SignIn() {
     if (token) navigate('/dashboard');
   }, [navigate]);
 
+  // Build Google OAuth URL (support either VITE_API_BASE_URL or VITE_API_BASE; fallback to same origin)
   const googleUrl = useMemo(() => {
-    const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-    if (!BASE) return null;
-    const url = new URL('/api/auth/google', BASE + '/');
-    url.searchParams.set('role', 'PROPERTY_MANAGER');
-    return url.toString();
+    const BASE =
+      (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || window.location.origin)
+        .toString()
+        .replace(/\/+$/, '');
+    try {
+      const url = new URL('/api/auth/google', BASE + '/');
+      url.searchParams.set('role', 'PROPERTY_MANAGER');
+      return url.toString();
+    } catch {
+      return null;
+    }
   }, []);
 
   const handleChange = (e) => {
@@ -60,9 +67,14 @@ export default function SignIn() {
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
-      // eslint-disable-next-line no-console
+      // Prefer server message if available
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Login failed. Please try again.';
       console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
+      setError(msg);
     } finally {
       setLoading(false);
     }
