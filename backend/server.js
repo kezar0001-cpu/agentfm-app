@@ -28,10 +28,17 @@ const allowlist = new Set(
   if (origin) allowlist.add(origin.trim());
 });
 
+const dynamicOriginMatchers = [
+  /https:\/\/.+\.vercel\.app$/,
+];
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
     if (allowlist.has(origin)) return callback(null, true);
+    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+      return callback(null, true);
+    }
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
