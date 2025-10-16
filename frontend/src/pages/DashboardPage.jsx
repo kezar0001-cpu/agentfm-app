@@ -87,6 +87,9 @@ const DashboardPage = () => {
     );
   }
 
+  const alerts = Array.isArray(summary?.alerts) ? summary.alerts : [];
+  const activityItems = Array.isArray(activity) ? activity : [];
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       {/* Header */}
@@ -114,9 +117,9 @@ const DashboardPage = () => {
       </Box>
 
       {/* Alerts Section */}
-      {summary?.alerts && summary.alerts.length > 0 && (
+      {alerts.length > 0 && (
         <Box sx={{ mb: 3 }}>
-          {summary.alerts.map((alert, index) => (
+          {alerts.map((alert, index) => (
             <Alert
               key={index}
               severity={alert.type}
@@ -213,7 +216,7 @@ const DashboardPage = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             
-            {!activity || activity.length === 0 ? (
+            {activityItems.length === 0 ? (
               <DataState
                 type="empty"
                 message="No recent activity"
@@ -221,7 +224,7 @@ const DashboardPage = () => {
               />
             ) : (
               <Stack spacing={2}>
-                {activity.map((item) => (
+                {activityItems.map((item) => (
                   <ActivityItem key={item.id} item={item} />
                 ))}
               </Stack>
@@ -328,6 +331,8 @@ const DashboardPage = () => {
 
 // Stat Card Component
 const StatCard = ({ title, value, icon, color, details, onClick }) => {
+  const detailItems = Array.isArray(details) ? details : [];
+
   return (
     <Card
       sx={{
@@ -349,9 +354,9 @@ const StatCard = ({ title, value, icon, color, details, onClick }) => {
             <Typography variant="h3" component="div" sx={{ mb: 2 }}>
               {value}
             </Typography>
-            {details && (
+            {detailItems.length > 0 && (
               <Stack spacing={0.5}>
-                {details.map((detail, index) => (
+                {detailItems.map((detail, index) => (
                   <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" color="text.secondary">
                       {detail.label}:
