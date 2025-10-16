@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const routes = require('./routes/routes');
+const propertyRoutes = require('./routes/routes');
 dotenv.config();
 
 
@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 // API routes
-app.use('/api', routes);
+app.use('/api', propertyRoutes);
 
 // test route
 app.get('/', (req, res) => {
