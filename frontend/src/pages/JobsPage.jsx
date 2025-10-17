@@ -30,6 +30,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import JobForm from '../components/JobForm';
+import ensureArray from '../utils/ensureArray';
 
 const JobsPage = () => {
   const navigate = useNavigate();
@@ -51,7 +52,7 @@ const JobsPage = () => {
 
   // Fetch jobs
   const {
-    data: jobs,
+    data: jobs = [],
     isLoading,
     error,
     refetch,
@@ -59,16 +60,16 @@ const JobsPage = () => {
     queryKey: ['jobs', filters],
     queryFn: async () => {
       const response = await apiClient.get(`/jobs?${queryParams.toString()}`);
-      return response.data;
+      return ensureArray(response.data, ['jobs', 'data', 'items', 'results']);
     },
   });
 
   // Fetch properties for filter
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
     },
   });
 
@@ -221,7 +222,7 @@ const JobsPage = () => {
                 size="small"
               >
                 <MenuItem value="">All Properties</MenuItem>
-                {properties?.map((property) => (
+                {properties.map((property) => (
                   <MenuItem key={property.id} value={property.id}>
                     {property.name}
                   </MenuItem>
