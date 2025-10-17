@@ -157,7 +157,7 @@ export default function SignUp() {
 
             <TextField
               margin="normal" fullWidth id="phone" label="Phone Number" name="phone"
-              type="tel" autoComplete="tel" placeholder="+61 400 000 000"
+              type="tel" autoComplete="tel" placeholder="e.g., +971 4 xxx-xxxx"
               value={formData.phone} onChange={handleChange} disabled={loading}
             />
 
