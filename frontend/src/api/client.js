@@ -1,11 +1,14 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/auth.js';
 
-// Choose your API base URL (env wins; fallback to same-origin /api)
+// Choose your API base URL (env wins; fallback to same-origin)
 const envBase = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE;
-const baseURL = envBase
-  ? envBase.replace(/\/$/, '')
-  : `${window.location.origin.replace(/\/$/, '')}/api`;
+let baseURL = '';
+if (envBase) {
+  baseURL = envBase.replace(/\/+$/, '');
+} else if (typeof window !== 'undefined') {
+  baseURL = window.location.origin.replace(/\/+$/, '');
+}
 
 const apiClient = axios.create({
   baseURL,
@@ -15,6 +18,12 @@ const apiClient = axios.create({
 
 // Automatically attach the auth token (if we have one) to every request
 apiClient.interceptors.request.use((config) => {
+  if (config?.url && !/^https?:\/\//i.test(config.url)) {
+    const leadingSlash = config.url.startsWith('/') ? config.url : `/${config.url}`;
+    const hasApiPrefix = /^\/api(\/|\?|$)/.test(leadingSlash);
+    config.url = hasApiPrefix ? leadingSlash : `/api${leadingSlash}`;
+  }
+
   try {
     const token = getAuthToken();
     if (token) {
