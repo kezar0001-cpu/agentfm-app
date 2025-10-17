@@ -1,10 +1,11 @@
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from './jwt.js';
 
 const COOKIE_NAME = 'session';
 const ONE_DAY = 24 * 60 * 60; // seconds
 
 function setSessionCookie(res, payload) {
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ONE_DAY });
+  const token = jwt.sign(payload, getJwtSecret(), { expiresIn: ONE_DAY });
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'none',
@@ -17,7 +18,7 @@ function readSession(req) {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (_) {
     return null;
   }
