@@ -174,6 +174,8 @@ const ServiceRequestsPage = () => {
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={4}>
               <TextField
+                id="service-request-filter-status"
+                name="status"
                 select
                 fullWidth
                 label="Status"
@@ -192,6 +194,8 @@ const ServiceRequestsPage = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <TextField
+                id="service-request-filter-category"
+                name="category"
                 select
                 fullWidth
                 label="Category"
@@ -214,6 +218,8 @@ const ServiceRequestsPage = () => {
             {userRole !== 'TENANT' && (
               <Grid item xs={12} sm={6} md={4}>
                 <TextField
+                  id="service-request-filter-property"
+                  name="propertyId"
                   select
                   fullWidth
                   label="Property"
@@ -448,6 +454,8 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
+              id="review-status"
+              name="status"
               select
               fullWidth
               label="Status"
@@ -459,6 +467,8 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
               <MenuItem value="REJECTED">Rejected</MenuItem>
             </TextField>
             <TextField
+              id="review-notes"
+              name="reviewNotes"
               fullWidth
               label="Review Notes"
               value={formData.reviewNotes}
@@ -524,6 +534,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               This will create a new job and update the service request status.
             </Alert>
             <TextField
+              id="convert-technician"
+              name="assignedToId"
               select
               fullWidth
               label="Assign to Technician (Optional)"
@@ -538,6 +550,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               ))}
             </TextField>
             <TextField
+              id="convert-scheduled-date"
+              name="scheduledDate"
               fullWidth
               label="Scheduled Date (Optional)"
               type="datetime-local"
@@ -546,6 +560,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               InputLabelProps={{ shrink: true }}
             />
             <TextField
+              id="convert-estimated-cost"
+              name="estimatedCost"
               fullWidth
               label="Estimated Cost (Optional)"
               type="number"
