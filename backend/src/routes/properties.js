@@ -1,275 +1,241 @@
 // backend/src/routes/properties.js
 import { Router } from 'express';
 import { z } from 'zod';
-import prisma from '../config/prismaClient.js';
 import jwt from 'jsonwebtoken';
+
+import prisma from '../config/prismaClient.js';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 
 const router = Router();
-const F_MINIMAL = process.env.PROPS_MINIMAL === '1';
 
-// --- Helpers ---
-const uploadPath = path.join(process.cwd(), 'uploads');
-const absoluteUploadPath = path.resolve(uploadPath);
-const fsp = fs.promises;
-
-const ensureUserOrg = async (user, client = prisma) => {
-  if (!user) throw new Error('User context is required');
-
-  if (user.orgId && typeof user.orgId === 'string') {
-    const found = await client.org.findUnique({ where: { id: user.orgId }, select: { id: true } });
-    if (found) return found.id;
-  }
-
-  const orgId = await client.$transaction(async (tx) => {
-    const fresh = await tx.user.findUnique({ where: { id: user.id }, select: { orgId: true, company: true, name: true } });
-    if (fresh?.orgId) {
-      const chk = await tx.org.findUnique({ where: { id: fresh.orgId }, select: { id: true } });
-      if (chk) return chk.id;
-    }
-    const orgName = (fresh?.company?.trim() || fresh?.name?.trim() || 'New Organization');
-    const org = await tx.org.create({ data: { name: orgName }, select: { id: true } });
-    await tx.user.update({ where: { id: user.id }, data: { orgId: org.id } });
-    return org.id;
-  });
-
-  return orgId;
-};
-
-const normalizePropertyPayload = (payload = {}) => {
-  const out = {};
-  for (const [k, v] of Object.entries(payload)) {
-    if (v === undefined || v === null) continue;
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (t === '') {
-        if (k === 'status') continue;
-        out[k] = null;
-      } else {
-        out[k] = t;
-      }
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
-};
-
-const toAbsoluteUploadPath = (imagePath) => {
-  if (!imagePath || typeof imagePath !== 'string') return null;
-  if (!imagePath.startsWith('/uploads')) return null;
-  const relative = imagePath.replace(/^\/+/, '');
-  const resolved = path.resolve(process.cwd(), relative);
-  if (!resolved.startsWith(absoluteUploadPath)) return null;
-  return resolved;
-};
-
-const removeImageFiles = async (imagePaths = []) => {
-  if (!Array.isArray(imagePaths) || imagePaths.length === 0) return;
-  await Promise.allSettled(
-    imagePaths.map(async (p) => {
-      const absolutePath = toAbsoluteUploadPath(p);
-      if (!absolutePath) return;
-      try {
-        await fsp.unlink(absolutePath);
-      } catch (e) {
-        if (e.code !== 'ENOENT') console.warn('unlink failed:', absolutePath, e.message);
-      }
-    }),
-  );
-};
-
-const normaliseSingleImage = (value, { defaultToNull = false } = {}) => {
-  if (value === undefined) return defaultToNull ? null : undefined;
-  if (value === null) return null;
-  if (typeof value === 'string') {
-    const t = value.trim();
-    return t ? t : (defaultToNull ? null : undefined);
-  }
-  if (value && typeof value === 'object' && typeof value.url === 'string') {
-    const t = value.url.trim();
-    return t ? t : (defaultToNull ? null : undefined);
-  }
-  return defaultToNull ? null : undefined;
-};
-
-const normaliseImageList = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((it) => normaliseSingleImage(it, { defaultToNull: false }))
-    .filter((s) => typeof s === 'string' && s.trim().length > 0);
-};
-
-const parseExistingImages = (value, fallback = []) => {
-  if (value === undefined || value === null) return Array.isArray(fallback) ? fallback : [];
-  if (Array.isArray(value)) return value.filter((s) => typeof s === 'string' && s.trim().length > 0);
-  if (typeof value === 'string') {
-    const t = value.trim();
-    if (!t) return [];
-    try {
-      const parsed = JSON.parse(t);
-      if (!Array.isArray(parsed)) throw new Error('existingImages must be an array');
-      return parsed.filter((s) => typeof s === 'string' && s.trim().length > 0);
-    } catch {
-      throw new Error('Invalid existingImages payload');
-    }
-  }
-  throw new Error('Invalid existingImages payload');
-};
-
-const dedupeImages = (images = []) => {
-  const seen = new Set();
-  const out = [];
-  for (const img of images) {
-    if (typeof img !== 'string') continue;
-    const t = img.trim();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
-};
-
-// --- Auth/Role ---
+// ---------------------------------------------------------------------------
+// Authentication middleware
+// ---------------------------------------------------------------------------
 const requireAuth = async (req, res, next) => {
   try {
-    const h = req.headers.authorization;
-    if (!h?.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'No token provided' });
-    const token = h.split(' ')[1];
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
     let decoded;
+
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    } catch (e) {
-      console.error('JWT verify failed:', { name: e?.name, message: e?.message, code: e?.code });
+    } catch (error) {
+      console.error('JWT verification failed:', {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+      });
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
+
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) return res.status(401).json({ success: false, message: 'User not found' });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
     req.user = user;
     next();
-  } catch (e) {
-    console.error('Auth middleware error:', e?.message);
+  } catch (error) {
+    console.error('Auth middleware error:', error?.message);
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 };
+
 router.use(requireAuth);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 
-// --- Multer ---
-const UPLOAD_DIR = uploadPath;
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
-const upload = multer({ storage });
-
-// --- Zod ---
-const optionalStringField = z.preprocess((v) => {
-  if (v === undefined || v === null) return v;
-  if (typeof v !== 'string') return v;
-  const t = v.trim();
-  return t === '' ? null : t;
-}, z.string().min(1).nullable().optional());
-
-const imageField = z.preprocess((v) => normaliseSingleImage(v), z.string().min(1).nullable().optional());
-const imageListField = z.preprocess((v) => normaliseImageList(v), z.array(z.string().min(1)).nullable().optional());
-
-const propertyFieldSchemas = {
-  name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.string().min(1, 'Name is required')),
-  address: optionalStringField,
-  city: optionalStringField,
-  postcode: optionalStringField,
-  country: optionalStringField,
-  type: optionalStringField,
-  coverImage: imageField,
-  images: imageListField,
-  status: z.preprocess((v) => {
-    if (v === undefined || v === null) return v;
-    if (typeof v !== 'string') return v;
-    const t = v.trim();
-    return t === '' ? undefined : t;
-  }, z.string().optional()),
+// ---------------------------------------------------------------------------
+// Zod helpers
+// ---------------------------------------------------------------------------
+const trimToNull = (value) => {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
 };
 
-const propertySchema = z.object({
-  ...propertyFieldSchemas,
-  status: propertyFieldSchemas.status.default('Active'),
-  coverImage: propertyFieldSchemas.coverImage.nullish(),
-  images: propertyFieldSchemas.images.default([]),
-});
+const requiredString = (message) =>
+  z.preprocess((value) => (typeof value === 'string' ? value.trim() : value), z.string().min(1, message));
 
-const propertyUpdateSchema = z.object({
-  name: propertyFieldSchemas.name.optional(),
-  address: propertyFieldSchemas.address,
-  city: propertyFieldSchemas.city,
-  postcode: propertyFieldSchemas.postcode,
-  country: propertyFieldSchemas.country,
-  type: propertyFieldSchemas.type,
-  status: propertyFieldSchemas.status,
-  coverImage: propertyFieldSchemas.coverImage,
-  images: propertyFieldSchemas.images,
-});
+const optionalString = () =>
+  z.preprocess((value) => trimToNull(value), z.string().min(1).nullable().optional());
+
+const optionalUrl = () =>
+  z
+    .preprocess((value) => trimToNull(value), z.string().url({ message: 'Must be a valid URL' }))
+    .nullable()
+    .optional();
+
+const optionalInt = (opts = {}) =>
+  z
+    .preprocess((value) => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.trunc(parsed) : value;
+    }, z.number({ invalid_type_error: 'Must be a number' }).int())
+    .nullable()
+    .optional()
+    .refine((value) => (value == null ? true : value >= (opts.min ?? Number.MIN_SAFE_INTEGER)), {
+      message: opts.minMessage || 'Value is too small',
+    })
+    .refine((value) => (value == null ? true : value <= (opts.max ?? Number.MAX_SAFE_INTEGER)), {
+      message: opts.maxMessage || 'Value is too large',
+    });
+
+const optionalFloat = () =>
+  z
+    .preprocess((value) => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : value;
+    }, z.number({ invalid_type_error: 'Must be a number' }))
+    .nullable()
+    .optional();
+
+const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
+
+const basePropertySchema = z.object({
+    name: requiredString('Property name is required'),
+    address: requiredString('Address is required'),
+    city: requiredString('City is required'),
+    state: requiredString('State is required'),
+    zipCode: optionalString(),
+    postcode: optionalString(),
+    country: requiredString('Country is required'),
+    propertyType: optionalString(),
+    type: optionalString(),
+    status: z
+      .preprocess((value) => (typeof value === 'string' ? value.trim().toUpperCase() : value), z.enum(STATUS_VALUES))
+      .default('ACTIVE'),
+    yearBuilt: optionalInt({
+      min: 1800,
+      minMessage: 'Year must be 1800 or later',
+      max: new Date().getFullYear(),
+      maxMessage: `Year cannot be later than ${new Date().getFullYear()}`,
+    }),
+    totalUnits: optionalInt({ min: 0, minMessage: 'Total units cannot be negative' }).default(0),
+    totalArea: optionalFloat(),
+    description: optionalString(),
+    imageUrl: optionalUrl(),
+    managerId: optionalString(),
+
+    // Legacy aliases – accepted but converted internally
+    coverImage: optionalString(),
+    images: z.array(z.string()).optional(),
+  });
+
+const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
+  schema.superRefine((data, ctx) => {
+    if (requireCoreFields && !data.zipCode && !data.postcode) {
+      ctx.addIssue({
+        path: ['zipCode'],
+        code: z.ZodIssueCode.custom,
+        message: 'ZIP code is required',
+      });
+    }
+
+    if (requireCoreFields && !data.propertyType && !data.type) {
+      ctx.addIssue({
+        path: ['propertyType'],
+        code: z.ZodIssueCode.custom,
+        message: 'Property type is required',
+      });
+    }
+  });
+
+const propertySchema = withAliasValidation(basePropertySchema);
+const propertyUpdateSchema = withAliasValidation(basePropertySchema.partial(), { requireCoreFields: false });
 
 const unitSchema = z.object({
-  unitCode: z.string().min(1, 'Unit code is required'),
-  address: z.string().optional(),
-  bedrooms: z.preprocess((v) => {
-    if (v === undefined || v === null) return null;
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (t === '') return null;
-      const n = Number(t);
-      return Number.isNaN(n) ? v : n;
-    }
-    return v;
-  }, z.number().int().min(0).nullable()).optional(),
-  status: z.string().optional(),
+  unitNumber: requiredString('Unit number is required'),
+  address: optionalString(),
+  bedrooms: optionalInt({ min: 0, minMessage: 'Bedrooms cannot be negative' }),
+  status: optionalString(),
 });
 
-// --- Routes ---
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const applyLegacyAliases = (input = {}) => {
+  const data = { ...input };
+  if (!data.zipCode && data.postcode) {
+    data.zipCode = data.postcode;
+  }
+  if (!data.propertyType && data.type) {
+    data.propertyType = data.type;
+  }
+  if (!data.imageUrl && (data.coverImage || data.images?.length)) {
+    const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
+    const firstUrl = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    if (firstUrl) {
+      data.imageUrl = firstUrl;
+    }
+  }
+  return data;
+};
 
-// GET /api/properties
+const toPublicProperty = (property) => {
+  if (!property) return property;
+
+  return {
+    ...property,
+    postcode: property.postcode ?? property.zipCode ?? null,
+    type: property.type ?? property.propertyType ?? null,
+    coverImage: property.coverImage ?? property.imageUrl ?? null,
+    images: property.images ?? (property.imageUrl ? [property.imageUrl] : []),
+  };
+};
+
+const ensurePropertyAccess = (property, user) => {
+  if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
+  if (user.role === ROLES.ADMIN) return { allowed: true };
+  if (property.managerId === user.id) return { allowed: true };
+  return { allowed: false, reason: 'Forbidden', status: 403 };
+};
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
 router.get('/', async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
+    const where = req.user.role === ROLES.ADMIN ? {} : { managerId: req.user.id };
 
-    const selectMinimal = {
-      id: true,
-      name: true,
-      orgId: true,
-      createdAt: true,
-      updatedAt: true,
-    };
-
-    const selectFull = {
+    const select = {
       id: true,
       name: true,
       address: true,
       city: true,
+      state: true,
+      zipCode: true,
       postcode: true,
       country: true,
+      propertyType: true,
       type: true,
       status: true,
-      images: true,     // requires text[] column in DB
-      orgId: true,
+      description: true,
+      imageUrl: true,
+      coverImage: true,
+      images: true,
+      totalUnits: true,
+      totalArea: true,
+      yearBuilt: true,
+      managerId: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { units: true } },
     };
 
     const properties = await prisma.property.findMany({
-      where: { orgId },
-      select: F_MINIMAL ? selectMinimal : selectFull,
+      where,
+      select,
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, properties });
+    res.json({ success: true, properties: properties.map(toPublicProperty) });
   } catch (error) {
     console.error('Get properties error:', {
       message: error?.message,
@@ -281,137 +247,120 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/properties
-router.post('/', upload.array('images', 10), async (req, res) => {
-  const uploadedImagePaths = (req.files ? req.files.map((f) => `/uploads/${f.filename}`) : []);
+router.post('/', async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
-    const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
-    const validated = propertySchema.parse(payload);
-    const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validated;
+    const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
+    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
-    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
-    const imagesToPersist = dedupeImages([ ...(coverImagePath ? [coverImagePath] : []), ...bodyImageList, ...uploadedImagePaths ]);
+    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : req.user.id;
 
     const property = await prisma.property.create({
-      data: { ...propertyData, images: imagesToPersist, orgId },
+      data: {
+        ...data,
+        managerId,
+      },
     });
 
-    res.status(201).json({ success: true, property });
+    res.status(201).json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
     }
-    console.error('Create property error:', { message: error?.message, code: error?.code, meta: error?.meta });
-    await removeImageFiles(uploadedImagePaths);
+
+    console.error('Create property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to create property' });
   }
 });
 
-// GET /api/properties/:id
 router.get('/:id', async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
-    const property = await prisma.property.findFirst({
-      where: { id: req.params.id, orgId },
-      select: {
-        id: true, name: true, address: true, city: true, postcode: true, country: true,
-        type: true, status: true, images: true, orgId: true, createdAt: true, updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
-      },
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { units: { orderBy: { unitNumber: 'asc' } } },
     });
-    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
-    res.json({ success: true, property });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
+
+    res.json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
-    console.error('Get property error:', { message: error?.message, code: error?.code, meta: error?.meta });
+    console.error('Get property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to fetch property' });
   }
 });
 
-// PATCH /api/properties/:id
-router.patch('/:id', upload.array('images', 10), async (req, res) => {
-  const uploadedImagePaths = (req.files ? req.files.map((f) => `/uploads/${f.filename}`) : []);
+router.patch('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const orgId = await ensureUserOrg(req.user);
-    const existing = await prisma.property.findFirst({ where: { id, orgId } });
-    if (!existing) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(404).json({ success: false, message: 'Property not found' });
+    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
     }
 
-    const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
-    const validated = propertyUpdateSchema.parse(payload);
-    const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validated;
+    const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
+    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    let keepImages;
-    try {
-      keepImages = parseExistingImages(req.body.existingImages, existing.images);
-    } catch (parseError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: parseError.message });
-    }
+    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : property.managerId;
 
-    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
-    let nextImages = [...keepImages, ...bodyImageList, ...uploadedImagePaths];
-
-    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
-    if (coverImagePath) nextImages = [coverImagePath, ...nextImages.filter((i) => i !== coverImagePath)];
-
-    const imagesToPersist = dedupeImages(nextImages);
-    const updateData = { ...propertyData, images: imagesToPersist };
-
-    const updated = await prisma.property.update({ where: { id: existing.id }, data: updateData });
-
-    const removedImages = (existing.images || []).filter((p) => !keepImages.includes(p));
-    await removeImageFiles(removedImages);
-
-    const property = await prisma.property.findFirst({
-      where: { id: updated.id, orgId },
-      select: {
-        id: true, name: true, address: true, city: true, postcode: true, country: true,
-        type: true, status: true, images: true, orgId: true, createdAt: true, updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
+    const updated = await prisma.property.update({
+      where: { id: property.id },
+      data: {
+        ...data,
+        managerId,
       },
     });
 
-    res.json({ success: true, property });
+    res.json({ success: true, property: toPublicProperty(updated) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
     }
-    console.error('Update property error:', { message: error?.message, code: error?.code, meta: error?.meta });
-    await removeImageFiles(uploadedImagePaths);
+
+    console.error('Update property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to update property' });
   }
 });
 
-// DELETE /api/properties/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const orgId = await ensureUserOrg(req.user);
-    const property = await prisma.property.findFirst({ where: { id, orgId }, select: { id: true, images: true } });
-    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
 
     await prisma.property.delete({ where: { id: property.id } });
-    await removeImageFiles(property.images || []);
     res.json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
-    console.error('Delete property error:', { message: error?.message, code: error?.code, meta: error?.meta });
+    console.error('Delete property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to delete property' });
   }
 });
 
 router._test = {
-  ensureUserOrg,
   propertySchema,
-  normaliseSingleImage,
-  normaliseImageList,
+  propertyUpdateSchema,
+  unitSchema,
+  applyLegacyAliases,
+  toPublicProperty,
 };
+
 export default router;
