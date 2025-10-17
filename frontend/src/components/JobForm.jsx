@@ -178,7 +178,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-title"
+              id="job-form-title"
               name="title"
               label="Title"
               value={formData.title}
@@ -193,7 +193,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-description"
+              id="job-form-description"
               name="description"
               label="Description"
               value={formData.description}
@@ -211,7 +211,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-priority"
+              id="job-form-priority"
               name="priority"
               label="Priority"
               value={formData.priority}
@@ -230,7 +230,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               <TextField
                 select
                 fullWidth
-                id="job-status"
+                id="job-form-status"
                 name="status"
                 label="Status"
                 value={formData.status}
@@ -250,7 +250,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-property"
+              id="job-form-property"
               name="propertyId"
               label="Property"
               value={formData.propertyId}
@@ -272,7 +272,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-unit"
+              id="job-form-unit"
               name="unitId"
               label="Unit (Optional)"
               value={formData.unitId}
@@ -292,7 +292,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-assigned-to"
+              id="job-form-assigned-to"
               name="assignedToId"
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
@@ -310,7 +310,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="job-scheduled-date"
+              id="job-form-scheduled-date"
               name="scheduledDate"
               label="Scheduled Date (Optional)"
               type="datetime-local"
@@ -323,7 +323,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="job-estimated-cost"
+              id="job-form-estimated-cost"
               name="estimatedCost"
               label="Estimated Cost (Optional)"
               type="number"
@@ -342,7 +342,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-notes"
+              id="job-form-notes"
               name="notes"
               label="Notes (Optional)"
               value={formData.notes}
