@@ -7,8 +7,6 @@ import session from 'express-session';
 import passport from 'passport';
 import path from 'path'; // Your existing code has this
 import fs from 'fs';
-import { ensurePropertySchema } from './utils/ensurePropertySchema.js';
-import { ensureUserSchema } from './utils/ensureUserSchema.js';
 import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
 
 // ---- Load env
@@ -172,8 +170,6 @@ app.use((err, _req, res, _next) => {
 
 async function startServer() {
   try {
-    await ensureUserSchema(prisma);
-    await ensurePropertySchema(prisma);
 
     const server = app.listen(PORT, () => {
       console.log(`✅ AgentFM backend listening on port ${PORT}`);
