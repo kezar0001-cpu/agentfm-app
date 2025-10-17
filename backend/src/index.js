@@ -134,7 +134,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/recommendations', recommendationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/serviceRequests', serviceRequestsRoutes);
+app.use('/api/service-requests', serviceRequestsRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
