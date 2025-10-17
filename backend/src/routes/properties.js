@@ -25,12 +25,19 @@ const ensureUserOrg = async (user, client = prisma) => {
   }
 
   const orgId = await client.$transaction(async (tx) => {
-    const fresh = await tx.user.findUnique({ where: { id: user.id }, select: { orgId: true, company: true, name: true } });
+    const fresh = await tx.user.findUnique({
+      where: { id: user.id },
+      select: { orgId: true, company: true, firstName: true, lastName: true },
+    });
     if (fresh?.orgId) {
       const chk = await tx.org.findUnique({ where: { id: fresh.orgId }, select: { id: true } });
       if (chk) return chk.id;
     }
-    const orgName = (fresh?.company?.trim() || fresh?.name?.trim() || 'New Organization');
+    const trimmedCompany = typeof fresh?.company === 'string' ? fresh.company.trim() : '';
+    const firstName = typeof fresh?.firstName === 'string' ? fresh.firstName.trim() : '';
+    const lastName = typeof fresh?.lastName === 'string' ? fresh.lastName.trim() : '';
+    const fallbackName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    const orgName = trimmedCompany || fallbackName || 'New Organization';
     const org = await tx.org.create({ data: { name: orgName }, select: { id: true } });
     await tx.user.update({ where: { id: user.id }, data: { orgId: org.id } });
     return org.id;
