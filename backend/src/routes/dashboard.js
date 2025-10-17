@@ -1,7 +1,10 @@
+// backend/src/routes/dashboard.js
+
 import express from 'express';
+// 👇 CORRECT: Import the controller functions
+import { getDashboardSummary, getRecentActivity } from '../controllers/dashboardController.js'; 
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
-import { getDashboardSummary } from '../data/memoryStore.js';
 
 const router = express.Router();
 
@@ -18,7 +21,7 @@ const requireAuth = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { org: true }
+      include: { org: true },
     });
 
     if (!user) {
@@ -34,8 +37,10 @@ const requireAuth = async (req, res, next) => {
 
 router.use(requireAuth);
 
-router.get('/summary', (req, res) => {
-  res.json(getDashboardSummary(req.user.orgId));
-});
+// 👇 CORRECT: Wire the '/summary' route to the controller function
+router.get('/summary', getDashboardSummary);
+
+// 👇 CORRECT: Wire the '/activity' route to the controller function
+router.get('/activity', getRecentActivity);
 
 export default router;
