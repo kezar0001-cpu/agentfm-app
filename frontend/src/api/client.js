@@ -1,14 +1,12 @@
+// frontend/src/api/client.js
 import axios from 'axios';
 import { getAuthToken } from '../lib/auth.js';
 
-// Choose your API base URL (env wins; fallback to same-origin)
+// Determine the base URL. Use the environment variable if it exists, otherwise use the current page's origin.
 const envBase = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE;
-let baseURL = '';
-if (envBase) {
-  baseURL = envBase.replace(/\/+$/, '');
-} else if (typeof window !== 'undefined') {
-  baseURL = window.location.origin.replace(/\/+$/, '');
-}
+const baseURL = envBase
+  ? envBase.replace(/\/$/, '') // Use env variable and remove any trailing slash
+  : `${window.location.origin.replace(/\/$/, '')}`; // Default to the current host
 
 const apiClient = axios.create({
   baseURL,
@@ -16,14 +14,14 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Automatically attach the auth token (if we have one) to every request
+// This is the crucial part: An interceptor that modifies every request before it's sent.
 apiClient.interceptors.request.use((config) => {
-  if (config?.url && !/^https?:\/\//i.test(config.url)) {
-    const leadingSlash = config.url.startsWith('/') ? config.url : `/${config.url}`;
-    const hasApiPrefix = /^\/api(\/|\?|$)/.test(leadingSlash);
-    config.url = hasApiPrefix ? leadingSlash : `/api${leadingSlash}`;
+  // If the URL is relative (doesn't start with http), ensure it's prefixed with /api.
+  if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/api')) {
+    config.url = `/api${config.url}`;
   }
 
+  // This part attaches your login token to the request.
   try {
     const token = getAuthToken();
     if (token) {
@@ -31,12 +29,10 @@ apiClient.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch (error) {
-    // If localStorage is unavailable for some reason we still want the call to proceed
     console.warn('Unable to attach auth token:', error);
   }
   return config;
 });
 
-// Export BOTH ways so all imports work
 export default apiClient;
 export { apiClient };
