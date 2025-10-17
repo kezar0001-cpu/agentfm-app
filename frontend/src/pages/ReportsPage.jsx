@@ -59,7 +59,7 @@ export default function ReportsPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
-              id="reports-property"
+              id="reports-form-property"
               name="propertyId"
               label={t('reports.property')}
               fullWidth
@@ -70,7 +70,7 @@ export default function ReportsPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 type="date"
-                id="reports-from-date"
+                id="reports-form-from-date"
                 name="from"
                 label={t('reports.from')}
                 InputLabelProps={{ shrink: true }}
@@ -81,7 +81,7 @@ export default function ReportsPage() {
               />
               <TextField
                 type="date"
-                id="reports-to-date"
+                id="reports-form-to-date"
                 name="to"
                 label={t('reports.to')}
                 InputLabelProps={{ shrink: true }}
