@@ -474,6 +474,8 @@ export default function InspectionDetailPage() {
             rows={8}
             id="inspection-complete-findings"
             name="findings"
+            inputProps={{ id: 'inspection-complete-findings', name: 'findings' }}
+            InputLabelProps={{ htmlFor: 'inspection-complete-findings' }}
             label="Findings *"
             value={completeData.findings}
             onChange={(e) =>
@@ -486,6 +488,8 @@ export default function InspectionDetailPage() {
             fullWidth
             id="inspection-complete-photos"
             name="photos"
+            inputProps={{ id: 'inspection-complete-photos', name: 'photos' }}
+            InputLabelProps={{ htmlFor: 'inspection-complete-photos' }}
             label="Photo URLs (comma-separated)"
             value={completeData.photos.join(', ')}
             onChange={(e) =>

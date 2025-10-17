@@ -178,8 +178,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-title"
+              id="job-form-title"
               name="title"
+              inputProps={{ id: 'job-form-title', name: 'title' }}
+              InputLabelProps={{ htmlFor: 'job-form-title' }}
               label="Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -193,8 +195,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-description"
+              id="job-form-description"
               name="description"
+              inputProps={{ id: 'job-form-description', name: 'description' }}
+              InputLabelProps={{ htmlFor: 'job-form-description' }}
               label="Description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
@@ -211,8 +215,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-priority"
+              id="job-form-priority"
               name="priority"
+              inputProps={{ id: 'job-form-priority', name: 'priority' }}
+              InputLabelProps={{ htmlFor: 'job-form-priority' }}
               label="Priority"
               value={formData.priority}
               onChange={(e) => handleChange('priority', e.target.value)}
@@ -230,8 +236,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               <TextField
                 select
                 fullWidth
-                id="job-status"
+                id="job-form-status"
                 name="status"
+                inputProps={{ id: 'job-form-status', name: 'status' }}
+                InputLabelProps={{ htmlFor: 'job-form-status' }}
                 label="Status"
                 value={formData.status}
                 onChange={(e) => handleChange('status', e.target.value)}
@@ -250,8 +258,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-property"
+              id="job-form-property"
               name="propertyId"
+              inputProps={{ id: 'job-form-property', name: 'propertyId' }}
+              InputLabelProps={{ htmlFor: 'job-form-property' }}
               label="Property"
               value={formData.propertyId}
               onChange={(e) => handleChange('propertyId', e.target.value)}
@@ -272,8 +282,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-unit"
+              id="job-form-unit"
               name="unitId"
+              inputProps={{ id: 'job-form-unit', name: 'unitId' }}
+              InputLabelProps={{ htmlFor: 'job-form-unit' }}
               label="Unit (Optional)"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
@@ -292,8 +304,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="job-assigned-to"
+              id="job-form-assigned-to"
               name="assignedToId"
+              inputProps={{ id: 'job-form-assigned-to', name: 'assignedToId' }}
+              InputLabelProps={{ htmlFor: 'job-form-assigned-to' }}
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
               onChange={(e) => handleChange('assignedToId', e.target.value)}
@@ -310,21 +324,24 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="job-scheduled-date"
+              id="job-form-scheduled-date"
               name="scheduledDate"
+              inputProps={{ id: 'job-form-scheduled-date', name: 'scheduledDate' }}
+              InputLabelProps={{ htmlFor: 'job-form-scheduled-date', shrink: true }}
               label="Scheduled Date (Optional)"
               type="datetime-local"
               value={formData.scheduledDate}
               onChange={(e) => handleChange('scheduledDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="job-estimated-cost"
+              id="job-form-estimated-cost"
               name="estimatedCost"
+              inputProps={{ id: 'job-form-estimated-cost', name: 'estimatedCost', min: 0, step: 0.01 }}
+              InputLabelProps={{ htmlFor: 'job-form-estimated-cost' }}
               label="Estimated Cost (Optional)"
               type="number"
               value={formData.estimatedCost}
@@ -332,18 +349,16 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               InputProps={{
                 startAdornment: '$',
               }}
-              inputProps={{
-                min: 0,
-                step: 0.01,
-              }}
             />
           </Grid>
 
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="job-notes"
+              id="job-form-notes"
               name="notes"
+              inputProps={{ id: 'job-form-notes', name: 'notes' }}
+              InputLabelProps={{ htmlFor: 'job-form-notes' }}
               label="Notes (Optional)"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}

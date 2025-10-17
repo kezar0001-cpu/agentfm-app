@@ -193,8 +193,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-name"
+                id="property-form-name"
                 name="name"
+                inputProps={{ id: 'property-form-name', name: 'name' }}
+                InputLabelProps={{ htmlFor: 'property-form-name' }}
                 label="Property Name"
                 value={formData.name}
                 onChange={handleChange('name')}
@@ -208,8 +210,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-street-address"
+                id="property-form-address"
                 name="address"
+                inputProps={{ id: 'property-form-address', name: 'address' }}
+                InputLabelProps={{ htmlFor: 'property-form-address' }}
                 label="Street Address"
                 value={formData.address}
                 onChange={handleChange('address')}
@@ -223,8 +227,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-city"
+                id="property-form-city"
                 name="city"
+                inputProps={{ id: 'property-form-city', name: 'city' }}
+                InputLabelProps={{ htmlFor: 'property-form-city' }}
                 label="City"
                 value={formData.city}
                 onChange={handleChange('city')}
@@ -236,8 +242,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-state"
+                id="property-form-state"
                 name="state"
+                inputProps={{ id: 'property-form-state', name: 'state' }}
+                InputLabelProps={{ htmlFor: 'property-form-state' }}
                 select
                 label="State"
                 value={formData.state}
@@ -256,8 +264,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-zip-code"
+                id="property-form-zip-code"
                 name="zipCode"
+                inputProps={{ id: 'property-form-zip-code', name: 'zipCode' }}
+                InputLabelProps={{ htmlFor: 'property-form-zip-code' }}
                 label="ZIP Code"
                 value={formData.zipCode}
                 onChange={handleChange('zipCode')}
@@ -271,8 +281,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-type"
+                id="property-form-type"
                 name="propertyType"
+                inputProps={{ id: 'property-form-type', name: 'propertyType' }}
+                InputLabelProps={{ htmlFor: 'property-form-type' }}
                 select
                 label="Property Type"
                 value={formData.propertyType}
@@ -290,8 +302,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                id="property-status"
+                id="property-form-status"
                 name="status"
+                inputProps={{ id: 'property-form-status', name: 'status' }}
+                InputLabelProps={{ htmlFor: 'property-form-status' }}
                 select
                 label="Status"
                 value={formData.status}
@@ -309,8 +323,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-year-built"
+                id="property-form-year-built"
                 name="yearBuilt"
+                inputProps={{ id: 'property-form-year-built', name: 'yearBuilt' }}
+                InputLabelProps={{ htmlFor: 'property-form-year-built' }}
                 label="Year Built"
                 type="number"
                 value={formData.yearBuilt}
@@ -322,8 +338,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-total-units"
+                id="property-form-total-units"
                 name="totalUnits"
+                inputProps={{ id: 'property-form-total-units', name: 'totalUnits' }}
+                InputLabelProps={{ htmlFor: 'property-form-total-units' }}
                 label="Total Units"
                 type="number"
                 value={formData.totalUnits}
@@ -335,8 +353,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-total-area"
+                id="property-form-total-area"
                 name="totalArea"
+                inputProps={{ id: 'property-form-total-area', name: 'totalArea' }}
+                InputLabelProps={{ htmlFor: 'property-form-total-area' }}
                 label="Total Area (sq ft)"
                 type="number"
                 value={formData.totalArea}
@@ -352,8 +372,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 multiline
                 rows={3}
-                id="property-description"
+                id="property-form-description"
                 name="description"
+                inputProps={{ id: 'property-form-description', name: 'description' }}
+                InputLabelProps={{ htmlFor: 'property-form-description' }}
                 label="Description"
                 value={formData.description}
                 onChange={handleChange('description')}
@@ -364,8 +386,10 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                id="property-image-url"
+                id="property-form-image-url"
                 name="imageUrl"
+                inputProps={{ id: 'property-form-image-url', name: 'imageUrl' }}
+                InputLabelProps={{ htmlFor: 'property-form-image-url' }}
                 label="Image URL (optional)"
                 value={formData.imageUrl}
                 onChange={handleChange('imageUrl')}

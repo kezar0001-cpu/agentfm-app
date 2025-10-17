@@ -168,8 +168,10 @@ const InspectionsPage = () => {
               <TextField
                 select
                 fullWidth
-                id="inspection-filter-status"
+                id="inspections-filter-status"
                 name="status"
+                inputProps={{ id: 'inspections-filter-status', name: 'status' }}
+                InputLabelProps={{ htmlFor: 'inspections-filter-status' }}
                 label="Status"
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -186,8 +188,10 @@ const InspectionsPage = () => {
               <TextField
                 select
                 fullWidth
-                id="inspection-filter-property"
+                id="inspections-filter-property"
                 name="propertyId"
+                inputProps={{ id: 'inspections-filter-property', name: 'propertyId' }}
+                InputLabelProps={{ htmlFor: 'inspections-filter-property' }}
                 label="Property"
                 value={filters.propertyId}
                 onChange={(e) => handleFilterChange('propertyId', e.target.value)}
@@ -204,27 +208,29 @@ const InspectionsPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspection-filter-date-from"
+                id="inspections-filter-date-from"
                 name="dateFrom"
+                inputProps={{ id: 'inspections-filter-date-from', name: 'dateFrom' }}
+                InputLabelProps={{ htmlFor: 'inspections-filter-date-from', shrink: true }}
                 label="From Date"
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                 size="small"
-                InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspection-filter-date-to"
+                id="inspections-filter-date-to"
                 name="dateTo"
+                inputProps={{ id: 'inspections-filter-date-to', name: 'dateTo' }}
+                InputLabelProps={{ htmlFor: 'inspections-filter-date-to', shrink: true }}
                 label="To Date"
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                 size="small"
-                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>

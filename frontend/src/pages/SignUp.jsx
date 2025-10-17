@@ -135,43 +135,101 @@ export default function SignUp() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  margin="normal" required fullWidth id="firstName" label="First Name" name="firstName"
-                  autoComplete="given-name" autoFocus value={formData.firstName}
-                  onChange={handleChange} disabled={loading}
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="firstName"
+                  name="firstName"
+                  inputProps={{ id: 'firstName', name: 'firstName' }}
+                  InputLabelProps={{ htmlFor: 'firstName' }}
+                  label="First Name"
+                  autoComplete="given-name"
+                  autoFocus
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  margin="normal" required fullWidth id="lastName" label="Last Name" name="lastName"
-                  autoComplete="family-name" value={formData.lastName}
-                  onChange={handleChange} disabled={loading}
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="lastName"
+                  name="lastName"
+                  inputProps={{ id: 'lastName', name: 'lastName' }}
+                  InputLabelProps={{ htmlFor: 'lastName' }}
+                  label="Last Name"
+                  autoComplete="family-name"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
               </Grid>
             </Grid>
 
             <TextField
-              margin="normal" required fullWidth id="email" label="Email Address" name="email"
-              type="email" autoComplete="email" value={formData.email}
-              onChange={handleChange} disabled={loading}
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              name="email"
+              inputProps={{ id: 'email', name: 'email' }}
+              InputLabelProps={{ htmlFor: 'email' }}
+              label="Email Address"
+              type="email"
+              autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={loading}
             />
 
             <TextField
-              margin="normal" fullWidth id="phone" label="Phone Number" name="phone"
-              type="tel" autoComplete="tel" placeholder="+61 400 000 000"
-              value={formData.phone} onChange={handleChange} disabled={loading}
+              margin="normal"
+              fullWidth
+              id="phone"
+              name="phone"
+              inputProps={{ id: 'phone', name: 'phone' }}
+              InputLabelProps={{ htmlFor: 'phone' }}
+              label="Phone Number"
+              type="tel"
+              autoComplete="tel"
+              placeholder="+61 400 000 000"
+              value={formData.phone}
+              onChange={handleChange}
+              disabled={loading}
             />
 
             {/* Optional field for your UI — not required by schema */}
             <TextField
-              margin="normal" fullWidth id="company" label="Company / Organization" name="company"
-              autoComplete="organization" value={formData.company}
-              onChange={handleChange} disabled={loading}
+              margin="normal"
+              fullWidth
+              id="company"
+              name="company"
+              inputProps={{ id: 'company', name: 'company' }}
+              InputLabelProps={{ htmlFor: 'company' }}
+              label="Company / Organization"
+              autoComplete="organization"
+              value={formData.company}
+              onChange={handleChange}
+              disabled={loading}
             />
 
             <TextField
-              margin="normal" required fullWidth name="password" label="Password"
-              type={showPassword ? 'text' : 'password'} id="password" autoComplete="new-password"
-              value={formData.password} onChange={handleChange} disabled={loading} helperText="Minimum 8 characters"
+              margin="normal"
+              required
+              fullWidth
+              id="password"
+              name="password"
+              inputProps={{ id: 'password', name: 'password' }}
+              InputLabelProps={{ htmlFor: 'password' }}
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={loading}
+              helperText="Minimum 8 characters"
               InputProps={{ endAdornment: (
                 <InputAdornment position="end">
                   <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
@@ -182,9 +240,19 @@ export default function SignUp() {
             />
 
             <TextField
-              margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
-              type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" autoComplete="new-password"
-              value={formData.confirmPassword} onChange={handleChange} disabled={loading}
+              margin="normal"
+              required
+              fullWidth
+              id="confirmPassword"
+              name="confirmPassword"
+              inputProps={{ id: 'confirmPassword', name: 'confirmPassword' }}
+              InputLabelProps={{ htmlFor: 'confirmPassword' }}
+              label="Confirm Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              disabled={loading}
               InputProps={{ endAdornment: (
                 <InputAdornment position="end">
                   <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" disabled={loading}>

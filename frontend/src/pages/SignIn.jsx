@@ -124,15 +124,37 @@ export default function SignIn() {
 
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
-              margin="normal" required fullWidth id="email" label="Email Address" name="email"
-              type="email" autoComplete="email" autoFocus value={formData.email}
-              onChange={handleChange} disabled={loading} sx={{ mb: 2 }}
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              name="email"
+              inputProps={{ id: 'email', name: 'email' }}
+              InputLabelProps={{ htmlFor: 'email' }}
+              label="Email Address"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={formData.email}
+              onChange={handleChange}
+              disabled={loading}
+              sx={{ mb: 2 }}
             />
 
             <TextField
-              margin="normal" required fullWidth name="password" label="Password"
-              type={showPassword ? 'text' : 'password'} id="password" autoComplete="current-password"
-              value={formData.password} onChange={handleChange} disabled={loading}
+              margin="normal"
+              required
+              fullWidth
+              id="password"
+              name="password"
+              inputProps={{ id: 'password', name: 'password' }}
+              InputLabelProps={{ htmlFor: 'password' }}
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -140,7 +162,7 @@ export default function SignIn() {
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
-                )
+                ),
               }}
             />
 

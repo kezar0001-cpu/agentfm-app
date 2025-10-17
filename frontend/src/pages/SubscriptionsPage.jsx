@@ -277,6 +277,10 @@ export default function SubscriptionsPage() {
                             size="small"
                             id={`subscription-${subscription.id}-status`}
                             name="status"
+                            inputProps={{
+                              id: `subscription-${subscription.id}-status`,
+                              name: 'status',
+                            }}
                             value={subscription.status || ''}
                             onChange={(event) =>
                               handleStatusChange(subscription.id, event.target.value)

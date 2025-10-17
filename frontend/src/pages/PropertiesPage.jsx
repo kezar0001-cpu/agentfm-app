@@ -168,8 +168,9 @@ export default function PropertiesPage() {
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
-                id="properties-search"
-                name="search"
+                id="properties-search-term"
+                name="searchTerm"
+                inputProps={{ id: 'properties-search-term', name: 'searchTerm' }}
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -188,6 +189,8 @@ export default function PropertiesPage() {
                 select
                 id="properties-filter-status"
                 name="filterStatus"
+                inputProps={{ id: 'properties-filter-status', name: 'filterStatus' }}
+                InputLabelProps={{ htmlFor: 'properties-filter-status' }}
                 label="Status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}

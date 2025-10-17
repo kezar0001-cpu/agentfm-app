@@ -59,8 +59,10 @@ export default function ReportsPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
-              id="reports-property"
+              id="reports-form-property"
               name="propertyId"
+              inputProps={{ id: 'reports-form-property', name: 'propertyId' }}
+              InputLabelProps={{ htmlFor: 'reports-form-property' }}
               label={t('reports.property')}
               fullWidth
               {...register('propertyId')}
@@ -70,10 +72,11 @@ export default function ReportsPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 type="date"
-                id="reports-from-date"
+                id="reports-form-from-date"
                 name="from"
-                label={t('reports.from')}
-                InputLabelProps={{ shrink: true }}
+                inputProps={{ id: 'reports-form-from-date', name: 'from' }}
+              InputLabelProps={{ htmlFor: 'reports-form-from-date', shrink: true }}
+              label={t('reports.from')}
                 fullWidth
                 {...register('from')}
                 error={Boolean(errors.from)}
@@ -81,10 +84,11 @@ export default function ReportsPage() {
               />
               <TextField
                 type="date"
-                id="reports-to-date"
+                id="reports-form-to-date"
                 name="to"
-                label={t('reports.to')}
-                InputLabelProps={{ shrink: true }}
+                inputProps={{ id: 'reports-form-to-date', name: 'to' }}
+              InputLabelProps={{ htmlFor: 'reports-form-to-date', shrink: true }}
+              label={t('reports.to')}
                 fullWidth
                 {...register('to')}
                 error={Boolean(errors.to)}

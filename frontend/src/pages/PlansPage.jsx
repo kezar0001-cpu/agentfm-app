@@ -68,8 +68,10 @@ export default function PlansPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
-              id="plan-name"
+              id="plans-form-name"
               name="name"
+              inputProps={{ id: 'plans-form-name', name: 'name' }}
+              InputLabelProps={{ htmlFor: 'plans-form-name' }}
               label={t('plans.name')}
               fullWidth
               autoComplete="off"
@@ -78,8 +80,10 @@ export default function PlansPage() {
               helperText={errors.name && t(errors.name.message)}
             />
             <TextField
-              id="plan-frequency"
+              id="plans-form-frequency"
               name="frequency"
+              inputProps={{ id: 'plans-form-frequency', name: 'frequency' }}
+              InputLabelProps={{ htmlFor: 'plans-form-frequency' }}
               label={t('plans.frequency')}
               fullWidth
               autoComplete="off"
@@ -88,8 +92,10 @@ export default function PlansPage() {
               helperText={errors.frequency && t(errors.frequency.message)}
             />
             <TextField
-              id="plan-description"
+              id="plans-form-description"
               name="description"
+              inputProps={{ id: 'plans-form-description', name: 'description' }}
+              InputLabelProps={{ htmlFor: 'plans-form-description' }}
               label="Description"
               multiline
               minRows={3}

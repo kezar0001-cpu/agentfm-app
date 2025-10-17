@@ -173,8 +173,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="inspection-title"
+              id="inspection-form-title"
               name="title"
+              inputProps={{ id: 'inspection-form-title', name: 'title' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-title' }}
               label="Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -189,8 +191,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-type"
+              id="inspection-form-type"
               name="type"
+              inputProps={{ id: 'inspection-form-type', name: 'type' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-type' }}
               label="Type"
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
@@ -209,8 +213,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="inspection-scheduled-date"
+              id="inspection-form-scheduled-date"
               name="scheduledDate"
+              inputProps={{ id: 'inspection-form-scheduled-date', name: 'scheduledDate' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-scheduled-date', shrink: true }}
               label="Scheduled Date & Time"
               type="datetime-local"
               value={formData.scheduledDate}
@@ -218,7 +224,6 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
               error={!!errors.scheduledDate}
               helperText={errors.scheduledDate}
               required
-              InputLabelProps={{ shrink: true }}
             />
           </Grid>
 
@@ -226,8 +231,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-property"
+              id="inspection-form-property"
               name="propertyId"
+              inputProps={{ id: 'inspection-form-property', name: 'propertyId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-property' }}
               label="Property"
               value={formData.propertyId}
               onChange={(e) => handleChange('propertyId', e.target.value)}
@@ -248,8 +255,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-unit"
+              id="inspection-form-unit"
               name="unitId"
+              inputProps={{ id: 'inspection-form-unit', name: 'unitId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-unit' }}
               label="Unit (Optional)"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
@@ -268,8 +277,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-assigned-to"
+              id="inspection-form-assigned-to"
               name="assignedToId"
+              inputProps={{ id: 'inspection-form-assigned-to', name: 'assignedToId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-assigned-to' }}
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
               onChange={(e) => handleChange('assignedToId', e.target.value)}
@@ -286,8 +297,10 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="inspection-notes"
+              id="inspection-form-notes"
               name="notes"
+              inputProps={{ id: 'inspection-form-notes', name: 'notes' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-notes' }}
               label="Notes (Optional)"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
