@@ -6,136 +6,93 @@ const prisma = new PrismaClient();
 // ============================================
 
 /**
- * Get all properties for the authenticated user
- * - Property managers see their properties
- * - Owners see properties they own
- * - Tenants see properties where they have units
+ * Get all properties for the authenticated user, filtered by their role.
  */
 exports.getProperties = async (req, res) => {
   try {
     const userId = req.user.id;
     const role = req.user.role;
-    
-    let properties;
-    
+    let whereClause = {};
+
+    // Determine the properties to show based on the user's role
     if (role === 'PROPERTY_MANAGER') {
-      properties = await prisma.property.findMany({
-        where: { managerId: userId },
-        include: {
-          units: {
-            select: {
-              id: true,
-              unitNumber: true,
-              status: true,
-            },
-          },
-          owners: {
-            include: {
-              owner: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              units: true,
-              jobs: true,
-              inspections: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      whereClause = { managerId: userId };
     } else if (role === 'OWNER') {
-      properties = await prisma.property.findMany({
-        where: {
-          owners: {
-            some: { ownerId: userId },
-          },
-        },
-        include: {
-          units: {
-            select: {
-              id: true,
-              unitNumber: true,
-              status: true,
-            },
-          },
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
-          },
-          _count: {
-            select: {
-              units: true,
-              jobs: true,
-              inspections: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      whereClause = { owners: { some: { ownerId: userId } } };
     } else if (role === 'TENANT') {
-      properties = await prisma.property.findMany({
-        where: {
-          units: {
-            some: {
-              tenants: {
-                some: {
-                  tenantId: userId,
-                  isActive: true,
-                },
-              },
-            },
-          },
-        },
-        include: {
-          units: {
-            where: {
-              tenants: {
-                some: {
-                  tenantId: userId,
-                  isActive: true,
-                },
-              },
-            },
-            select: {
-              id: true,
-              unitNumber: true,
-              status: true,
-            },
-          },
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
+      const tenantUnits = await prisma.unitTenant.findMany({
+        where: { tenantId: userId, isActive: true },
+        select: { unit: { select: { propertyId: true } } },
       });
+      const propertyIds = [...new Set(tenantUnits.map(ut => ut.unit.propertyId))];
+      whereClause = { id: { in: propertyIds } };
     } else {
-      // Technicians might see properties based on assigned jobs
-      properties = [];
+      // For other roles like TECHNICIAN or if no specific filter applies,
+      // you might want to return an empty list or handle as per your business logic.
+      return res.json([]);
     }
-    
+
+    const properties = await prisma.property.findMany({
+      where: whereClause,
+      include: {
+        _count: {
+          select: { units: true, jobs: true, inspections: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
     res.json(properties);
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
+  }
+};
+
+/**
+ * Create a new property.
+ */
+exports.createProperty = async (req, res) => {
+  try {
+    const { name, address, city, state, zipCode, propertyType } = req.body;
+
+    const property = await prisma.property.create({
+      data: {
+        name,
+        address,
+        city,
+        state,
+        zipCode,
+        propertyType,
+        managerId: req.user.id, // Assign the current user as the manager
+      },
+    });
+
+    res.status(201).json(property);
+  } catch (error) {
+    console.error('Error creating property:', error);
+    res.status(500).json({ error: 'Failed to create property' });
+  }
+};
+
+/**
+ * Get a single property by its ID.
+ */
+exports.getPropertyById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const property = await prisma.property.findUnique({
+      where: { id },
+    });
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json(property);
+  } catch (error) {
+    console.error('Error fetching property:', error);
+    res.status(500).json({ error: 'Failed to fetch property' });
   }
 };
 
