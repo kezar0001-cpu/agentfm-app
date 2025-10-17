@@ -168,7 +168,7 @@ const InspectionsPage = () => {
               <TextField
                 select
                 fullWidth
-                id="inspection-filter-status"
+                id="inspections-filter-status"
                 name="status"
                 label="Status"
                 value={filters.status}
@@ -186,7 +186,7 @@ const InspectionsPage = () => {
               <TextField
                 select
                 fullWidth
-                id="inspection-filter-property"
+                id="inspections-filter-property"
                 name="propertyId"
                 label="Property"
                 value={filters.propertyId}
@@ -204,7 +204,7 @@ const InspectionsPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspection-filter-date-from"
+                id="inspections-filter-date-from"
                 name="dateFrom"
                 label="From Date"
                 type="date"
@@ -217,7 +217,7 @@ const InspectionsPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspection-filter-date-to"
+                id="inspections-filter-date-to"
                 name="dateTo"
                 label="To Date"
                 type="date"
