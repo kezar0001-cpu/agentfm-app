@@ -173,6 +173,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
+              id="inspection-title"
+              name="title"
               label="Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -187,6 +189,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="inspection-type"
+              name="type"
               label="Type"
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
@@ -205,6 +209,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
+              id="inspection-scheduled-date"
+              name="scheduledDate"
               label="Scheduled Date & Time"
               type="datetime-local"
               value={formData.scheduledDate}
@@ -220,6 +226,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="inspection-property"
+              name="propertyId"
               label="Property"
               value={formData.propertyId}
               onChange={(e) => handleChange('propertyId', e.target.value)}
@@ -240,6 +248,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="inspection-unit"
+              name="unitId"
               label="Unit (Optional)"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
@@ -258,6 +268,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="inspection-assigned-to"
+              name="assignedToId"
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
               onChange={(e) => handleChange('assignedToId', e.target.value)}
@@ -274,6 +286,8 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
+              id="inspection-notes"
+              name="notes"
               label="Notes (Optional)"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}

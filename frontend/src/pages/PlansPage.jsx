@@ -69,6 +69,7 @@ export default function PlansPage() {
           <Stack spacing={2}>
             <TextField
               id="plan-name"
+              name="name"
               label={t('plans.name')}
               fullWidth
               autoComplete="off"
@@ -78,6 +79,7 @@ export default function PlansPage() {
             />
             <TextField
               id="plan-frequency"
+              name="frequency"
               label={t('plans.frequency')}
               fullWidth
               autoComplete="off"
@@ -87,6 +89,7 @@ export default function PlansPage() {
             />
             <TextField
               id="plan-description"
+              name="description"
               label="Description"
               multiline
               minRows={3}
