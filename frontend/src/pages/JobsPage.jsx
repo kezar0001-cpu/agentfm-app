@@ -183,6 +183,8 @@ const JobsPage = () => {
               <TextField
                 select
                 fullWidth
+                id="job-filter-status"
+                name="status"
                 label="Status"
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -200,6 +202,8 @@ const JobsPage = () => {
               <TextField
                 select
                 fullWidth
+                id="job-filter-priority"
+                name="priority"
                 label="Priority"
                 value={filters.priority}
                 onChange={(e) => handleFilterChange('priority', e.target.value)}
@@ -216,6 +220,8 @@ const JobsPage = () => {
               <TextField
                 select
                 fullWidth
+                id="job-filter-property"
+                name="propertyId"
                 label="Property"
                 value={filters.propertyId}
                 onChange={(e) => handleFilterChange('propertyId', e.target.value)}
@@ -233,6 +239,8 @@ const JobsPage = () => {
               <TextField
                 select
                 fullWidth
+                id="job-filter-quick"
+                name="filter"
                 label="Quick Filter"
                 value={filters.filter}
                 onChange={(e) => handleFilterChange('filter', e.target.value)}

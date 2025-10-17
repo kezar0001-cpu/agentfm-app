@@ -168,6 +168,8 @@ export default function PropertiesPage() {
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
+                id="properties-search"
+                name="search"
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -184,6 +186,8 @@ export default function PropertiesPage() {
               <TextField
                 fullWidth
                 select
+                id="properties-filter-status"
+                name="filterStatus"
                 label="Status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}

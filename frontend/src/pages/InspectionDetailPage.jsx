@@ -472,6 +472,8 @@ export default function InspectionDetailPage() {
             fullWidth
             multiline
             rows={8}
+            id="inspection-complete-findings"
+            name="findings"
             label="Findings *"
             value={completeData.findings}
             onChange={(e) =>
@@ -482,6 +484,8 @@ export default function InspectionDetailPage() {
           />
           <TextField
             fullWidth
+            id="inspection-complete-photos"
+            name="photos"
             label="Photo URLs (comma-separated)"
             value={completeData.photos.join(', ')}
             onChange={(e) =>

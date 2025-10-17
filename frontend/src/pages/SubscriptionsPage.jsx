@@ -275,6 +275,8 @@ export default function SubscriptionsPage() {
                         <TableCell>
                           <Select
                             size="small"
+                            id={`subscription-${subscription.id}-status`}
+                            name="status"
                             value={subscription.status || ''}
                             onChange={(event) =>
                               handleStatusChange(subscription.id, event.target.value)

@@ -193,6 +193,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-name"
+                name="name"
                 label="Property Name"
                 value={formData.name}
                 onChange={handleChange('name')}
@@ -206,6 +208,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-street-address"
+                name="address"
                 label="Street Address"
                 value={formData.address}
                 onChange={handleChange('address')}
@@ -219,6 +223,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-city"
+                name="city"
                 label="City"
                 value={formData.city}
                 onChange={handleChange('city')}
@@ -230,6 +236,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-state"
+                name="state"
                 select
                 label="State"
                 value={formData.state}
@@ -248,6 +256,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-zip-code"
+                name="zipCode"
                 label="ZIP Code"
                 value={formData.zipCode}
                 onChange={handleChange('zipCode')}
@@ -261,6 +271,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
+                id="property-type"
+                name="propertyType"
                 select
                 label="Property Type"
                 value={formData.propertyType}
@@ -278,6 +290,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                id="property-status"
+                name="status"
                 select
                 label="Status"
                 value={formData.status}
@@ -295,6 +309,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="property-year-built"
+                name="yearBuilt"
                 label="Year Built"
                 type="number"
                 value={formData.yearBuilt}
@@ -306,6 +322,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="property-total-units"
+                name="totalUnits"
                 label="Total Units"
                 type="number"
                 value={formData.totalUnits}
@@ -317,6 +335,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="property-total-area"
+                name="totalArea"
                 label="Total Area (sq ft)"
                 type="number"
                 value={formData.totalArea}
@@ -332,6 +352,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 multiline
                 rows={3}
+                id="property-description"
+                name="description"
                 label="Description"
                 value={formData.description}
                 onChange={handleChange('description')}
@@ -342,6 +364,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                id="property-image-url"
+                name="imageUrl"
                 label="Image URL (optional)"
                 value={formData.imageUrl}
                 onChange={handleChange('imageUrl')}
