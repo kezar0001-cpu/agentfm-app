@@ -68,7 +68,7 @@ export default function PlansPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
-              id="plan-name"
+              id="plans-form-name"
               name="name"
               label={t('plans.name')}
               fullWidth
@@ -78,7 +78,7 @@ export default function PlansPage() {
               helperText={errors.name && t(errors.name.message)}
             />
             <TextField
-              id="plan-frequency"
+              id="plans-form-frequency"
               name="frequency"
               label={t('plans.frequency')}
               fullWidth
@@ -88,7 +88,7 @@ export default function PlansPage() {
               helperText={errors.frequency && t(errors.frequency.message)}
             />
             <TextField
-              id="plan-description"
+              id="plans-form-description"
               name="description"
               label="Description"
               multiline
