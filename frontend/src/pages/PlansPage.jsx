@@ -68,24 +68,30 @@ export default function PlansPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
+              id="plan-name"
               label={t('plans.name')}
               fullWidth
+              autoComplete="off"
               {...register('name')}
               error={Boolean(errors.name)}
               helperText={errors.name && t(errors.name.message)}
             />
             <TextField
+              id="plan-frequency"
               label={t('plans.frequency')}
               fullWidth
+              autoComplete="off"
               {...register('frequency')}
               error={Boolean(errors.frequency)}
               helperText={errors.frequency && t(errors.frequency.message)}
             />
             <TextField
+              id="plan-description"
               label="Description"
               multiline
               minRows={3}
               fullWidth
+              autoComplete="off"
               {...register('description')}
             />
             {mutation.isError && <Alert severity="error">{mutation.error.message}</Alert>}
