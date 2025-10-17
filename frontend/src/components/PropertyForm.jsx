@@ -193,7 +193,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-name"
+                id="property-form-name"
                 name="name"
                 label="Property Name"
                 value={formData.name}
@@ -208,7 +208,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-street-address"
+                id="property-form-address"
                 name="address"
                 label="Street Address"
                 value={formData.address}
@@ -223,7 +223,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-city"
+                id="property-form-city"
                 name="city"
                 label="City"
                 value={formData.city}
@@ -236,7 +236,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-state"
+                id="property-form-state"
                 name="state"
                 select
                 label="State"
@@ -256,7 +256,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-zip-code"
+                id="property-form-zip-code"
                 name="zipCode"
                 label="ZIP Code"
                 value={formData.zipCode}
@@ -271,7 +271,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               <TextField
                 fullWidth
                 required
-                id="property-type"
+                id="property-form-type"
                 name="propertyType"
                 select
                 label="Property Type"
@@ -290,7 +290,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                id="property-status"
+                id="property-form-status"
                 name="status"
                 select
                 label="Status"
@@ -309,7 +309,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-year-built"
+                id="property-form-year-built"
                 name="yearBuilt"
                 label="Year Built"
                 type="number"
@@ -322,7 +322,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-total-units"
+                id="property-form-total-units"
                 name="totalUnits"
                 label="Total Units"
                 type="number"
@@ -335,7 +335,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="property-total-area"
+                id="property-form-total-area"
                 name="totalArea"
                 label="Total Area (sq ft)"
                 type="number"
@@ -352,7 +352,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 multiline
                 rows={3}
-                id="property-description"
+                id="property-form-description"
                 name="description"
                 label="Description"
                 value={formData.description}
@@ -364,7 +364,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                id="property-image-url"
+                id="property-form-image-url"
                 name="imageUrl"
                 label="Image URL (optional)"
                 value={formData.imageUrl}

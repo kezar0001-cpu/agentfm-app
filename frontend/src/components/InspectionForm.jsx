@@ -173,7 +173,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="inspection-title"
+              id="inspection-form-title"
               name="title"
               label="Title"
               value={formData.title}
@@ -189,7 +189,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-type"
+              id="inspection-form-type"
               name="type"
               label="Type"
               value={formData.type}
@@ -209,7 +209,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              id="inspection-scheduled-date"
+              id="inspection-form-scheduled-date"
               name="scheduledDate"
               label="Scheduled Date & Time"
               type="datetime-local"
@@ -226,7 +226,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-property"
+              id="inspection-form-property"
               name="propertyId"
               label="Property"
               value={formData.propertyId}
@@ -248,7 +248,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-unit"
+              id="inspection-form-unit"
               name="unitId"
               label="Unit (Optional)"
               value={formData.unitId}
@@ -268,7 +268,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
-              id="inspection-assigned-to"
+              id="inspection-form-assigned-to"
               name="assignedToId"
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
@@ -286,7 +286,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="inspection-notes"
+              id="inspection-form-notes"
               name="notes"
               label="Notes (Optional)"
               value={formData.notes}

@@ -168,8 +168,8 @@ export default function PropertiesPage() {
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
-                id="properties-search"
-                name="search"
+                id="properties-search-term"
+                name="searchTerm"
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
