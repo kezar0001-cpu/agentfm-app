@@ -170,7 +170,6 @@ export default function PropertiesPage() {
                 fullWidth
                 id="properties-search-term"
                 name="searchTerm"
-                inputProps={{ id: 'properties-search-term', name: 'searchTerm' }}
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
