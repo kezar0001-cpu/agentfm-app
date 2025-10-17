@@ -25,7 +25,11 @@ export default function GlobalGuard() {
         if (!user) return;
 
         localStorage.setItem('user', JSON.stringify(user));
-        const isActive = user.subscriptionStatus === 'ACTIVE' || user.subscriptionStatus === 'TRIAL';
+        const trialEndDate = user.trialEndDate ? new Date(user.trialEndDate) : null;
+        const trialActive =
+          user.subscriptionStatus === 'TRIAL' && (!trialEndDate || trialEndDate.getTime() > Date.now());
+        const isActive = user.subscriptionStatus === 'ACTIVE' || trialActive;
+
         if (!isActive && path !== SUBS_PATH) {
           navigate(SUBS_PATH, { replace: true });
         }
