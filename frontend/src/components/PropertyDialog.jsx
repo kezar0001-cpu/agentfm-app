@@ -1,74 +1,43 @@
-import { useState } from 'react';
 import {
+  Button,
   Dialog,
-  DialogTitle,
+  DialogActions,
   DialogContent,
-  IconButton,
-  Box,
+  DialogTitle,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { useQueryClient } from '@tanstack/react-query'; // 👈 ADD THIS IMPORT
 import PropertyForm from './PropertyForm';
-import useApiMutation from '../hooks/useApiMutation';
 
-export default function PropertyDialog({ open, onClose, onSuccess }) {
-  const [error, setError] = useState(null);
-  
-  const { mutateAsync, isPending } = useApiMutation({
-    url: '/api/properties',
-    method: 'post',
-  });
+function PropertyDialog({ open, onClose, property }) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const queryClient = useQueryClient(); // 👈 GET THE QUERY CLIENT
 
-  const handleSubmit = async (formData) => {
-    try {
-      setError(null);
-      const response = await mutateAsync({ data: formData });
-      onSuccess?.(response?.property);
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Failed to create property');
-      throw err;
-    }
-  };
-
-  const handleClose = () => {
-    if (!isPending) {
-      setError(null);
-      onClose();
-    }
+  const handleSuccess = () => {
+    // 👇 TELL REACT QUERY TO REFETCH THE PROPERTIES LIST
+    queryClient.invalidateQueries({ queryKey: ['/properties'] });
+    onClose(); // Close the dialog
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: { minHeight: '60vh' }
-      }}
-    >
-      <DialogTitle>
-        <Box display="flex" alignItems="center" justifyContent="space-between">
-          Add New Property
-          <IconButton
-            edge="end"
-            onClick={handleClose}
-            disabled={isPending}
-            aria-label="close"
-          >
-            <Close />
-          </IconButton>
-        </Box>
-      </DialogTitle>
-      <DialogContent dividers>
+    <Dialog open={open} onClose={onClose} fullScreen={fullScreen} maxWidth="md" fullWidth>
+      <DialogTitle>{property ? 'Edit Property' : 'Add New Property'}</DialogTitle>
+      <DialogContent>
         <PropertyForm
-          mode="create"
-          onSubmit={handleSubmit}
-          onCancel={handleClose}
-          isSubmitting={isPending}
-          submitError={error}
+          property={property}
+          onSuccess={handleSuccess} // 👈 PASS THE SUCCESS HANDLER TO THE FORM
         />
       </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button type="submit" form="property-form" variant="contained">
+          Save
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }
+
+export default PropertyDialog;
