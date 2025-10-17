@@ -162,6 +162,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
               <TextField
                 fullWidth
                 required
+                id="unit-unit-number"
+                name="unitNumber"
                 label="Unit Number"
                 value={formData.unitNumber}
                 onChange={handleChange('unitNumber')}
@@ -174,6 +176,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                id="unit-status"
+                name="status"
                 select
                 label="Status"
                 value={formData.status}
@@ -191,6 +195,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="unit-floor"
+                name="floor"
                 label="Floor"
                 type="number"
                 value={formData.floor}
@@ -204,6 +210,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="unit-bedrooms"
+                name="bedrooms"
                 label="Bedrooms"
                 type="number"
                 value={formData.bedrooms}
@@ -217,6 +225,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                id="unit-bathrooms"
+                name="bathrooms"
                 label="Bathrooms"
                 type="number"
                 inputProps={{ step: 0.5 }}
@@ -231,6 +241,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                id="unit-area"
+                name="area"
                 label="Area (sq ft)"
                 type="number"
                 value={formData.area}
@@ -244,6 +256,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                id="unit-rent-amount"
+                name="rentAmount"
                 label="Monthly Rent ($)"
                 type="number"
                 value={formData.rentAmount}
@@ -259,6 +273,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 multiline
                 rows={3}
+                id="unit-description"
+                name="description"
                 label="Description"
                 value={formData.description}
                 onChange={handleChange('description')}
@@ -270,6 +286,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                id="unit-image-url"
+                name="imageUrl"
                 label="Image URL (optional)"
                 value={formData.imageUrl}
                 onChange={handleChange('imageUrl')}

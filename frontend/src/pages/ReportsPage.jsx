@@ -59,6 +59,8 @@ export default function ReportsPage() {
         <form onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <TextField
+              id="reports-property"
+              name="propertyId"
               label={t('reports.property')}
               fullWidth
               {...register('propertyId')}
@@ -68,6 +70,8 @@ export default function ReportsPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 type="date"
+                id="reports-from-date"
+                name="from"
                 label={t('reports.from')}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
@@ -77,6 +81,8 @@ export default function ReportsPage() {
               />
               <TextField
                 type="date"
+                id="reports-to-date"
+                name="to"
                 label={t('reports.to')}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
