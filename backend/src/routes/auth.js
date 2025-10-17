@@ -5,6 +5,53 @@ import passport from 'passport';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 
+const TRIAL_PERIOD_DAYS = 14;
+
+function calculateTrialEndDate(baseDate = new Date()) {
+  const endDate = new Date(baseDate);
+  endDate.setDate(endDate.getDate() + TRIAL_PERIOD_DAYS);
+  return endDate;
+}
+
+async function ensureTrialState(user) {
+  if (!user) return user;
+
+  const now = new Date();
+  const updates = {};
+  let trialEndDate = user.trialEndDate ? new Date(user.trialEndDate) : null;
+
+  if (user.subscriptionStatus === 'TRIAL') {
+    const baseDate = user.createdAt ? new Date(user.createdAt) : now;
+
+    if (!trialEndDate) {
+      trialEndDate = calculateTrialEndDate(baseDate);
+      updates.trialEndDate = trialEndDate;
+    }
+
+    if (trialEndDate && trialEndDate <= now) {
+      updates.subscriptionStatus = 'SUSPENDED';
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: updates,
+    });
+
+    return {
+      ...user,
+      ...updates,
+      trialEndDate: updates.trialEndDate ?? trialEndDate ?? user.trialEndDate,
+    };
+  }
+
+  return {
+    ...user,
+    trialEndDate: trialEndDate ?? user.trialEndDate ?? null,
+  };
+}
+
 const router = Router();
 
 // ========================================
@@ -65,6 +112,8 @@ router.post('/register', async (req, res) => {
 
     // (trial/subscription/org removed – not in schema)
 
+    const trialEndDate = calculateTrialEndDate();
+
     const user = await prisma.user.create({
       data: {
         firstName,
@@ -73,6 +122,9 @@ router.post('/register', async (req, res) => {
         passwordHash,
         phone,
         role: 'PROPERTY_MANAGER',
+        subscriptionPlan: 'FREE_TRIAL',
+        subscriptionStatus: 'TRIAL',
+        trialEndDate,
       },
     });
 
@@ -85,7 +137,8 @@ router.post('/register', async (req, res) => {
     );
 
     // Strip passwordHash
-    const { passwordHash: _ph, ...userWithoutPassword } = user;
+    const userWithTrial = await ensureTrialState(user);
+    const { passwordHash: _ph, ...userWithoutPassword } = userWithTrial;
 
     res.status(201).json({
       success: true,
@@ -138,7 +191,9 @@ router.post('/login', async (req, res) => {
 
     await prisma.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
 
-    const { passwordHash: _ph, ...userWithoutPassword } = user;
+    const userWithTrial = await ensureTrialState(user);
+
+    const { passwordHash: _ph, ...userWithoutPassword } = userWithTrial;
     res.json({ success: true, token, user: userWithoutPassword });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -214,7 +269,7 @@ router.get(
 // ========================================
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
         id: true,
@@ -225,12 +280,15 @@ router.get('/me', requireAuth, async (req, res) => {
         role: true,
         createdAt: true,
         updatedAt: true,
+        subscriptionStatus: true,
+        subscriptionPlan: true,
+        trialEndDate: true,
       },
     });
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // ❌ Removed: trial/subscription math (not in schema)
+    user = await ensureTrialState(user);
 
     res.json({ success: true, user });
   } catch (error) {
