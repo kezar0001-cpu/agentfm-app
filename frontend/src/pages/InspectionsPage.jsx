@@ -29,6 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
+import ensureArray from '../utils/ensureArray';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const InspectionsPage = () => {
 
   // Fetch inspections
   const {
-    data: inspections,
+    data: inspections = [],
     isLoading,
     error,
     refetch,
@@ -58,16 +59,16 @@ const InspectionsPage = () => {
     queryKey: ['inspections', filters],
     queryFn: async () => {
       const response = await apiClient.get(`/inspections?${queryParams.toString()}`);
-      return response.data;
+      return ensureArray(response.data, ['inspections', 'data', 'items', 'results']);
     },
   });
 
   // Fetch properties for filter
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
     },
   });
 
@@ -189,7 +190,7 @@ const InspectionsPage = () => {
                 size="small"
               >
                 <MenuItem value="">All Properties</MenuItem>
-                {properties?.map((property) => (
+                {properties.map((property) => (
                   <MenuItem key={property.id} value={property.id}>
                     {property.name}
                   </MenuItem>
