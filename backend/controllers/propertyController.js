@@ -581,7 +581,53 @@ async function checkPropertyAccess(userId, role, propertyId) {
   return false;
 }
 
+const TRIAL_PERIOD_DAYS = 14;
+
+function calculateTrialEndDate(baseDate = new Date()) {
+  const endDate = new Date(baseDate);
+  endDate.setDate(endDate.getDate() + TRIAL_PERIOD_DAYS);
+  return endDate;
+}
+
 async function checkActiveSubscription(userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      subscriptionStatus: true,
+      trialEndDate: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) return false;
+
+  if (user.subscriptionStatus === 'ACTIVE') {
+    return true;
+  }
+
+  if (user.subscriptionStatus === 'TRIAL') {
+    const now = new Date();
+    let trialEndDate = user.trialEndDate ? new Date(user.trialEndDate) : null;
+
+    if (!trialEndDate) {
+      trialEndDate = calculateTrialEndDate(user.createdAt ? new Date(user.createdAt) : now);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { trialEndDate },
+      });
+    }
+
+    if (trialEndDate > now) {
+      return true;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { subscriptionStatus: 'SUSPENDED', trialEndDate },
+    });
+    return false;
+  }
+
   const subscription = await prisma.subscription.findFirst({
     where: {
       userId,
@@ -592,6 +638,16 @@ async function checkActiveSubscription(userId) {
       ],
     },
   });
-  
-  return !!subscription;
+
+  if (subscription) {
+    if (user.subscriptionStatus !== 'ACTIVE') {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { subscriptionStatus: 'ACTIVE' },
+      });
+    }
+    return true;
+  }
+
+  return false;
 }
