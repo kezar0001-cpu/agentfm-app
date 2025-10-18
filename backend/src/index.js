@@ -1,4 +1,4 @@
-// backend/src/index.js
+console.log('>>> STARTING index.js - Webhook Fix Deployed <<<');
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
