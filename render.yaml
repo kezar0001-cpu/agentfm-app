@@ -1,42 +1,74 @@
-# render.yaml (at repo root)
+# render.yaml
+# This file configures the deployment of the AgentFM application on Render.
+# It defines three services:
+# 1. A PostgreSQL database for the backend.
+# 2. The Express.js backend service.
+# 3. The Vite/React frontend as a static site.
+
 services:
-  # --------------------------
+  # ---------------------------------
+  # PostgreSQL Database
+  # ---------------------------------
+  - type: psql
+    name: agentfm-database
+    plan: free # 'free' tier is suitable for development/hobby projects.
+
+  # ---------------------------------
   # Backend (Express + Prisma)
-  # --------------------------
+  # ---------------------------------
   - type: web
     name: agentfm-backend
     env: node
     rootDir: backend
-    plan: free
+    plan: free # Choose a plan that suits your needs.
     buildCommand: |
-      npm ci
+      npm install
       npx prisma generate
       npx prisma migrate deploy
     startCommand: node src/index.js
     autoDeploy: true
+    healthCheck:
+      path: /health
+      initialDelaySeconds: 45
     envVars:
-      # Set these in the Render dashboard (don’t put values here)
       - key: DATABASE_URL
-        sync: false
+        fromService:
+          type: psql
+          name: agentfm-database
+          property: connectionString
       - key: JWT_SECRET
-        sync: false
-      # FRONTEND_URL will be set after the frontend creates a URL; you can leave
-      # this blank for the first deploy and set it in the dashboard afterward.
+        generateValue: true # Let Render generate a secure secret.
+      - key: SESSION_SECRET
+        generateValue: true # Let Render generate a secure secret.
       - key: FRONTEND_URL
-        sync: false
+        fromService:
+          type: static_site
+          name: agentfm-frontend
+          property: url
+      - key: NODE_ENV
+        value: production
 
-  # --------------------------
-  # Frontend (Vite static)
-  # --------------------------
-  - type: static
+  # ---------------------------------
+  # Frontend (Vite static site)
+  # ---------------------------------
+  - type: static_site
     name: agentfm-frontend
     rootDir: frontend
     buildCommand: |
-      npm ci
+      npm install
       npm run build
     staticPublishPath: dist
     autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://agentfm-backend.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
-      # VITE needs the backend base URL at build time
       - key: VITE_API_BASE_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentfm-backend
+          property: url
