@@ -28,7 +28,7 @@ services:
   # --------------------------
   # Frontend (Vite static)
   # --------------------------
-  - type: static
+  - type: static_site
     name: agentfm-frontend
     rootDir: frontend
     buildCommand: |
