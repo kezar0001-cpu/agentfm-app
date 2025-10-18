@@ -102,6 +102,7 @@ import recommendationsRoutes from './routes/recommendations.js';
 import plansRoutes from './routes/plans.js';
 import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
+import usersRouter from './routes/users.js';
 
 // ===================================================================
 //
@@ -130,6 +131,7 @@ app.use('/api/recommendations', recommendationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/service-requests', serviceRequestsRoutes);
+app.use('/api/users', usersRouter);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic

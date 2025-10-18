@@ -7,7 +7,9 @@ import prisma from '../config/prismaClient.js';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import unitsRouter from './units.js';
 
+import unitsRouter from './units.js';
 const router = Router();
+router.use('/:id/units', unitsRouter);
 
 // ---------------------------------------------------------------------------
 // Authentication middleware
