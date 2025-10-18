@@ -25,16 +25,12 @@ import {
   Container,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
-import {
-  getCurrentUser,
-  refreshCurrentUser,
-  USER_UPDATED_EVENT,
-} from '../lib/auth.js';
+import { getCurrentUser, refreshCurrentUser } from '../lib/auth.js'; // Import auth helpers
+import { calculateDaysRemaining } from '../utils/date.js';
 
 const STATUSES = {
   ACTIVE: 'Active',
@@ -47,9 +43,9 @@ const normaliseStatus = (status) =>
   typeof status === 'string' ? status.toUpperCase() : '';
 
 export default function SubscriptionsPage() {
-  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
 
   const query = useApiQuery({
     queryKey: ['subscriptions'],
@@ -92,40 +88,21 @@ export default function SubscriptionsPage() {
 
   // Effect to refresh user data on successful subscription
   useEffect(() => {
-    if (showSuccess) {
-      let isMounted = true;
+    if (!showSuccess) return;
 
-      const syncUser = async () => {
-        setDisplaySuccess(true);
-
-        try {
-          const updatedUser = await refreshCurrentUser();
-          if (isMounted) {
-            setCurrentUser(updatedUser ?? null);
-          }
-        } catch (error) {
-          console.error('Unable to refresh user after checkout success:', error);
-        } finally {
-          try {
-            await query.refetch();
-          } catch (refetchError) {
-            console.error('Failed to refetch subscriptions:', refetchError);
-          }
-
-          if (isMounted && location.search) {
-            // Remove success param from URL to prevent message on reload
-            navigate(location.pathname, { replace: true });
-          }
+    refreshCurrentUser()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user);
+        } else {
+          setCurrentUser(getCurrentUser());
         }
-      };
-
-      syncUser();
-
-      return () => {
-        isMounted = false;
-      };
-    }
-  }, [showSuccess, navigate, location.pathname, location.search, query.refetch]);
+      })
+      .finally(() => {
+        // Remove success param from URL to prevent message on reload
+        navigate(location.pathname, { replace: true });
+      });
+  }, [showSuccess, navigate, location.pathname]);
 
 
   const subscriptions = normaliseArray(query.data);
@@ -163,6 +140,36 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleManageBilling = () => startCheckout(planForCheckout);
+
+  const formatEnumValue = (value, fallback = 'Not available') => {
+    if (!value) return fallback;
+    return value
+      .toString()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const trialStatusLabel = () => {
+    if (trialDaysRemaining === null) return null;
+    if (trialDaysRemaining > 0) {
+      return `Trial ends in ${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'}`;
+    }
+    return 'Trial ended';
+  };
+
+  let primaryCtaLabel = 'Subscribe';
+  let primaryCtaAction = () => startCheckout(planForCheckout);
+  if (isTrialActive) {
+    primaryCtaLabel = 'Resume trial';
+  } else if (userHasActiveSubscription) {
+    primaryCtaLabel = 'Manage Billing';
+    primaryCtaAction = handleManageBilling;
+  }
+
+  const trialLabel = trialStatusLabel();
+
   return (
     <Box sx={{ py: 4 }}>
       <Container maxWidth="lg">
@@ -199,6 +206,59 @@ export default function SubscriptionsPage() {
               {checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
             </Alert>
           )}
+
+          {/* Subscription Summary */}
+          <Card sx={{ borderRadius: 3, boxShadow: 1 }}>
+            <CardContent>
+              <Stack spacing={3}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={3}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Plan
+                      </Typography>
+                      <Typography variant="h6">
+                        {formatEnumValue(subscriptionPlan, 'No plan selected')}
+                      </Typography>
+                    </Box>
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Status
+                      </Typography>
+                      <Chip
+                        label={formatEnumValue(subscriptionStatus, 'No status')}
+                        color={userHasActiveSubscription ? 'success' : isTrialActive ? 'warning' : 'default'}
+                        variant={userHasActiveSubscription ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+                  </Stack>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: { xs: '100%', sm: 'auto' } }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={primaryCtaAction}
+                      disabled={checkoutMutation.isPending}
+                    >
+                      {checkoutMutation.isPending ? 'Processing...' : primaryCtaLabel}
+                    </Button>
+                  </Box>
+                </Stack>
+                {trialLabel && (
+                  <Chip
+                    label={trialLabel}
+                    color={trialDaysRemaining > 0 ? 'warning' : 'default'}
+                    variant={trialDaysRemaining > 0 ? 'filled' : 'outlined'}
+                  />
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
 
           {/* Pricing Card - Only show if no active subscription */}
           {!hasActiveSubscription && (
