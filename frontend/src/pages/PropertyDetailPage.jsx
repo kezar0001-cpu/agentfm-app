@@ -48,6 +48,10 @@ import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
 import { normaliseArray } from '../utils/error';
+import {
+  formatPropertyAddressLine,
+  formatPropertyLocality,
+} from '../utils/formatPropertyLocation';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
@@ -163,7 +167,7 @@ export default function PropertyDetailPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                   <LocationIcon fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
-                    {property.address}, {property.city}, {property.state} {property.zipCode}
+                    {formatPropertyAddressLine(property)}
                   </Typography>
                 </Box>
               </Box>
@@ -288,11 +292,17 @@ export default function PropertyDetailPage() {
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" color="text.secondary">
-                          City, State, ZIP
+                          Locality
                         </Typography>
                         <Typography variant="body1">
-                          {property.city}, {property.state} {property.zipCode}
+                          {formatPropertyLocality(property)}
                         </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Country
+                        </Typography>
+                        <Typography variant="body1">{property.country}</Typography>
                       </Grid>
                       {property.totalArea && (
                         <Grid item xs={12} sm={6}>
@@ -300,7 +310,7 @@ export default function PropertyDetailPage() {
                             Total Area
                           </Typography>
                           <Typography variant="body1">
-                            {property.totalArea.toLocaleString()} sq ft
+                            {property.totalArea.toLocaleString()}
                           </Typography>
                         </Grid>
                       )}
