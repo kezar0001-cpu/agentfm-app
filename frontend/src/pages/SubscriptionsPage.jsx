@@ -32,7 +32,15 @@ import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
 import { refreshCurrentUser } from '../lib/auth.js'; // Import the refresh function
 
-const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
+const STATUSES = {
+  ACTIVE: 'Active',
+  PENDING: 'Pending',
+  SUSPENDED: 'Suspended',
+  CANCELLED: 'Cancelled',
+};
+
+const normaliseStatus = (status) =>
+  typeof status === 'string' ? status.toUpperCase() : '';
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
@@ -73,14 +81,15 @@ export default function SubscriptionsPage() {
 
   const subscriptions = normaliseArray(query.data);
   const hasActiveSubscription = subscriptions.some(
-    (sub) => sub.status === 'active'
+    (sub) => normaliseStatus(sub.status) === 'ACTIVE'
   );
 
   const handleStatusChange = async (subscriptionId, status) => {
+    const normalisedStatus = normaliseStatus(status);
     await mutation.mutateAsync({
       url: `/api/subscriptions/${subscriptionId}`,
       method: 'patch',
-      data: { status },
+      data: { status: normalisedStatus },
     });
   };
 
@@ -279,38 +288,42 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {subscriptions.map((subscription) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell>{subscription.id}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={subscription.planName || subscription.planId}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{subscription.customerName || subscription.customerId}</TableCell>
-                        <TableCell>
-                          <Select
-                            size="small"
-                            id={`subscription-${subscription.id}-status`}
-                            name="status"
-                            value={subscription.status || ''}
-                            onChange={(event) =>
-                              handleStatusChange(subscription.id, event.target.value)
-                            }
-                            disabled={mutation.isPending}
-                          >
-                            {STATUSES.map((status) => (
-                              <MenuItem key={status} value={status}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {subscriptions.map((subscription) => {
+                      const statusValue = normaliseStatus(subscription.status);
+
+                      return (
+                        <TableRow key={subscription.id}>
+                          <TableCell>{subscription.id}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={subscription.planName || subscription.planId}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{subscription.customerName || subscription.customerId}</TableCell>
+                          <TableCell>
+                            <Select
+                              size="small"
+                              id={`subscription-${subscription.id}-status`}
+                              name="status"
+                              value={statusValue}
+                              onChange={(event) =>
+                                handleStatusChange(subscription.id, event.target.value)
+                              }
+                              disabled={mutation.isPending}
+                            >
+                            {Object.entries(STATUSES).map(([value, label]) => (
+                              <MenuItem key={value} value={value}>
+                                {label}
                               </MenuItem>
                             ))}
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </DataState>
