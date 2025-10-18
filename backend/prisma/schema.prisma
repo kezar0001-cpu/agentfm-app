@@ -297,9 +297,9 @@ model Property {
   name            String
   address         String
   city            String
-  state           String
-  zipCode         String
-  country         String         @default("USA")
+  state           String?
+  zipCode         String?
+  country         String
 
   propertyType    String
   yearBuilt       Int?
