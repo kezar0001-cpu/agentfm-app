@@ -59,7 +59,9 @@ export function UserProvider({ children }) {
       });
       return;
     }
-    persistUser(next ?? null);
+    const value = next ?? null;
+    setUser(value);
+    persistUser(value);
   }, []);
 
   const refreshUser = useCallback(async () => {
