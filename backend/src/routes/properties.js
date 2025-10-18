@@ -102,7 +102,7 @@ const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
     address: requiredString('Address is required'),
     city: requiredString('City is required'),
-    state: requiredString('State is required'),
+    state: optionalString(),
     zipCode: optionalString(),
     postcode: optionalString(),
     country: requiredString('Country is required'),
@@ -130,14 +130,6 @@ const basePropertySchema = z.object({
 
 const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
   schema.superRefine((data, ctx) => {
-    if (requireCoreFields && !data.zipCode && !data.postcode) {
-      ctx.addIssue({
-        path: ['zipCode'],
-        code: z.ZodIssueCode.custom,
-        message: 'ZIP code is required',
-      });
-    }
-
     if (requireCoreFields && !data.propertyType && !data.type) {
       ctx.addIssue({
         path: ['propertyType'],
