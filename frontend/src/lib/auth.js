@@ -1,6 +1,32 @@
 // frontend/src/lib/auth.js
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
+export const USER_UPDATED_EVENT = 'agentfm:user-updated';
+
+export function broadcastUserUpdate(user) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
+    return;
+  }
+
+  let event;
+  if (typeof window.CustomEvent === 'function') {
+    event = new window.CustomEvent(USER_UPDATED_EVENT, { detail: user });
+  } else {
+    event = new Event(USER_UPDATED_EVENT);
+    try {
+      Object.defineProperty(event, 'detail', {
+        configurable: true,
+        enumerable: true,
+        value: user,
+      });
+    } catch {
+      event.detail = user;
+    }
+  }
+
+  window.dispatchEvent(event);
+}
+
 export async function api(endpoint, options = {}) {
   const { json, ...fetchOptions } = options;
 
@@ -60,7 +86,17 @@ export function saveTokenFromUrl(autoRedirect = true) {
     localStorage.setItem('token', token);
 
     if (userParam) {
-      try { localStorage.setItem('user', decodeURIComponent(userParam)); } catch {}
+      try {
+        const decoded = decodeURIComponent(userParam);
+        localStorage.setItem('user', decoded);
+        try {
+          broadcastUserUpdate(JSON.parse(decoded));
+        } catch {
+          broadcastUserUpdate(getCurrentUser());
+        }
+      } catch {
+        broadcastUserUpdate(getCurrentUser());
+      }
     } else if (!localStorage.getItem('user')) {
       const meUrl = API_BASE ? `${API_BASE}/api/auth/me` : '/api/auth/me';
       fetch(meUrl, { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' })
@@ -70,6 +106,7 @@ export function saveTokenFromUrl(autoRedirect = true) {
           let payload; try { payload = JSON.parse(t); } catch { return; }
           if (payload?.user) {
             localStorage.setItem('user', JSON.stringify(payload.user));
+            broadcastUserUpdate(payload.user);
             const target = portalPathForRole(payload.user.role);
             const here = window.location.pathname;
             if (autoRedirect && !here.startsWith(target)) window.location.replace(target);
@@ -101,6 +138,7 @@ export async function logout() {
     await api('/auth/logout', { method: 'POST' });
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
   localStorage.removeItem('auth_token'); localStorage.removeItem('user'); localStorage.removeItem('token'); sessionStorage.clear();
+  broadcastUserUpdate(null);
 }
 export function getAuthToken() { return localStorage.getItem('auth_token') || localStorage.getItem('token'); }
 
@@ -113,6 +151,7 @@ export async function refreshCurrentUser() {
     const data = await api('/auth/me'); // Use the api helper
     if (data?.user) {
       localStorage.setItem('user', JSON.stringify(data.user));
+      broadcastUserUpdate(data.user);
       return data.user;
     }
     return null;

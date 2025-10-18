@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -30,7 +30,11 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
-import { refreshCurrentUser } from '../lib/auth.js'; // Import the refresh function
+import {
+  getCurrentUser,
+  refreshCurrentUser,
+  USER_UPDATED_EVENT,
+} from '../lib/auth.js';
 
 const STATUSES = {
   ACTIVE: 'Active',
@@ -66,23 +70,69 @@ export default function SubscriptionsPage() {
   const showSuccess = params.get('success') === '1';
   const showCanceled = params.get('canceled') === '1';
 
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const [displaySuccess, setDisplaySuccess] = useState(showSuccess);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleUserUpdated = (event) => {
+      const nextUser = event?.detail ?? getCurrentUser();
+      setCurrentUser(nextUser || null);
+    };
+
+    window.addEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+
+    return () => {
+      window.removeEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+    };
+  }, []);
+
   // Effect to refresh user data on successful subscription
   useEffect(() => {
     if (showSuccess) {
-      refreshCurrentUser().then(() => {
-        // Remove success param from URL to prevent message on reload
-        navigate(location.pathname, { replace: true });
-        // Optional: you could show a more persistent success message here
-        // using a snackbar or notification context.
-      });
+      let isMounted = true;
+
+      const syncUser = async () => {
+        setDisplaySuccess(true);
+
+        try {
+          const updatedUser = await refreshCurrentUser();
+          if (isMounted) {
+            setCurrentUser(updatedUser ?? null);
+          }
+        } catch (error) {
+          console.error('Unable to refresh user after checkout success:', error);
+        } finally {
+          try {
+            await query.refetch();
+          } catch (refetchError) {
+            console.error('Failed to refetch subscriptions:', refetchError);
+          }
+
+          if (isMounted && location.search) {
+            // Remove success param from URL to prevent message on reload
+            navigate(location.pathname, { replace: true });
+          }
+        }
+      };
+
+      syncUser();
+
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [showSuccess, navigate, location.pathname]);
+  }, [showSuccess, navigate, location.pathname, location.search, query.refetch]);
 
 
   const subscriptions = normaliseArray(query.data);
-  const hasActiveSubscription = subscriptions.some(
-    (sub) => normaliseStatus(sub.status) === 'ACTIVE'
-  );
+  const userStatus = normaliseStatus(currentUser?.subscriptionStatus);
+  const hasActiveSubscription =
+    userStatus === 'ACTIVE' ||
+    subscriptions.some((sub) => normaliseStatus(sub.status) === 'ACTIVE');
 
   const handleStatusChange = async (subscriptionId, status) => {
     const normalisedStatus = normaliseStatus(status);
@@ -130,8 +180,12 @@ export default function SubscriptionsPage() {
           </Box>
 
           {/* Banners */}
-          {showSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
+          {displaySuccess && (
+            <Alert
+              severity="success"
+              sx={{ mb: 2 }}
+              onClose={() => setDisplaySuccess(false)}
+            >
               <strong>Payment successful!</strong> Your subscription is now active. Welcome to AgentFM!
             </Alert>
           )}
