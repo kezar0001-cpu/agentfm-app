@@ -227,6 +227,7 @@ model User {
   uploadedAttachments InspectionAttachment[]
   createdReminders    InspectionReminder[]
   auditLogs           InspectionAuditLog[]
+  reportRequests    ReportRequest[]
 
   @@index([email])
   @@index([role])
@@ -328,6 +329,7 @@ model Property {
   plans           MaintenancePlan[]
   serviceRequests ServiceRequest[]
   invites         Invite[]
+  reportRequests ReportRequest[]
 
   @@index([managerId])
   @@index([status])
@@ -381,6 +383,7 @@ model Unit {
   jobs            Job[]
   invites         Invite[]
   serviceRequests ServiceRequest[]
+  reportRequests  ReportRequest[]
 
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
@@ -647,6 +650,33 @@ model ServiceRequest {
 // ======================================================
 // REPORTS
 // ======================================================
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ReportRequest {
+  id            String       @id @default(cuid())
+  reportType    String
+  status        ReportStatus @default(PENDING)
+  parameters    Json
+  fileUrl       String?
+  requestedById String
+  requestedBy   User         @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  propertyId    String
+  property      Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unitId        String?
+  unit          Unit?        @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([requestedById])
+  @@index([propertyId])
+  @@index([status])
+}
+
 model Report {
   id              String   @id @default(cuid())
   title           String
