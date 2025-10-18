@@ -171,7 +171,7 @@ const DashboardPage = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => navigate('/properties/new')}
+            onClick={() => navigate('/properties', { state: { openCreateDialog: true } })}
           >
             Add Property
           </Button>
@@ -330,7 +330,7 @@ const DashboardPage = () => {
                 variant="outlined"
                 fullWidth
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/properties/new')}
+                onClick={() => navigate('/properties', { state: { openCreateDialog: true } })}
               >
                 Add Property
               </Button>
