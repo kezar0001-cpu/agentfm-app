@@ -434,6 +434,12 @@ model Inspection {
   findings        String?          @db.Text
 
   photos          Json?
+  attachments     InspectionAttachment[]
+  tags            String[]         @default([])
+
+  reminders       InspectionReminder[]
+  auditLogs       InspectionAuditLog[]
+  jobs            Job[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -472,6 +478,9 @@ model Job {
   maintenancePlanId String?
   maintenancePlan   MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id], onDelete: SetNull)
 
+  inspectionId    String?
+  inspection      Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+
   scheduledDate   DateTime?
   completedDate   DateTime?
   estimatedCost   Float?
@@ -489,6 +498,81 @@ model Job {
   @@index([status])
   @@index([priority])
   @@index([scheduledDate])
+  @@index([inspectionId])
+}
+
+// ======================================================
+// INSPECTION ATTACHMENTS
+// ======================================================
+
+model InspectionAttachment {
+  id            String     @id @default(cuid())
+  inspectionId  String
+  inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  url           String
+  name          String
+  mimeType      String
+  size          Int?
+  annotations   Json?
+
+  uploadedById  String?
+  uploadedBy    User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([inspectionId])
+  @@index([uploadedById])
+}
+
+// ======================================================
+// INSPECTION REMINDERS
+// ======================================================
+
+model InspectionReminder {
+  id            String     @id @default(cuid())
+  inspectionId  String
+  inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  remindAt      DateTime
+  channel       String     @default("IN_APP")
+  recipients    String[]   @default([])
+  status        String     @default("PENDING")
+  deliveredAt   DateTime?
+  metadata      Json?
+
+  createdById   String?
+  createdBy     User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([inspectionId])
+  @@index([remindAt])
+  @@index([status])
+}
+
+// ======================================================
+// INSPECTION AUDIT LOGS
+// ======================================================
+
+model InspectionAuditLog {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action       String
+  changes      Json?
+
+  createdAt    DateTime   @default(now())
+
+  @@index([inspectionId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 // ======================================================
