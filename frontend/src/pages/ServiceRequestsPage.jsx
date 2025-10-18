@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -32,6 +32,7 @@ import ServiceRequestForm from '../components/ServiceRequestForm';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState({
     status: '',
     category: '',
@@ -89,6 +90,13 @@ const ServiceRequestsPage = () => {
     refetch();
     handleCloseDialog();
   };
+
+  useEffect(() => {
+    if (location.state?.openCreateDialog) {
+      setOpenDialog(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const handleReview = (request) => {
     setReviewDialog(request);

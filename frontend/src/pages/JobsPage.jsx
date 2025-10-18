@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -34,6 +34,7 @@ import ensureArray from '../utils/ensureArray';
 
 const JobsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
@@ -96,6 +97,14 @@ const JobsPage = () => {
     refetch();
     handleCloseDialog();
   };
+
+  useEffect(() => {
+    if (location.state?.openCreateDialog) {
+      setSelectedJob(null);
+      setOpenDialog(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const getPriorityColor = (priority) => {
     const colors = {
