@@ -77,12 +77,10 @@ async function applySubscriptionUpdate({ userId, orgId, data }) {
 // POST /api/billing/checkout
 router.post('/checkout', async (req, res) => {
   try {
-    // Require JWT
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'No token' });
 
-    // Decode (we only need email/orgId/id for now)
     let user;
     try {
       user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
@@ -93,7 +91,6 @@ router.post('/checkout', async (req, res) => {
     const { plan = 'STARTER', successUrl, cancelUrl } = req.body || {};
     const normalisedPlan = normalisePlan(plan) || 'STARTER';
 
-    // Map plan -> Price ID (env)
     if (!stripeAvailable) {
       return res.status(503).json({ error: 'Stripe is not configured' });
     }
@@ -101,14 +98,10 @@ router.post('/checkout', async (req, res) => {
     const priceId = PLAN_PRICE_MAP[normalisedPlan];
     if (!priceId) return res.status(400).json({ error: `Unknown plan or missing price id: ${plan}` });
 
-    // Always add session_id placeholder so we can confirm if webhook misses
     const defaultSuccess = `${process.env.FRONTEND_URL}/subscriptions?success=1`;
     const baseSuccess = (successUrl || process.env.STRIPE_SUCCESS_URL || defaultSuccess);
     const success = `${baseSuccess}${baseSuccess.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
-
-    const cancel = cancelUrl
-      || process.env.STRIPE_CANCEL_URL
-      || `${process.env.FRONTEND_URL}/subscriptions?canceled=1`;
+    const cancel = cancelUrl || process.env.STRIPE_CANCEL_URL || `${process.env.FRONTEND_URL}/subscriptions?canceled=1`;
 
     const metadata = {
       orgId: user.orgId || '',
@@ -140,10 +133,7 @@ router.post('/checkout', async (req, res) => {
   }
 });
 
-/**
- * Fallback confirmation if webhook doesn’t hit in time.
- * POST /api/billing/confirm  { sessionId }
- */
+// POST /api/billing/confirm  { sessionId }
 router.post('/confirm', async (req, res) => {
   try {
     if (!stripeAvailable) {
@@ -153,7 +143,6 @@ router.post('/confirm', async (req, res) => {
     const { sessionId } = req.body || {};
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
 
-    // Verify with Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription.items.data.price'],
     });
@@ -161,11 +150,9 @@ router.post('/confirm', async (req, res) => {
     if (session.mode !== 'subscription') {
       return res.status(400).json({ error: 'Not a subscription session' });
     }
-    // “complete” for new Checkout, or payment_status “paid” for paid sessions.
     const isComplete = session.status === 'complete' || session.payment_status === 'paid';
     if (!isComplete) return res.status(400).json({ error: 'Session not complete' });
 
-    // Update your DB just like the webhook
     const userId = session.metadata?.userId;
     const orgId = session.metadata?.orgId || session.client_reference_id;
     const subscription =
@@ -198,11 +185,11 @@ router.post('/confirm', async (req, res) => {
 });
 
 /**
- * Stripe Webhook (keep as-is; this is still the primary source of truth)
+ * Stripe Webhook (This must be exported to be used in index.js)
  */
 export async function webhook(req, res) {
-  // 👇 ADD THIS LINE FOR DEBUGGING
-  console.log('>>> Stripe Webhook Handler Invoked <<<');
+  // This is the console.log for debugging
+  console.log('>>> INSIDE billing.js webhook handler <<<');
 
   const sig = req.headers['stripe-signature'];
   let event;
@@ -212,7 +199,7 @@ export async function webhook(req, res) {
       throw new StripeNotConfiguredError();
     }
     event = stripe.webhooks.constructEvent(
-      req.body,              // raw body (index.js mounts express.raw)
+      req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
