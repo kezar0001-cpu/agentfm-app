@@ -97,9 +97,34 @@ export function getCurrentUser() {
 }
 export async function logout() {
   try {
-    const url = API_BASE ? `${API_BASE}/api/auth/logout` : '/api/auth/logout';
-    await fetch(url, { method: 'POST', credentials: 'include' });
+    // Using the api helper function for consistency, though fetch works too
+    await api('/auth/logout', { method: 'POST' });
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
   localStorage.removeItem('auth_token'); localStorage.removeItem('user'); localStorage.removeItem('token'); sessionStorage.clear();
 }
 export function getAuthToken() { return localStorage.getItem('auth_token') || localStorage.getItem('token'); }
+
+/**
+ * Fetches the latest user data from the server and updates localStorage.
+ * This is useful after events like subscription changes.
+ */
+export async function refreshCurrentUser() {
+  try {
+    const data = await api('/auth/me'); // Use the api helper
+    if (data?.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+      return data.user;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to refresh user data:", error);
+    // If token is invalid, the api helper might throw an error.
+    // A 401 status would indicate we should log the user out.
+    if (error.message.includes('401')) {
+      await logout();
+      window.location.href = '/signin';
+    }
+    return null;
+  }
+}
+

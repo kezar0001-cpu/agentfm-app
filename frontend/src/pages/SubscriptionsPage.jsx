@@ -1,3 +1,5 @@
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -28,11 +30,14 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
+import { refreshCurrentUser } from '../lib/auth.js'; // Import the refresh function
 
 const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const query = useApiQuery({
     queryKey: ['subscriptions'],
@@ -48,6 +53,23 @@ export default function SubscriptionsPage() {
     url: '/api/billing/checkout',
     method: 'post',
   });
+  
+  const params = new URLSearchParams(location.search);
+  const showSuccess = params.get('success') === '1';
+  const showCanceled = params.get('canceled') === '1';
+
+  // Effect to refresh user data on successful subscription
+  useEffect(() => {
+    if (showSuccess) {
+      refreshCurrentUser().then(() => {
+        // Remove success param from URL to prevent message on reload
+        navigate(location.pathname, { replace: true });
+        // Optional: you could show a more persistent success message here
+        // using a snackbar or notification context.
+      });
+    }
+  }, [showSuccess, navigate, location.pathname]);
+
 
   const subscriptions = normaliseArray(query.data);
   const hasActiveSubscription = subscriptions.some(
@@ -62,9 +84,6 @@ export default function SubscriptionsPage() {
     });
   };
 
-  const params = new URLSearchParams(window.location.search);
-  const showSuccess = params.get('success') === '1';
-  const showCanceled = params.get('canceled') === '1';
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
@@ -337,3 +356,4 @@ export default function SubscriptionsPage() {
     </Box>
   );
 }
+
