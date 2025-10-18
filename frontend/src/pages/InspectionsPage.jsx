@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -33,6 +33,7 @@ import ensureArray from '../utils/ensureArray';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState({
     status: '',
     propertyId: '',
@@ -95,6 +96,14 @@ const InspectionsPage = () => {
     refetch();
     handleCloseDialog();
   };
+
+  useEffect(() => {
+    if (location.state?.openCreateDialog) {
+      setSelectedInspection(null);
+      setOpenDialog(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const handleView = (id) => {
     navigate(`/inspections/${id}`);

@@ -338,7 +338,7 @@ const DashboardPage = () => {
                 variant="outlined"
                 fullWidth
                 startIcon={<AssignmentIcon />}
-                onClick={() => navigate('/inspections/new')}
+                onClick={() => navigate('/inspections', { state: { openCreateDialog: true } })}
               >
                 Schedule Inspection
               </Button>
@@ -346,14 +346,14 @@ const DashboardPage = () => {
                 variant="outlined"
                 fullWidth
                 startIcon={<BuildIcon />}
-                onClick={() => navigate('/jobs/new')}
+                onClick={() => navigate('/jobs', { state: { openCreateDialog: true } })}
               >
                 Create Job
               </Button>
               <Button
                 variant="outlined"
                 fullWidth
-                onClick={() => navigate('/service-requests')}
+                onClick={() => navigate('/service-requests', { state: { openCreateDialog: true } })}
               >
                 View Requests
               </Button>
