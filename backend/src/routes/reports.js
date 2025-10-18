@@ -1,66 +1,105 @@
 import express from 'express';
 import { z } from 'zod';
-import validate from '../middleware/validate.js';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
-import { createReportRequest } from '../data/memoryStore.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
-
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true }
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
+router.use(requireAuth);
 
 const reportSchema = z.object({
+  reportType: z.enum(['MAINTENANCE_HISTORY', 'UNIT_LEDGER']),
   propertyId: z.string().min(1),
-  from: z
-    .string()
-    .min(1)
-    .refine((value) => !Number.isNaN(Date.parse(value)), {
-      message: 'from must be a valid ISO date',
-    }),
-  to: z
-    .string()
-    .min(1)
-    .refine((value) => !Number.isNaN(Date.parse(value)), {
-      message: 'to must be a valid ISO date',
-    }),
+  unitId: z.string().optional().nullable(),
+  fromDate: z.string().datetime(),
+  toDate: z.string().datetime(),
 });
 
-router.post('/', requireAuth, validate(reportSchema), (req, res) => {
-  const result = createReportRequest(req.user.orgId, req.body);
-  if (result instanceof Error) {
-    const status = result.code === 'NOT_FOUND' ? 404 : 400;
-    return res.status(status).json({ error: result.message });
+// POST /api/reports - Create a new report request
+router.post('/', async (req, res) => {
+  try {
+    const payload = reportSchema.parse(req.body);
+
+    const reportRequest = await prisma.reportRequest.create({
+      data: {
+        reportType: payload.reportType,
+        parameters: {
+          fromDate: payload.fromDate,
+          toDate: payload.toDate,
+        },
+        propertyId: payload.propertyId,
+        unitId: payload.unitId,
+        requestedById: req.user.id,
+        status: 'PENDING',
+      },
+    });
+
+    // In a real app, you would trigger a background job here.
+    // For now, we'll just return the created request.
+
+    res.status(202).json(reportRequest);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, errors: error.issues });
+    }
+    console.error('Failed to create report request:', error);
+    res.status(500).json({ success: false, message: 'Failed to queue report request' });
   }
-  res.status(202).json({ reportId: result.id, message: 'Report request queued' });
 });
 
-router.get('/:id.pdf', requireAuth, (req, res) => {
-  res.status(404).send('Report not generated in demo environment');
+// GET /api/reports - Get all report requests
+router.get('/', async (req, res) => {
+  try {
+    const reports = await prisma.reportRequest.findMany({
+      where: {
+        requestedBy: {
+          orgId: req.user.orgId,
+        },
+      },
+      include: {
+        property: { select: { id: true, name: true } },
+        unit: { select: { id: true, unitNumber: true } },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    res.json({ success: true, reports });
+  } catch (error) {
+    console.error('Failed to fetch report requests:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch reports' });
+  }
+});
+
+// GET /api/reports/:id/download - Download a completed report
+router.get('/:id/download', async (req, res) => {
+  try {
+    const report = await prisma.reportRequest.findFirst({
+      where: {
+        id: req.params.id,
+        requestedBy: {
+          orgId: req.user.orgId,
+        },
+      },
+    });
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    if (report.status !== 'COMPLETED') {
+      return res.status(425).json({ success: false, message: 'Report is not ready yet.' });
+    }
+
+    if (!report.fileUrl) {
+      return res.status(500).json({ success: false, message: 'Report file is missing.' });
+    }
+
+    // In a real app, you would redirect to the fileUrl or stream the file
+    res.json({ success: true, message: 'Report downloaded (placeholder)', url: report.fileUrl });
+  } catch (error) {
+    console.error('Failed to download report:', error);
+    res.status(500).json({ success: false, message: 'Failed to download report' });
+  }
 });
 
 export default router;
