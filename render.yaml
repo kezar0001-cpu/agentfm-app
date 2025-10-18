@@ -9,8 +9,9 @@ services:
   # ---------------------------------
   # PostgreSQL Database
   # ---------------------------------
-  - type: psql
+  - type: private # Corrected from 'psql' to 'private'
     name: agentfm-database
+    runtime: postgres # Specify the runtime for the private service
     plan: free # 'free' tier is suitable for development/hobby projects.
 
   # ---------------------------------
@@ -33,7 +34,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromService:
-          type: psql
+          type: private
           name: agentfm-database
           property: connectionString
       - key: JWT_SECRET
