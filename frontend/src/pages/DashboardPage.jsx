@@ -353,7 +353,7 @@ const DashboardPage = () => {
               <Button
                 variant="outlined"
                 fullWidth
-                onClick={() => navigate('/service-requests', { state: { openCreateDialog: true } })}
+                onClick={() => navigate('/service-requests')}
               >
                 View Requests
               </Button>
