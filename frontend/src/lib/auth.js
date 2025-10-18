@@ -1,4 +1,6 @@
 // frontend/src/lib/auth.js
+import { api } from '../api.js';
+
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
 export const USER_UPDATED_EVENT = 'agentfm:user-updated';
@@ -34,40 +36,40 @@ export function setCurrentUser(user) {
   return null;
 }
 
-export async function api(endpoint, options = {}) {
-  const { json, ...fetchOptions } = options;
-
-  let url = endpoint;
-  if (!endpoint?.startsWith('http')) {
-    const path = endpoint.startsWith('/api')
-      ? endpoint
-      : `/api${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-    url = API_BASE ? `${API_BASE}${path}` : path;
+export function getAuthToken() {
+  try {
+    return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  } catch (error) {
+    console.error('Failed to read auth token from storage:', error);
+    return null;
   }
+}
 
-  const headers = { ...(fetchOptions.headers || {}) };
-  if (json !== undefined) headers['Content-Type'] = 'application/json';
-
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const config = { ...fetchOptions, headers, credentials: 'include' };
-  if (json !== undefined) config.body = JSON.stringify(json);
+export function saveAuthToken(token) {
+  if (!token) {
+    removeAuthToken();
+    return null;
+  }
 
   try {
-    const response = await fetch(url, config);
-    const text = await response.text();
-    let data;
-    try { data = text ? JSON.parse(text) : undefined; } catch {}
-    if (!response.ok) {
-      const message = data?.message || data?.error || text || `HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    return data ?? text;
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('token', token);
   } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+    console.error('Failed to persist auth token:', error);
   }
+
+  return token;
+}
+
+export function removeAuthToken() {
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
+  } catch (error) {
+    console.error('Failed to clear auth token:', error);
+  }
+
+  setCurrentUser(null);
 }
 
 export function portalPathForRole(role) {
@@ -89,8 +91,7 @@ export function saveTokenFromUrl(autoRedirect = true) {
     const userParam = u.searchParams.get('user');
     if (!token) return false;
 
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('token', token);
+    saveAuthToken(token);
 
     if (userParam) {
       try {
@@ -136,32 +137,41 @@ export function getCurrentUser() {
 export async function logout() {
   try {
     // Using the api helper function for consistency, though fetch works too
-    await api('/auth/logout', { method: 'POST' });
+    await api.post('/auth/logout');
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
-  localStorage.removeItem('auth_token'); localStorage.removeItem('token'); sessionStorage.clear();
-  setCurrentUser(null);
+  sessionStorage.clear();
+  removeAuthToken();
 }
-export function getAuthToken() { return localStorage.getItem('auth_token') || localStorage.getItem('token'); }
 
 /**
  * Fetches the latest user data from the server and updates localStorage.
  * This is useful after events like subscription changes.
  */
 export async function refreshCurrentUser() {
+  const token = getAuthToken();
+  if (!token) {
+    console.warn('Cannot refresh user without an auth token.');
+    removeAuthToken();
+    return null;
+  }
+
   try {
-    const data = await api('/auth/me'); // Use the api helper
-    if (data?.user) {
-      return setCurrentUser(data.user);
+    const data = await api.get('/auth/me');
+    const user = data?.user ?? data ?? null;
+
+    if (user) {
+      return setCurrentUser(user);
     }
+
+    removeAuthToken();
     return null;
   } catch (error) {
-    console.error("Failed to refresh user data:", error);
-    // If token is invalid, the api helper might throw an error.
-    // A 401 status would indicate we should log the user out.
-    if (error.message.includes('401')) {
-      await logout();
-      window.location.href = '/signin';
+    console.error('Failed to refresh user data:', error);
+
+    if (error?.status === 401) {
+      removeAuthToken();
     }
+
     return null;
   }
 }
