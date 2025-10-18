@@ -1,8 +1,4 @@
-import jwt from 'jsonwebtoken';
-import prisma from '../config/prismaClient.js';
-import { Router } from 'express';
-import { z } from 'zod';
-import { ROLES, requireRole } from '../../middleware/roleAuth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
