@@ -31,18 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { getCurrentUser } from '../lib/auth'; // Import the function to get user data
-
-// Helper function to calculate the difference in days between two dates
-const calculateDaysRemaining = (endDateString) => {
-  if (!endDateString) return null;
-  const endDate = new Date(endDateString);
-  const now = new Date();
-  // Set to the end of the day to be inclusive
-  endDate.setHours(23, 59, 59, 999);
-  const diffTime = endDate.getTime() - now.getTime();
-  if (diffTime < 0) return 0; // Trial has expired
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
+import { calculateDaysRemaining } from '../utils/date.js';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
