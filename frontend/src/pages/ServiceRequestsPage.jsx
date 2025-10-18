@@ -74,6 +74,9 @@ const ServiceRequestsPage = () => {
     },
   });
 
+  const requestList = Array.isArray(requests) ? requests : [];
+  const propertyOptions = Array.isArray(properties) ? properties : [];
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -236,7 +239,7 @@ const ServiceRequestsPage = () => {
                   size="small"
                 >
                   <MenuItem value="">All Properties</MenuItem>
-                  {properties?.map((property) => (
+                  {propertyOptions.map((property) => (
                     <MenuItem key={property.id} value={property.id}>
                       {property.name}
                     </MenuItem>
@@ -249,7 +252,7 @@ const ServiceRequestsPage = () => {
       </Card>
 
       {/* Service Requests List */}
-      {!requests || requests.length === 0 ? (
+      {requestList.length === 0 ? (
         <DataState
           type="empty"
           message="No service requests found"
@@ -265,8 +268,19 @@ const ServiceRequestsPage = () => {
         />
       ) : (
         <Grid container spacing={3}>
-          {requests.map((request) => (
-            <Grid item xs={12} md={6} lg={4} key={request.id}>
+          {requestList.map((request) => {
+            const description = typeof request.description === 'string' ? request.description : '';
+            const displayDescription = description
+              ? description.length > 100
+                ? `${description.substring(0, 100)}...`
+                : description
+              : 'No description provided.';
+            const statusLabel = request.status ? request.status.replace(/_/g, ' ') : 'Unknown';
+            const categoryLabel = request.category ? request.category.replace(/_/g, ' ') : 'Uncategorized';
+            const priorityLabel = request.priority ? request.priority.replace(/_/g, ' ') : null;
+
+            return (
+              <Grid item xs={12} md={6} lg={4} key={request.id}>
               <Card
                 sx={{
                   height: '100%',
@@ -286,20 +300,22 @@ const ServiceRequestsPage = () => {
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                       <Chip
-                        label={request.status.replace('_', ' ')}
+                        label={statusLabel}
                         color={getStatusColor(request.status)}
                         size="small"
                       />
                       <Chip
-                        label={request.category.replace('_', ' ')}
+                        label={categoryLabel}
                         color={getCategoryColor(request.category)}
                         size="small"
                         variant="outlined"
                       />
-                      <Chip
-                        label={request.priority}
-                        size="small"
-                      />
+                      {priorityLabel && (
+                        <Chip
+                          label={priorityLabel}
+                          size="small"
+                        />
+                      )}
                     </Stack>
                   </Box>
 
@@ -308,9 +324,7 @@ const ServiceRequestsPage = () => {
                     color="text.secondary"
                     sx={{ mb: 2 }}
                   >
-                    {request.description.length > 100
-                      ? `${request.description.substring(0, 100)}...`
-                      : request.description}
+                    {displayDescription}
                   </Typography>
 
                   <Stack spacing={1}>
@@ -390,8 +404,9 @@ const ServiceRequestsPage = () => {
                   </Box>
                 )}
               </Card>
-            </Grid>
-          ))}
+              </Grid>
+            );
+          })}
         </Grid>
       )}
 
