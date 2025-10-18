@@ -5,7 +5,7 @@ import {
   IconButton, InputAdornment, Grid, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { saveTokenFromUrl } from '../lib/auth';
+import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { api } from '../api.js';
 
 export default function SignUp() {
@@ -75,7 +75,7 @@ export default function SignUp() {
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
       localStorage.setItem('auth_token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
+      setCurrentUser(res.user);
       navigate('/dashboard');
     } catch (err) {
       const msg =

@@ -30,14 +30,14 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
-import { getCurrentUser } from '../lib/auth'; // Import the function to get user data
+import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining } from '../utils/date.js';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const currentUser = getCurrentUser(); // Get user data from local storage
+  const { user: currentUser } = useCurrentUser();
 
   useEffect(() => {
     // Update the time every second
