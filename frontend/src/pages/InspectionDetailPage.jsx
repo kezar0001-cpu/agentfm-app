@@ -34,6 +34,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../utils/api';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
+import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 
 export default function InspectionDetailPage() {
   const { id } = useParams();
@@ -201,8 +202,7 @@ export default function InspectionDetailPage() {
                     {inspection.property?.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {inspection.property?.address}, {inspection.property?.city},{' '}
-                    {inspection.property?.state}
+                    {formatPropertyAddressLine(inspection.property)}
                   </Typography>
                 </Grid>
 
