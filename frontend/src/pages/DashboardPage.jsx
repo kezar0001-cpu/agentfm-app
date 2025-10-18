@@ -13,7 +13,6 @@ import {
   Chip,
   IconButton,
   Paper,
-  CircularProgress,
   Divider,
   Stack,
 } from '@mui/material';
@@ -23,20 +22,43 @@ import {
   Build as BuildIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Error as ErrorIcon,
   Info as InfoIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
+  AccessTime as AccessTimeIcon, // Import clock icon for trial
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import { getCurrentUser } from '../lib/auth'; // Import the function to get user data
+
+// Helper function to calculate the difference in days between two dates
+const calculateDaysRemaining = (endDateString) => {
+  if (!endDateString) return null;
+  const endDate = new Date(endDateString);
+  const now = new Date();
+  // Set to the end of the day to be inclusive
+  endDate.setHours(23, 59, 59, 999);
+  const diffTime = endDate.getTime() - now.getTime();
+  if (diffTime < 0) return 0; // Trial has expired
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const currentUser = getCurrentUser(); // Get user data from local storage
+
+  useEffect(() => {
+    // Update the time every second
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    // Cleanup interval on component unmount
+    return () => clearInterval(timer);
+  }, []);
+
 
   // Fetch dashboard summary
   const {
@@ -67,6 +89,56 @@ const DashboardPage = () => {
     refetch();
   };
 
+  // --- Subscription Status Logic ---
+  const subscriptionStatus = currentUser?.subscriptionStatus;
+  const trialEndDate = currentUser?.trialEndDate;
+  const trialDaysRemaining = calculateDaysRemaining(trialEndDate);
+  
+  const isTrialActive = subscriptionStatus === 'TRIAL' && trialDaysRemaining > 0;
+  const isSubscribed = subscriptionStatus === 'ACTIVE';
+  
+  // We want to show an alert if the user is NOT actively subscribed.
+  // This covers cases where the trial has expired, or the status is null/cancelled/suspended.
+  const showSubscriptionAlert = !isSubscribed;
+
+  const renderSubscriptionAlert = () => {
+    if (isTrialActive) {
+      return (
+        <Alert
+          severity="info"
+          icon={<AccessTimeIcon fontSize="inherit" />}
+          action={
+            <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
+              Subscribe Now
+            </Button>
+          }
+          sx={{ mb: 3 }}
+        >
+          <AlertTitle>Trial Period</AlertTitle>
+          You have <strong>{trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left</strong> in your free trial. Subscribe to keep access to all features.
+        </Alert>
+      );
+    }
+    
+    // This will show if the trial is over, or status is anything other than ACTIVE or a valid TRIAL.
+    return (
+      <Alert
+        severity="warning"
+        icon={<WarningIcon fontSize="inherit" />}
+        action={
+          <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
+            Subscribe
+          </Button>
+        }
+        sx={{ mb: 3 }}
+      >
+        <AlertTitle>No Active Subscription</AlertTitle>
+        Your trial has ended or your subscription is inactive. Please subscribe to restore full functionality.
+      </Alert>
+    );
+  };
+  // --- End Subscription Status Logic ---
+
   if (isLoading) {
     return (
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
@@ -86,8 +158,9 @@ const DashboardPage = () => {
       </Container>
     );
   }
-
-  const alerts = Array.isArray(summary?.alerts) ? summary.alerts : [];
+  
+  // Filter out the generic "no subscription" alert if we are handling it separately
+  const backendAlerts = Array.isArray(summary?.alerts) ? summary.alerts.filter(alert => alert.id !== 'no_subscription') : [];
   const activityItems = Array.isArray(activity) ? activity : [];
 
   return (
@@ -116,10 +189,34 @@ const DashboardPage = () => {
         </Stack>
       </Box>
 
-      {/* Alerts Section */}
-      {alerts.length > 0 && (
+      {/* --- Dynamic Subscription Status Display --- */}
+      {showSubscriptionAlert && renderSubscriptionAlert()}
+      
+      {isSubscribed && (
+         <Alert
+          severity="success"
+          icon={<CheckCircleIcon fontSize="inherit" />}
+          sx={{ mb: 3, display: 'flex', alignItems: 'center' }}
+        >
+          <Box sx={{ flexGrow: 1 }}>
+            <AlertTitle>Subscription Active</AlertTitle>
+            You have full access to all features.
+          </Box>
+          <Typography variant="body2" sx={{ mr: 2 }}>
+            {currentTime.toLocaleTimeString()}
+          </Typography>
+          <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
+            Manage
+          </Button>
+        </Alert>
+      )}
+      {/* --- End Subscription Status Display --- */}
+
+
+      {/* Backend-driven Alerts Section */}
+      {backendAlerts.length > 0 && (
         <Box sx={{ mb: 3 }}>
-          {alerts.map((alert, index) => (
+          {backendAlerts.map((alert, index) => (
             <Alert
               key={index}
               severity={alert.type}
