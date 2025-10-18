@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 
 import prisma from '../config/prismaClient.js';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
+import unitsRouter from './units.js';
 
 const router = Router();
 
@@ -47,6 +48,7 @@ const requireAuth = async (req, res, next) => {
 
 router.use(requireAuth);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
+router.use('/:id/units', unitsRouter);
 
 // ---------------------------------------------------------------------------
 // Zod helpers
