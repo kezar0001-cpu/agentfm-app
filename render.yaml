@@ -1,20 +1,17 @@
 # render.yaml
 # This file configures the deployment of the AgentFM application on Render.
-# It defines three services:
-# 1. A PostgreSQL database for the backend.
-# 2. The Express.js backend service.
-# 3. The Vite/React frontend as a static site.
+# It defines two services: the backend and the frontend.
+#
+# IMPORTANT:
+# The PostgreSQL database is NOT defined here. You must create it manually
+# in the Render dashboard. Follow these steps:
+# 1. Go to your Render Dashboard -> New -> PostgreSQL.
+# 2. After creation, copy the "Internal Connection String".
+# 3. Go to the "agentfm-backend" service's Environment settings.
+# 4. Add a new secret file or environment variable with the key DATABASE_URL
+#    and paste the connection string as the value.
 
 services:
-  # ---------------------------------
-  # PostgreSQL Database
-  # ---------------------------------
-  - type: database # Correct type for a PostgreSQL database
-    name: agentfm-database
-    databaseName: agentfm_db # Specify a name for the database
-    user: agentfm_user # Specify a username
-    plan: free # 'free' tier is suitable for development/hobby projects.
-
   # ---------------------------------
   # Backend (Express + Prisma)
   # ---------------------------------
@@ -33,15 +30,13 @@ services:
       path: /health
       initialDelaySeconds: 45
     envVars:
+      # The DATABASE_URL must be set manually in the Render dashboard.
       - key: DATABASE_URL
-        fromService:
-          type: database # Match the database service type
-          name: agentfm-database
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
-        generateValue: true # Let Render generate a secure secret.
+        generateValue: true
       - key: SESSION_SECRET
-        generateValue: true # Let Render generate a secure secret.
+        generateValue: true
       - key: FRONTEND_URL
         fromService:
           type: static_site
