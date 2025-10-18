@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -31,7 +31,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
@@ -42,6 +42,7 @@ import { normaliseArray } from '../utils/error';
 export default function PropertiesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -50,6 +51,17 @@ export default function PropertiesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    if (!location.state?.openCreateDialog) {
+      return;
+    }
+
+    setEditMode(false);
+    setSelectedProperty(null);
+    setDialogOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state?.openCreateDialog, location.pathname, navigate]);
 
   // Fetch properties
   const query = useApiQuery({
