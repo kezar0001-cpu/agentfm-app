@@ -1,36 +1,19 @@
-# render.yaml
-# This file configures the deployment of the AgentFM application on Render.
-# It defines two services: the backend and the frontend.
-#
-# IMPORTANT:
-# The PostgreSQL database is NOT defined here. You must create it manually
-# in the Render dashboard. Follow these steps:
-# 1. Go to your Render Dashboard -> New -> PostgreSQL.
-# 2. After creation, copy the "Internal Connection String".
-# 3. Go to the "agentfm-backend" service's Environment settings.
-# 4. Add a new secret file or environment variable with the key DATABASE_URL
-#    and paste the connection string as the value.
+# render.yaml — AgentFM (backend + frontend)
 
 services:
-  # ---------------------------------
+  # -----------------------------
   # Backend (Express + Prisma)
-  # ---------------------------------
+  # -----------------------------
   - type: web
     name: agentfm-backend
-    env: node
+    runtime: node                  # was `env: node`; `runtime` is preferred
     rootDir: backend
-    plan: free # Choose a plan that suits your needs.
-    buildCommand: |
-      npm install
-      npx prisma generate
-      npx prisma migrate deploy
+    plan: free
+    buildCommand: npm ci && npx prisma generate
+    preDeployCommand: npx prisma migrate deploy   # run migrations pre-deploy
     startCommand: node src/index.js
-    autoDeploy: true
-    healthCheck:
-      path: /health
-      initialDelaySeconds: 45
+    healthCheckPath: /health                     # use healthCheckPath (spec)
     envVars:
-      # The DATABASE_URL must be set manually in the Render dashboard.
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -39,24 +22,22 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         fromService:
-          type: static_site
+          type: web
           name: agentfm-frontend
           property: url
       - key: NODE_ENV
         value: production
 
-  # ---------------------------------
+  # -----------------------------
   # Frontend (Vite static site)
-  # ---------------------------------
-  - type: static_site
+  # -----------------------------
+  - type: web
     name: agentfm-frontend
+    runtime: static               # <-- this is what makes it a static site
     rootDir: frontend
-    buildCommand: |
-      npm install
-      npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    autoDeploy: true
-    routes:
+    routes:                       # Static-site rewrites/proxies are supported
       - type: rewrite
         source: /api/*
         destination: https://agentfm-backend.onrender.com/api/*
@@ -69,4 +50,3 @@ services:
           type: web
           name: agentfm-backend
           property: url
-
