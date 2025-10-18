@@ -11,6 +11,69 @@ const router = express.Router();
 const stripe = createStripeClient();
 const stripeAvailable = isStripeClientConfigured(stripe);
 
+const PLAN_PRICE_MAP = {
+  STARTER: process.env.STRIPE_PRICE_ID_STARTER,
+  PROFESSIONAL: process.env.STRIPE_PRICE_ID_PROFESSIONAL,
+  ENTERPRISE: process.env.STRIPE_PRICE_ID_ENTERPRISE,
+};
+
+const PRICE_PLAN_MAP = Object.entries(PLAN_PRICE_MAP).reduce((acc, [plan, priceId]) => {
+  if (priceId) acc[priceId] = plan;
+  return acc;
+}, {});
+
+function normalisePlan(plan) {
+  if (!plan) return undefined;
+  const upper = String(plan).trim().toUpperCase();
+  if (upper === 'FREE_TRIAL') return upper;
+  return PLAN_PRICE_MAP[upper] ? upper : undefined;
+}
+
+function resolvePlanFromPriceId(priceId, fallback) {
+  if (!priceId) return normalisePlan(fallback);
+  return PRICE_PLAN_MAP[priceId] || normalisePlan(fallback);
+}
+
+function mapStripeStatusToAppStatus(status, fallback = 'PENDING') {
+  const normalised = typeof status === 'string' ? status.toLowerCase() : '';
+  switch (normalised) {
+    case 'active':
+      return 'ACTIVE';
+    case 'trialing':
+      return 'TRIAL';
+    case 'past_due':
+    case 'unpaid':
+    case 'paused':
+      return 'SUSPENDED';
+    case 'canceled':
+    case 'cancelled':
+    case 'incomplete_expired':
+      return 'CANCELLED';
+    case 'incomplete':
+      return 'PENDING';
+    default:
+      return fallback;
+  }
+}
+
+async function applySubscriptionUpdate({ userId, orgId, data }) {
+  if (!data) return;
+
+  const cleanedEntries = Object.entries(data).filter(([, value]) => value !== undefined);
+  if (cleanedEntries.length === 0) return;
+
+  const cleaned = Object.fromEntries(cleanedEntries);
+
+  if (userId) {
+    await prisma.user.update({ where: { id: userId }, data: cleaned });
+    return;
+  }
+
+  if (orgId) {
+    await prisma.user.updateMany({ where: { orgId }, data: cleaned });
+  }
+}
+
 // POST /api/billing/checkout
 router.post('/checkout', async (req, res) => {
   try {
@@ -28,18 +91,14 @@ router.post('/checkout', async (req, res) => {
     }
 
     const { plan = 'STARTER', successUrl, cancelUrl } = req.body || {};
+    const normalisedPlan = normalisePlan(plan) || 'STARTER';
 
     // Map plan -> Price ID (env)
     if (!stripeAvailable) {
       return res.status(503).json({ error: 'Stripe is not configured' });
     }
 
-    const planMap = {
-      STARTER: process.env.STRIPE_PRICE_ID_STARTER,
-      PROFESSIONAL: process.env.STRIPE_PRICE_ID_PROFESSIONAL,
-      ENTERPRISE: process.env.STRIPE_PRICE_ID_ENTERPRISE,
-    };
-    const priceId = planMap[plan];
+    const priceId = PLAN_PRICE_MAP[normalisedPlan];
     if (!priceId) return res.status(400).json({ error: `Unknown plan or missing price id: ${plan}` });
 
     // Always add session_id placeholder so we can confirm if webhook misses
@@ -51,6 +110,12 @@ router.post('/checkout', async (req, res) => {
       || process.env.STRIPE_CANCEL_URL
       || `${process.env.FRONTEND_URL}/subscriptions?canceled=1`;
 
+    const metadata = {
+      orgId: user.orgId || '',
+      userId: user.id || '',
+      plan: normalisedPlan,
+    };
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
@@ -58,7 +123,10 @@ router.post('/checkout', async (req, res) => {
       cancel_url: cancel,
       customer_email: user.email,
       client_reference_id: user.orgId || user.id,
-      metadata: { orgId: user.orgId || '', userId: user.id || '', plan },
+      metadata,
+      subscription_data: {
+        metadata,
+      },
       allow_promotion_codes: true,
     });
 
@@ -86,7 +154,9 @@ router.post('/confirm', async (req, res) => {
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
 
     // Verify with Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription.items.data.price'],
+    });
 
     if (session.mode !== 'subscription') {
       return res.status(400).json({ error: 'Not a subscription session' });
@@ -98,19 +168,24 @@ router.post('/confirm', async (req, res) => {
     // Update your DB just like the webhook
     const userId = session.metadata?.userId;
     const orgId = session.metadata?.orgId || session.client_reference_id;
-    const plan = session.metadata?.plan || 'STARTER';
+    const subscription =
+      session.subscription && typeof session.subscription === 'object'
+        ? session.subscription
+        : null;
 
-    if (userId) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { subscriptionStatus: 'ACTIVE', subscriptionPlan: plan },
-      });
-    } else if (orgId) {
-      await prisma.user.updateMany({
-        where: { orgId },
-        data: { subscriptionStatus: 'ACTIVE', subscriptionPlan: plan },
-      });
-    }
+    const priceId = subscription?.items?.data?.[0]?.price?.id;
+    const plan = resolvePlanFromPriceId(priceId, session.metadata?.plan || 'STARTER');
+    const status = mapStripeStatusToAppStatus(subscription?.status, 'ACTIVE');
+
+    const data = { subscriptionStatus: status };
+    if (plan) data.subscriptionPlan = plan;
+    if (status === 'ACTIVE') data.trialEndDate = null;
+
+    await applySubscriptionUpdate({
+      userId,
+      orgId,
+      data,
+    });
 
     return res.json({ ok: true });
   } catch (err) {
@@ -156,52 +231,67 @@ export async function webhook(req, res) {
         const session = event.data.object;
         const userId = session.metadata?.userId;
         const orgId  = session.metadata?.orgId || session.client_reference_id;
-        const plan   = session.metadata?.plan || 'STARTER';
+        const subscriptionId = session.subscription;
+        let subscription;
 
-        if (userId) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: { subscriptionStatus: 'ACTIVE', subscriptionPlan: plan },
-          });
-        } else if (orgId) {
-          await prisma.user.updateMany({
-            where: { orgId },
-            data: { subscriptionStatus: 'ACTIVE', subscriptionPlan: plan },
-          });
+        if (session.mode === 'subscription' && subscriptionId) {
+          try {
+            subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+              expand: ['items.data.price'],
+            });
+          } catch (error) {
+            console.warn('Failed to retrieve subscription for checkout.session.completed', error);
+          }
         }
+
+        const priceId = subscription?.items?.data?.[0]?.price?.id;
+        const plan = resolvePlanFromPriceId(priceId, session.metadata?.plan || 'STARTER');
+        const status = mapStripeStatusToAppStatus(subscription?.status, 'ACTIVE');
+
+        const update = {
+          subscriptionStatus: status,
+        };
+
+        if (plan) {
+          update.subscriptionPlan = plan;
+        }
+
+        if (status === 'ACTIVE') {
+          update.trialEndDate = null;
+        }
+
+        await applySubscriptionUpdate({ userId, orgId, data: update });
         break;
       }
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
+        const userId = subscription.metadata?.userId;
         const orgId = subscription.metadata?.orgId;
-        // Map Stripe status to your app's status
-        const statusMap = {
-          'active': 'ACTIVE',
-          'trialing': 'TRIAL',
-          'past_due': 'INACTIVE',
-          'canceled': 'CANCELED',
-          'unpaid': 'INACTIVE',
-        };
-        const newStatus = statusMap[subscription.status] || 'INACTIVE';
+        const priceId = subscription.items?.data?.[0]?.price?.id;
+        const plan = resolvePlanFromPriceId(priceId, subscription.metadata?.plan);
+        const newStatus = mapStripeStatusToAppStatus(subscription.status);
 
-        if (orgId) {
-          await prisma.user.updateMany({
-            where: { orgId },
-            data: { subscriptionStatus: newStatus },
-          });
-        }
+        const data = { subscriptionStatus: newStatus };
+        if (plan) data.subscriptionPlan = plan;
+        if (newStatus === 'ACTIVE') data.trialEndDate = null;
+
+        await applySubscriptionUpdate({ userId, orgId, data });
         break;
       }
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
+        const userId = subscription.metadata?.userId;
         const orgId = subscription.metadata?.orgId;
 
-        if (orgId) {
-          await prisma.user.updateMany({
-            where: { orgId },
-            data: { subscriptionStatus: 'CANCELED' },
-          });
-        }
+        await applySubscriptionUpdate({
+          userId,
+          orgId,
+          data: {
+            subscriptionStatus: 'CANCELLED',
+            subscriptionPlan: 'FREE_TRIAL',
+            trialEndDate: null,
+          },
+        });
         break;
       }
       default:
