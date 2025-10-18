@@ -481,31 +481,69 @@ const ActivityItem = ({ item }) => {
   const navigate = useNavigate();
 
   const getStatusColor = (status) => {
+    const normalizedStatus = status ? status.toUpperCase() : '';
     const statusColors = {
       COMPLETED: 'success',
       IN_PROGRESS: 'info',
       SCHEDULED: 'default',
       OPEN: 'warning',
       ASSIGNED: 'info',
+      ACTIVE: 'success',
+      INACTIVE: 'default',
+      UNDER_MAINTENANCE: 'warning',
+      AVAILABLE: 'success',
+      OCCUPIED: 'info',
+      MAINTENANCE: 'warning',
+      SUBMITTED: 'warning',
+      UNDER_REVIEW: 'info',
+      APPROVED: 'success',
+      CONVERTED_TO_JOB: 'primary',
+      REJECTED: 'error',
+      CANCELLED: 'default',
+      SYSTEM: 'info',
+      NOTIFICATION: 'info',
+      INSPECTION_SCHEDULED: 'info',
+      INSPECTION_REMINDER: 'info',
+      JOB_ASSIGNED: 'info',
+      JOB_COMPLETED: 'success',
+      SERVICE_REQUEST_UPDATE: 'info',
+      SUBSCRIPTION_EXPIRING: 'warning',
+      PAYMENT_DUE: 'warning',
     };
-    return statusColors[status] || 'default';
+    return statusColors[normalizedStatus] || 'default';
   };
 
   const getIcon = (type) => {
     const icons = {
       inspection: <AssignmentIcon fontSize="small" />,
       job: <BuildIcon fontSize="small" />,
+      property: <HomeIcon fontSize="small" />,
+      unit: <HomeIcon fontSize="small" />,
+      service_request: <BuildIcon fontSize="small" />,
+      notification: <InfoIcon fontSize="small" />,
     };
     return icons[type] || <InfoIcon fontSize="small" />;
   };
 
-  const getRoute = (type, id) => {
+  const getRoute = (type, id, currentItem) => {
     const routes = {
-      inspection: `/inspections/${id}`,
-      job: `/jobs/${id}`,
+      inspection: '/inspections',
+      job: '/jobs',
+      service_request: '/service-requests',
     };
+    if (type === 'unit' || type === 'property' || type === 'notification') {
+      return currentItem?.link;
+    }
     return routes[type];
   };
+
+  const route = item.link || getRoute(item.type, item.id, item);
+  const isClickable = Boolean(route);
+  const statusLabel = item.status ? item.status.replace(/_/g, ' ') : null;
+  const priorityLabel = item.priority ? item.priority.replace(/_/g, ' ') : null;
+  const formattedDate = item.date
+    ? new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+    : 'Date unavailable';
 
   return (
     <Box
@@ -515,13 +553,15 @@ const ActivityItem = ({ item }) => {
         gap: 2,
         p: 2,
         borderRadius: 1,
-        cursor: 'pointer',
+        cursor: isClickable ? 'pointer' : 'default',
         transition: 'background-color 0.2s',
-        '&:hover': {
-          bgcolor: 'action.hover',
-        },
+        '&:hover': isClickable
+          ? {
+              bgcolor: 'action.hover',
+            }
+          : undefined,
       }}
-      onClick={() => navigate(getRoute(item.type, item.id))}
+      onClick={isClickable ? () => navigate(route) : undefined}
     >
       <Box
         sx={{
@@ -539,19 +579,21 @@ const ActivityItem = ({ item }) => {
       <Box sx={{ flex: 1 }}>
         <Typography variant="subtitle2">{item.title}</Typography>
         <Typography variant="body2" color="text.secondary" gutterBottom>
-          {item.description}
+          {item.description || 'No additional details provided.'}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-          <Chip
-            label={item.status}
-            size="small"
-            color={getStatusColor(item.status)}
-          />
-          {item.priority && (
-            <Chip label={item.priority} size="small" variant="outlined" />
+          {statusLabel && (
+            <Chip
+              label={statusLabel}
+              size="small"
+              color={getStatusColor(item.status)}
+            />
+          )}
+          {priorityLabel && (
+            <Chip label={priorityLabel} size="small" variant="outlined" />
           )}
           <Typography variant="caption" color="text.secondary">
-            {new Date(item.date).toLocaleDateString()}
+            {formattedDate}
           </Typography>
         </Box>
       </Box>
