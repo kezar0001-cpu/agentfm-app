@@ -224,6 +224,10 @@ model User {
   createdRecommendations  Recommendation[] @relation("CreatedBy")
   approvedRecommendations Recommendation[] @relation("ApprovedBy")
 
+  uploadedAttachments InspectionAttachment[]
+  createdReminders    InspectionReminder[]
+  auditLogs           InspectionAuditLog[]
+
   @@index([email])
   @@index([role])
 }
