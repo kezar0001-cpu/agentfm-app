@@ -38,6 +38,7 @@ import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
 import { normaliseArray } from '../utils/error';
+import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 
 export default function PropertiesPage() {
   const { t } = useTranslation();
@@ -289,7 +290,7 @@ export default function PropertiesPage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <LocationIcon fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          {property.address}, {property.city}, {property.state}
+                          {formatPropertyAddressLine(property)}
                         </Typography>
                       </Box>
 

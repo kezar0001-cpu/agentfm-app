@@ -40,33 +40,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionAttachmentManager from '../components/InspectionAttachmentManager';
 import InspectionForm from '../components/InspectionForm';
-import { useCurrentUser } from '../context/UserContext.jsx';
-
-const PRIORITY_OPTIONS = [
-  { value: 'LOW', label: 'Low' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'HIGH', label: 'High' },
-];
-
-const STATUS_COLOR = {
-  SCHEDULED: 'info',
-  IN_PROGRESS: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'error',
-};
-
-const TYPE_COLOR = {
-  ROUTINE: 'primary',
-  MOVE_IN: 'info',
-  MOVE_OUT: 'warning',
-  EMERGENCY: 'error',
-  COMPLIANCE: 'secondary',
-};
-
-function formatDateTime(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString();
-}
+import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 
 export default function InspectionDetailPage() {
   const { id } = useParams();
@@ -278,7 +252,12 @@ export default function InspectionDetailPage() {
                   <Typography variant="caption" color="text.secondary">
                     Property
                   </Typography>
-                  <Typography variant="body1">{inspection.property?.name || 'Not specified'}</Typography>
+                  <Typography variant="body1">
+                    {inspection.property?.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatPropertyAddressLine(inspection.property)}
+                  </Typography>
                 </Grid>
                 {inspection.unit && (
                   <Grid item xs={12} sm={6}>

@@ -24,7 +24,7 @@ test('property schema requires core fields and normalises aliases', () => {
     city: 'San Francisco',
     state: 'CA',
     postcode: '94105',
-    country: 'USA',
+    country: 'United States',
     type: 'Residential',
     status: 'active',
     coverImage: 'https://example.com/cover.png',
@@ -37,6 +37,33 @@ test('property schema requires core fields and normalises aliases', () => {
   assert.equal(data.propertyType, 'Residential');
   assert.equal(data.status, 'ACTIVE');
   assert.equal(data.imageUrl, 'https://example.com/cover.png');
+});
+
+test('property schema allows missing state and postcode for international addresses', () => {
+  const result = propertySchema.safeParse({
+    name: 'One Canada Square',
+    address: '1 Canada Square',
+    city: 'London',
+    country: 'United Kingdom',
+    propertyType: 'Office',
+    status: 'ACTIVE',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.state, undefined);
+  assert.equal(result.data.zipCode, undefined);
+});
+
+test('property schema rejects missing country', () => {
+  const result = propertySchema.safeParse({
+    name: 'Marina Bay Sands',
+    address: '10 Bayfront Avenue',
+    city: 'Singapore',
+    propertyType: 'Hospitality',
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error?.issues[0]?.path[0], 'country');
 });
 
 test('property update schema allows partial payloads', () => {
