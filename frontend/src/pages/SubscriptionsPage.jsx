@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Typography, Paper, Table, TableHead, TableRow, TableCell, TableBody,
@@ -10,8 +10,8 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
-import { getCurrentUser, refreshCurrentUser } from '../lib/auth.js';
 import { calculateDaysRemaining } from '../utils/date.js';
+import { useCurrentUser } from '../context/UserContext.jsx';
 
 const STATUSES = {
   ACTIVE: 'Active',
@@ -26,8 +26,7 @@ const normaliseStatus = (status) =>
 export default function SubscriptionsPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  // CORRECT: Declare state for the current user only ONCE.
-  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const { user: currentUser, refreshUser } = useCurrentUser();
 
   const query = useApiQuery({
     queryKey: ['subscriptions'],
@@ -50,17 +49,21 @@ export default function SubscriptionsPage() {
   // Effect to refresh user data on successful subscription
   useEffect(() => {
     if (!showSuccess) return;
-    refreshCurrentUser()
-      .then((user) => {
-        if (user) {
-          setCurrentUser(user);
+    let isMounted = true;
+    (async () => {
+      try {
+        await refreshUser();
+      } finally {
+        if (isMounted) {
+          navigate(location.pathname, { replace: true });
         }
-      })
-      .finally(() => {
-        // Remove success param from URL to prevent message on reload
-        navigate(location.pathname, { replace: true });
-      });
-  }, [showSuccess, navigate, location.pathname]);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showSuccess, refreshUser, navigate, location.pathname]);
 
   // CORRECT: Define variables based on the currentUser state
   const subscriptionPlan = currentUser?.subscriptionPlan;
@@ -82,6 +85,7 @@ export default function SubscriptionsPage() {
       method: 'patch',
       data: { status: normalisedStatus },
     });
+    await refreshUser();
   };
 
   const startCheckout = async (plan = 'STARTER') => {
