@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -16,6 +17,8 @@ import {
   Dialog,
   Tooltip,
   Badge,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -25,12 +28,25 @@ import {
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
   AccessTime as AccessTimeIcon,
+  ViewModule as ViewModuleIcon,
+  ViewKanban as ViewKanbanIcon,
+  CalendarToday as CalendarTodayIcon,
+  Search as SearchIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import JobForm from '../components/JobForm';
 import ensureArray from '../utils/ensureArray';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import JobDetailModal from '../components/JobDetailModal';
+
+const localizer = momentLocalizer(moment);
+
 
 const JobsPage = () => {
   const navigate = useNavigate();
@@ -43,6 +59,9 @@ const JobsPage = () => {
   });
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [view, setView] = useState('card'); // 'card', 'kanban', 'calendar'
+  const [searchTerm, setSearchTerm] = useState('');
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Build query params
   const queryParams = new URLSearchParams();
@@ -77,6 +96,27 @@ const JobsPage = () => {
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
+
+  const handleViewChange = (event, nextView) => {
+    if (nextView !== null) {
+      setView(nextView);
+    }
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  const handleOpenDetailModal = (job) => {
+    setSelectedJob(job);
+    setDetailModalOpen(true);
+  };
+
+  const filteredJobs = jobs.filter(
+    (job) =>
+      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (job.description && job.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const handleCreate = () => {
     setSelectedJob(null);
@@ -137,6 +177,12 @@ const JobsPage = () => {
     return icons[priority];
   };
 
+  const onDragEnd = (result) => {
+    // For now, we'll just log the result.
+    // In a real app, you'd update the job status here.
+    console.log(result);
+  };
+
   const isOverdue = (job) => {
     if (job.status === 'COMPLETED' || job.status === 'CANCELLED') return false;
     if (!job.scheduledDate) return false;
@@ -182,6 +228,39 @@ const JobsPage = () => {
         >
           Create Job
         </Button>
+      </Box>
+
+      {/* Search and View Toggle */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TextField
+          variant="outlined"
+          placeholder="Search jobs..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+            ),
+          }}
+          sx={{ width: '40%' }}
+        />
+        <ToggleButtonGroup
+          value={view}
+          exclusive
+          onChange={handleViewChange}
+          aria-label="view toggle"
+        >
+          <ToggleButton value="card" aria-label="card view">
+            <ViewModuleIcon />
+          </ToggleButton>
+          <ToggleButton value="kanban" aria-label="kanban view">
+            <ViewKanbanIcon />
+          </ToggleButton>
+          <ToggleButton value="calendar" aria-label="calendar view">
+            <CalendarTodayIcon />
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {/* Filters */}
@@ -264,8 +343,8 @@ const JobsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Jobs List */}
-      {!jobs || jobs.length === 0 ? (
+      {/* Jobs List / Views */}
+      {!filteredJobs || filteredJobs.length === 0 ? (
         <DataState
           type="empty"
           message="No jobs found"
@@ -280,149 +359,179 @@ const JobsPage = () => {
           }
         />
       ) : (
-        <Grid container spacing={3}>
-          {jobs.map((job) => (
-            <Grid item xs={12} md={6} lg={4} key={job.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  borderLeft: isOverdue(job) ? '4px solid' : 'none',
-                  borderLeftColor: 'error.main',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" gutterBottom>
-                        {job.title}
-                      </Typography>
-                      <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-                        <Chip
-                          label={job.status.replace('_', ' ')}
-                          color={getStatusColor(job.status)}
-                          size="small"
-                        />
-                        <Chip
-                          icon={getPriorityIcon(job.priority)}
-                          label={job.priority}
-                          color={getPriorityColor(job.priority)}
-                          size="small"
-                        />
-                      </Stack>
-                      {isOverdue(job) && (
-                        <Chip
-                          icon={<ErrorIcon fontSize="small" />}
-                          label="OVERDUE"
-                          color="error"
-                          size="small"
-                          sx={{ mb: 1 }}
-                        />
-                      )}
-                    </Box>
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleEdit(job)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </Box>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 2 }}
-                    noWrap
+        <>
+          {view === 'card' && (
+            <Grid container spacing={3}>
+              {filteredJobs.map((job) => (
+                <Grid item xs={12} md={6} lg={4} key={job.id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      borderLeft: isOverdue(job) ? '4px solid' : 'none',
+                      borderLeftColor: 'error.main',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                      },
+                    }}
                   >
-                    {job.description}
-                  </Typography>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6" gutterBottom>
+                            {job.title}
+                          </Typography>
+                          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                            <Chip
+                              label={job.status.replace('_', ' ')}
+                              color={getStatusColor(job.status)}
+                              size="small"
+                            />
+                            <Chip
+                              icon={getPriorityIcon(job.priority)}
+                              label={job.priority}
+                              color={getPriorityColor(job.priority)}
+                              size="small"
+                            />
+                          </Stack>
+                          {isOverdue(job) && (
+                            <Chip
+                              icon={<ErrorIcon fontSize="small" />}
+                              label="OVERDUE"
+                              color="error"
+                              size="small"
+                              sx={{ mb: 1 }}
+                            />
+                          )}
+                        </Box>
+                        <Box>
+                          <IconButton
+                            size="small"
+                            color="default"
+                            onClick={() => handleOpenDetailModal(job)}
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleEdit(job)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Box>
+                      </Box>
 
-                  <Stack spacing={1}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Property
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                        noWrap
+                      >
+                        {job.description}
                       </Typography>
-                      <Typography variant="body2">
-                        {job.property?.name || 'N/A'}
-                      </Typography>
-                    </Box>
 
-                    {job.unit && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Unit
-                        </Typography>
-                        <Typography variant="body2">
-                          Unit {job.unit.unitNumber}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {job.assignedTo ? (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Assigned To
-                        </Typography>
-                        <Typography variant="body2">
-                          {job.assignedTo.firstName} {job.assignedTo.lastName}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Box>
-                        <Chip
-                          label="Unassigned"
-                          size="small"
-                          variant="outlined"
-                          color="warning"
-                        />
-                      </Box>
-                    )}
-
-                    {job.scheduledDate && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Scheduled Date
-                        </Typography>
-                        <Typography variant="body2">
-                          {new Date(job.scheduledDate).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {job.estimatedCost && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Estimated Cost
-                        </Typography>
-                        <Typography variant="body2">
-                          ${job.estimatedCost.toFixed(2)}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {job.serviceRequest && (
-                      <Box>
-                        <Chip
-                          label="From Service Request"
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
-                      </Box>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
+                      <Stack spacing={1}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Property
+                          </Typography>
+                          <Typography variant="body2">
+                            {job.property?.name || 'N/A'}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          )}
+
+          {view === 'kanban' && (
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Grid container spacing={2}>
+                {['OPEN', 'IN_PROGRESS', 'COMPLETED'].map((status) => (
+                  <Grid item xs={12} md={4} key={status}>
+                    <Paper sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
+                      <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
+                        {status.replace('_', ' ')}
+                      </Typography>
+                      <Droppable droppableId={status}>
+                        {(provided) => (
+                          <Box
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            sx={{ minHeight: '500px' }}
+                          >
+                            {filteredJobs
+                              .filter((job) => job.status === status)
+                              .map((job, index) => (
+                                <Draggable
+                                  key={job.id}
+                                  draggableId={job.id.toString()}
+                                  index={index}
+                                >
+                                  {(provided) => (
+                                    <Card
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      sx={{ mb: 2 }}
+                                    >
+                                      <CardContent>
+                                        <Typography variant="h6">{job.title}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          {job.property?.name}
+                                        </Typography>
+                                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                                          <Chip
+                                            label={job.priority}
+                                            color={getPriorityColor(job.priority)}
+                                            size="small"
+                                          />
+                                        </Stack>
+                                      </CardContent>
+                                    </Card>
+                                  )}
+                                </Draggable>
+                              ))}
+                            {provided.placeholder}
+                          </Box>
+                        )}
+                      </Droppable>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </DragDropContext>
+          )}
+
+          {view === 'calendar' && (
+            <Paper sx={{ p: 2 }}>
+              <Calendar
+                localizer={localizer}
+                events={filteredJobs
+                  .filter((job) => job.scheduledDate)
+                  .map((job) => ({
+                    id: job.id,
+                    title: job.title,
+                    start: new Date(job.scheduledDate),
+                    end: new Date(job.scheduledDate),
+                    allDay: true,
+                    resource: job,
+                  }))}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: 600 }}
+                onSelectEvent={(event) => handleOpenDetailModal(event.resource)}
+              />
+            </Paper>
+          )}
+        </>
       )}
 
       {/* Create/Edit Dialog */}
@@ -438,6 +547,12 @@ const JobsPage = () => {
           onCancel={handleCloseDialog}
         />
       </Dialog>
+
+      {/* Job Detail Modal */}
+      <JobDetailModal
+        job={selectedJob}
+        onClose={() => setDetailModalOpen(false)}
+      />
     </Container>
   );
 };
