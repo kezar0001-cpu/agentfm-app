@@ -302,82 +302,227 @@ export const getRecentActivity = async (req, res) => {
     const role = req.user.role;
     const { limit = 10 } = req.query;
 
-    let activities = [];
+    const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+    const activities = [];
 
-    // Build filters
-    let propertyFilter = {};
-    if (role === 'PROPERTY_MANAGER') {
-      propertyFilter = { managerId: userId };
-    } else if (role === 'OWNER') {
-      propertyFilter = {
-        owners: { some: { ownerId: userId } },
-      };
-    }
+    const propertyScope = role === 'PROPERTY_MANAGER'
+      ? { managerId: userId }
+      : role === 'OWNER'
+      ? { owners: { some: { ownerId: userId } } }
+      : undefined;
 
-    // Recent inspections
-    const inspections = await prisma.inspection.findMany({
-      where: role === 'TECHNICIAN' 
-        ? { assignedToId: userId }
-        : propertyFilter.managerId || propertyFilter.owners
-        ? { property: propertyFilter }
-        : {},
-      orderBy: { updatedAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        scheduledDate: true,
-        updatedAt: true,
-        property: { select: { name: true } },
-      },
-    });
+    const inspectionWhere = role === 'TECHNICIAN'
+      ? { assignedToId: userId }
+      : propertyScope
+      ? { property: propertyScope }
+      : {};
 
-    inspections.forEach((i) => {
+    const jobWhere = role === 'TECHNICIAN'
+      ? { assignedToId: userId }
+      : propertyScope
+      ? { property: propertyScope }
+      : role === 'TENANT'
+      ? { serviceRequest: { requestedById: userId } }
+      : {};
+
+    const unitWhere = role === 'TECHNICIAN'
+      ? { jobs: { some: { assignedToId: userId } } }
+      : propertyScope
+      ? { property: propertyScope }
+      : role === 'TENANT'
+      ? { tenants: { some: { tenantId: userId, isActive: true } } }
+      : {};
+
+    const serviceRequestWhere = role === 'PROPERTY_MANAGER'
+      ? { property: { managerId: userId } }
+      : role === 'OWNER'
+      ? { property: { owners: { some: { ownerId: userId } } } }
+      : role === 'TENANT'
+      ? { requestedById: userId }
+      : role === 'TECHNICIAN'
+      ? { jobs: { some: { assignedToId: userId } } }
+      : {};
+
+    const [inspections, jobs, serviceRequests, properties, units, notifications] = await Promise.all([
+      prisma.inspection.findMany({
+        where: inspectionWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          scheduledDate: true,
+          updatedAt: true,
+          property: { select: { name: true, id: true } },
+        },
+      }),
+      prisma.job.findMany({
+        where: jobWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          property: { select: { name: true, id: true } },
+        },
+      }),
+      prisma.serviceRequest.findMany({
+        where: serviceRequestWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          property: { select: { name: true, id: true } },
+          requestedBy: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      prisma.property.findMany({
+        where: propertyScope,
+        orderBy: { updatedAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.unit.findMany({
+        where: unitWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          unitNumber: true,
+          status: true,
+          updatedAt: true,
+          property: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: limitNumber,
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          type: true,
+          entityType: true,
+          entityId: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    inspections.forEach((inspection) => {
       activities.push({
         type: 'inspection',
-        id: i.id,
-        title: i.title,
-        description: `Inspection at ${i.property?.name || 'property'}`,
-        status: i.status,
-        date: i.updatedAt,
+        id: inspection.id,
+        title: inspection.title,
+        description: inspection.property?.name
+          ? `Inspection at ${inspection.property.name}`
+          : 'Inspection update',
+        status: inspection.status,
+        date: inspection.updatedAt,
+        link: '/inspections',
       });
     });
 
-    // Recent jobs
-    const jobs = await prisma.job.findMany({
-      where: role === 'TECHNICIAN'
-        ? { assignedToId: userId }
-        : {},
-      orderBy: { updatedAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        updatedAt: true,
-        property: { select: { name: true } },
-      },
-    });
-
-    jobs.forEach((j) => {
+    jobs.forEach((job) => {
       activities.push({
         type: 'job',
-        id: j.id,
-        title: j.title,
-        description: `Job at ${j.property?.name || 'property'}`,
-        status: j.status,
-        priority: j.priority,
-        date: j.updatedAt,
+        id: job.id,
+        title: job.title,
+        description: job.property?.name
+          ? `Job at ${job.property.name}`
+          : 'Job update',
+        status: job.status,
+        priority: job.priority,
+        date: job.updatedAt,
+        link: '/jobs',
       });
     });
 
-    // Sort by date and limit
-    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
-    activities = activities.slice(0, parseInt(limit));
+    serviceRequests.forEach((request) => {
+      const requesterName = request.requestedBy
+        ? `${request.requestedBy.firstName} ${request.requestedBy.lastName}`.trim()
+        : null;
+      const statusLabel = request.status
+        ? request.status.replace(/_/g, ' ').toLowerCase()
+        : 'updated';
 
-    res.json(activities);
+      activities.push({
+        type: 'service_request',
+        id: request.id,
+        title: request.title,
+        description: `${request.property?.name ? `${request.property.name} · ` : ''}${statusLabel}${requesterName ? ` by ${requesterName}` : ''}`,
+        status: request.status,
+        priority: request.priority,
+        date: request.updatedAt,
+        link: '/service-requests',
+      });
+    });
+
+    properties.forEach((property) => {
+      const statusLabel = property.status
+        ? property.status.replace(/_/g, ' ').toLowerCase()
+        : 'updated';
+
+      activities.push({
+        type: 'property',
+        id: property.id,
+        title: property.name,
+        description: `Property status updated to ${statusLabel}`,
+        status: property.status,
+        date: property.updatedAt,
+        link: `/properties/${property.id}`,
+      });
+    });
+
+    units.forEach((unit) => {
+      activities.push({
+        type: 'unit',
+        id: unit.id,
+        title: `Unit ${unit.unitNumber}`,
+        description: unit.property?.name
+          ? `Unit at ${unit.property.name} updated`
+          : 'Unit update',
+        status: unit.status,
+        date: unit.updatedAt,
+        link: unit.property ? `/properties/${unit.property.id}` : undefined,
+      });
+    });
+
+    notifications.forEach((notification) => {
+      activities.push({
+        type: notification.entityType || 'notification',
+        id: notification.entityId || notification.id,
+        title: notification.title,
+        description: notification.message,
+        status: notification.type,
+        date: notification.createdAt,
+        link: notification.entityType === 'inspection'
+          ? '/inspections'
+          : notification.entityType === 'job'
+          ? '/jobs'
+          : notification.entityType === 'service_request'
+          ? '/service-requests'
+          : undefined,
+      });
+    });
+
+    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(activities.slice(0, limitNumber));
   } catch (error) {
     console.error('Error fetching recent activity:', error);
     res.status(500).json({ error: 'Failed to fetch recent activity' });
