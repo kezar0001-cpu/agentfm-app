@@ -34,6 +34,17 @@ function resolvePlanFromPriceId(priceId, fallback) {
   return PRICE_PLAN_MAP[priceId] || normalisePlan(fallback);
 }
 
+function toDateOrNull(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === 'number') {
+    const date = new Date(value * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function mapStripeStatusToAppStatus(status, fallback = 'PENDING') {
   const normalised = typeof status === 'string' ? status.toLowerCase() : '';
   switch (normalised) {
@@ -164,7 +175,13 @@ router.post('/confirm', async (req, res) => {
     const plan = resolvePlanFromPriceId(priceId, session.metadata?.plan || 'STARTER');
     const status = mapStripeStatusToAppStatus(subscription?.status, 'ACTIVE');
 
-    const data = { subscriptionStatus: status };
+    const data = {
+      subscriptionStatus: status,
+      subscriptionCurrentPeriodEnd: toDateOrNull(subscription?.current_period_end),
+      subscriptionCancelAt: subscription?.cancel_at_period_end
+        ? toDateOrNull(subscription?.cancel_at || subscription?.current_period_end)
+        : toDateOrNull(subscription?.cancel_at),
+    };
     if (plan) data.subscriptionPlan = plan;
     if (status === 'ACTIVE') data.trialEndDate = null;
 
@@ -237,6 +254,10 @@ export async function webhook(req, res) {
 
         const update = {
           subscriptionStatus: status,
+          subscriptionCurrentPeriodEnd: toDateOrNull(subscription?.current_period_end),
+          subscriptionCancelAt: subscription?.cancel_at_period_end
+            ? toDateOrNull(subscription?.cancel_at || subscription?.current_period_end)
+            : toDateOrNull(subscription?.cancel_at),
         };
 
         if (plan) {
@@ -258,7 +279,13 @@ export async function webhook(req, res) {
         const plan = resolvePlanFromPriceId(priceId, subscription.metadata?.plan);
         const newStatus = mapStripeStatusToAppStatus(subscription.status);
 
-        const data = { subscriptionStatus: newStatus };
+        const data = {
+          subscriptionStatus: newStatus,
+          subscriptionCurrentPeriodEnd: toDateOrNull(subscription.current_period_end),
+          subscriptionCancelAt: subscription.cancel_at_period_end
+            ? toDateOrNull(subscription.cancel_at || subscription.current_period_end)
+            : toDateOrNull(subscription.cancel_at),
+        };
         if (plan) data.subscriptionPlan = plan;
         if (newStatus === 'ACTIVE') data.trialEndDate = null;
 
@@ -277,6 +304,8 @@ export async function webhook(req, res) {
             subscriptionStatus: 'CANCELLED',
             subscriptionPlan: 'FREE_TRIAL',
             trialEndDate: null,
+            subscriptionCurrentPeriodEnd: null,
+            subscriptionCancelAt: null,
           },
         });
         break;
