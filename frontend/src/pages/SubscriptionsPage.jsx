@@ -105,13 +105,6 @@ const formatDateDisplay = (value) => {
   });
 };
 
-const parseDate = (value) => {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
-};
-
 const calculateNextBillingDate = (subscription, plan) => {
   if (!subscription?.createdAt || !plan?.interval) return null;
   const start = new Date(subscription.createdAt);
@@ -298,32 +291,8 @@ export default function SubscriptionsPage() {
   const activeSubscriptionRecord =
     subscriptions.find((subscription) => normaliseStatus(subscription.status) === 'ACTIVE') ||
     (hasSubscriptionRecords ? subscriptions[0] : null);
-  const userSubscriptionStatusNormalised = normaliseStatus(subscriptionStatus);
-  const activeSubscriptionStatus = normaliseStatus(activeSubscriptionRecord?.status);
-  const stripeCurrentPeriodEndDate = parseDate(activeSubscriptionRecord?.stripeCurrentPeriodEnd);
-  const endDate = parseDate(activeSubscriptionRecord?.endDate);
-  const cancelledAtDate = parseDate(activeSubscriptionRecord?.cancelledAt);
-  const subscriptionEndDate = endDate || stripeCurrentPeriodEndDate;
-  const formattedSubscriptionEndDate = subscriptionEndDate ? formatDateDisplay(subscriptionEndDate) : null;
-  const hasScheduledCancellation = Boolean(
-    subscriptionEndDate &&
-      (
-        userSubscriptionStatusNormalised === 'CANCELLED' ||
-        activeSubscriptionStatus === 'CANCELLED' ||
-        Boolean(cancelledAtDate)
-      )
-  );
-  const shouldShowAccessUntil = hasScheduledCancellation;
-  const shouldShowNextRenewal = userHasActiveSubscription && !shouldShowAccessUntil;
   const nextBillingDate = calculateNextBillingDate(activeSubscriptionRecord, planDetails);
-  const nextBillingLabel = stripeCurrentPeriodEndDate
-    ? formatDateDisplay(stripeCurrentPeriodEndDate)
-    : nextBillingDate
-      ? formatDateDisplay(nextBillingDate)
-      : 'Managed via Stripe';
-  const showCancellationAlert = Boolean(
-    shouldShowAccessUntil && subscriptionEndDate && subscriptionEndDate.getTime() >= Date.now()
-  );
+  const nextBillingLabel = nextBillingDate ? formatDateDisplay(nextBillingDate) : 'Managed via Stripe';
   const planDescription = planDetails?.description || '';
   const planFeatures = Array.isArray(planDetails?.features) ? planDetails.features : [];
   const accountOwner = [currentUser?.firstName, currentUser?.lastName]
@@ -378,11 +347,6 @@ export default function SubscriptionsPage() {
           {checkoutMutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {checkoutMutation.error?.body?.message || checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
-            </Alert>
-          )}
-          {showCancellationAlert && formattedSubscriptionEndDate && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Your subscription will remain active until <strong>{formattedSubscriptionEndDate}</strong>. After this date, your workspace will move to the free plan unless you reactivate it.
             </Alert>
           )}
 
@@ -558,20 +522,11 @@ export default function SubscriptionsPage() {
                               />
                             )}
                           />
-                          {shouldShowNextRenewal && (
-                            <DetailRow
-                              icon={<CalendarMonthIcon fontSize="small" />}
-                              label="Next renewal"
-                              value={nextBillingLabel}
-                            />
-                          )}
-                          {shouldShowAccessUntil && formattedSubscriptionEndDate && (
-                            <DetailRow
-                              icon={<CalendarMonthIcon fontSize="small" />}
-                              label="Access available until"
-                              value={formattedSubscriptionEndDate}
-                            />
-                          )}
+                          <DetailRow
+                            icon={<CalendarMonthIcon fontSize="small" />}
+                            label="Next renewal"
+                            value={nextBillingLabel}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} md={6}>
