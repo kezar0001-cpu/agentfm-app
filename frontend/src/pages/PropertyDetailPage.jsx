@@ -82,7 +82,12 @@ export default function PropertyDetailPage() {
     invalidateKeys: [['units', id], ['property', id]],
   });
 
-  const property = propertyQuery.data;
+  const property = propertyQuery.data?.property ?? null;
+  const propertyStatus = property?.status ?? 'UNKNOWN';
+  const propertyManager = property?.manager ?? null;
+  const propertyManagerName = propertyManager
+    ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
+    : null;
   const units = normaliseArray(unitsQuery.data);
 
   const handleBack = () => {
@@ -217,8 +222,8 @@ export default function PropertyDetailPage() {
                       Status
                     </Typography>
                     <Chip
-                      label={property.status.replace('_', ' ')}
-                      color={getStatusColor(property.status)}
+                      label={propertyStatus.replace('_', ' ')}
+                      color={getStatusColor(propertyStatus)}
                       size="small"
                     />
                   </CardContent>
@@ -243,7 +248,7 @@ export default function PropertyDetailPage() {
                       Property Type
                     </Typography>
                     <Typography variant="h6">
-                      {property.propertyType}
+                      {property.propertyType || 'N/A'}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -331,15 +336,19 @@ export default function PropertyDetailPage() {
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
                     <Typography variant="body1">
-                      {property.manager.firstName} {property.manager.lastName}
+                      {propertyManagerName || 'No manager assigned'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {property.manager.email}
-                    </Typography>
-                    {property.manager.phone && (
-                      <Typography variant="body2" color="text.secondary">
-                        {property.manager.phone}
-                      </Typography>
+                    {propertyManager && (
+                      <>
+                        <Typography variant="body2" color="text.secondary">
+                          {propertyManager.email}
+                        </Typography>
+                        {propertyManager.phone && (
+                          <Typography variant="body2" color="text.secondary">
+                            {propertyManager.phone}
+                          </Typography>
+                        )}
+                      </>
                     )}
                   </Box>
                 </Stack>
