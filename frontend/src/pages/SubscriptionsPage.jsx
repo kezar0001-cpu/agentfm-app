@@ -208,6 +208,17 @@ export default function SubscriptionsPage() {
   const isTrialActive = subscriptionStatus === 'TRIAL';
   const userHasActiveSubscription = subscriptionStatus === 'ACTIVE';
   const trialDaysRemaining = calculateDaysRemaining(currentUser?.trialEndDate);
+  const subscriptionCancelAtRaw = currentUser?.subscriptionCancelAt;
+  const subscriptionCurrentPeriodEndRaw = currentUser?.subscriptionCurrentPeriodEnd;
+  const subscriptionCancelAt = subscriptionCancelAtRaw ? new Date(subscriptionCancelAtRaw) : null;
+  const subscriptionCurrentPeriodEnd = subscriptionCurrentPeriodEndRaw
+    ? new Date(subscriptionCurrentPeriodEndRaw)
+    : null;
+  const hasValidCancelAt = subscriptionCancelAt && !Number.isNaN(subscriptionCancelAt.getTime());
+  const hasValidPeriodEnd =
+    subscriptionCurrentPeriodEnd && !Number.isNaN(subscriptionCurrentPeriodEnd.getTime());
+  const hasScheduledCancellation =
+    hasValidCancelAt && ['ACTIVE', 'TRIAL', 'SUSPENDED'].includes(subscriptionStatus ?? '');
   const planForCheckout = subscriptionPlan || 'STARTER'; // Default to STARTER if no plan
 
   // Existing data fetching and processing logic
@@ -291,8 +302,12 @@ export default function SubscriptionsPage() {
   const activeSubscriptionRecord =
     subscriptions.find((subscription) => normaliseStatus(subscription.status) === 'ACTIVE') ||
     (hasSubscriptionRecords ? subscriptions[0] : null);
-  const nextBillingDate = calculateNextBillingDate(activeSubscriptionRecord, planDetails);
+  const nextBillingDate = hasValidPeriodEnd
+    ? subscriptionCurrentPeriodEnd
+    : calculateNextBillingDate(activeSubscriptionRecord, planDetails);
   const nextBillingLabel = nextBillingDate ? formatDateDisplay(nextBillingDate) : 'Managed via Stripe';
+  const subscriptionCancelAtLabel = hasValidCancelAt ? formatDateDisplay(subscriptionCancelAt) : null;
+  const nextBillingLabelTitle = hasScheduledCancellation ? 'Access until' : 'Next renewal';
   const planDescription = planDetails?.description || '';
   const planFeatures = Array.isArray(planDetails?.features) ? planDetails.features : [];
   const accountOwner = [currentUser?.firstName, currentUser?.lastName]
@@ -347,6 +362,12 @@ export default function SubscriptionsPage() {
           {checkoutMutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {checkoutMutation.error?.body?.message || checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
+            </Alert>
+          )}
+          {hasScheduledCancellation && subscriptionCancelAtLabel && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <strong>Cancellation scheduled.</strong> You will keep access until{' '}
+              <strong>{subscriptionCancelAtLabel}</strong>. Manage billing to resume your plan before this date.
             </Alert>
           )}
 
@@ -524,9 +545,16 @@ export default function SubscriptionsPage() {
                           />
                           <DetailRow
                             icon={<CalendarMonthIcon fontSize="small" />}
-                            label="Next renewal"
+                            label={nextBillingLabelTitle}
                             value={nextBillingLabel}
                           />
+                          {hasScheduledCancellation && subscriptionCancelAtLabel ? (
+                            <DetailRow
+                              icon={<AutorenewIcon fontSize="small" />}
+                              label="Cancellation scheduled"
+                              value={`Ends on ${subscriptionCancelAtLabel}`}
+                            />
+                          ) : null}
                         </Stack>
                       </Grid>
                       <Grid item xs={12} md={6}>
