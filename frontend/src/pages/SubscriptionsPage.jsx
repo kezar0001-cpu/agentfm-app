@@ -209,6 +209,13 @@ export default function SubscriptionsPage() {
   const userHasActiveSubscription = subscriptionStatus === 'ACTIVE';
   const trialDaysRemaining = calculateDaysRemaining(currentUser?.trialEndDate);
   const planForCheckout = subscriptionPlan || 'STARTER'; // Default to STARTER if no plan
+  const rawSubscriptionEndsAt = currentUser?.subscriptionEndsAt;
+  const subscriptionEndsAt = rawSubscriptionEndsAt ? new Date(rawSubscriptionEndsAt) : null;
+  const hasValidSubscriptionEnd = subscriptionEndsAt && !Number.isNaN(subscriptionEndsAt.getTime());
+  const isCancellationScheduled = Boolean(
+    hasValidSubscriptionEnd && userHasActiveSubscription && subscriptionEndsAt.getTime() > Date.now()
+  );
+  const subscriptionEndsLabel = hasValidSubscriptionEnd ? formatDateDisplay(subscriptionEndsAt) : null;
 
   // Existing data fetching and processing logic
   const subscriptions = normaliseArray(query.data);
@@ -291,8 +298,15 @@ export default function SubscriptionsPage() {
   const activeSubscriptionRecord =
     subscriptions.find((subscription) => normaliseStatus(subscription.status) === 'ACTIVE') ||
     (hasSubscriptionRecords ? subscriptions[0] : null);
-  const nextBillingDate = calculateNextBillingDate(activeSubscriptionRecord, planDetails);
-  const nextBillingLabel = nextBillingDate ? formatDateDisplay(nextBillingDate) : 'Managed via Stripe';
+  const nextBillingDate = isCancellationScheduled
+    ? null
+    : calculateNextBillingDate(activeSubscriptionRecord, planDetails);
+  const nextBillingLabel = isCancellationScheduled
+    ? (subscriptionEndsLabel ? `${subscriptionEndsLabel} (will not renew)` : 'Will not renew')
+    : nextBillingDate
+      ? formatDateDisplay(nextBillingDate)
+      : 'Managed via Stripe';
+  const nextBillingTitle = isCancellationScheduled ? 'Access until' : 'Next renewal';
   const planDescription = planDetails?.description || '';
   const planFeatures = Array.isArray(planDetails?.features) ? planDetails.features : [];
   const accountOwner = [currentUser?.firstName, currentUser?.lastName]
@@ -349,6 +363,12 @@ export default function SubscriptionsPage() {
               {checkoutMutation.error?.body?.message || checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
             </Alert>
           )}
+          {isCancellationScheduled && subscriptionEndsLabel && userHasActiveSubscription && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <strong>Auto-renew turned off.</strong> Your subscription will remain active until{' '}
+              <strong>{subscriptionEndsLabel}</strong>. It will not renew automatically.
+            </Alert>
+          )}
 
           {/* Subscription Summary Card */}
           <Card sx={{ borderRadius: 3, boxShadow: 1 }}>
@@ -400,6 +420,14 @@ export default function SubscriptionsPage() {
                     color={trialDaysRemaining > 0 ? 'warning' : 'default'}
                     variant={trialDaysRemaining > 0 ? 'filled' : 'outlined'}
                     sx={{ alignSelf: 'flex-start' }} // Position chip nicely
+                  />
+                )}
+                {isCancellationScheduled && subscriptionEndsLabel && (
+                  <Chip
+                    label={`Cancels on ${subscriptionEndsLabel}`}
+                    color="warning"
+                    variant="outlined"
+                    sx={{ alignSelf: 'flex-start' }}
                   />
                 )}
               </Stack>
@@ -524,7 +552,7 @@ export default function SubscriptionsPage() {
                           />
                           <DetailRow
                             icon={<CalendarMonthIcon fontSize="small" />}
-                            label="Next renewal"
+                            label={nextBillingTitle}
                             value={nextBillingLabel}
                           />
                         </Stack>

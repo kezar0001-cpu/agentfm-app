@@ -56,6 +56,42 @@ function mapStripeStatusToAppStatus(status, fallback = 'PENDING') {
   }
 }
 
+function toDateFromUnix(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'string' && value.trim() && !Number.isFinite(Number(value))) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  const date = new Date(numeric * 1000);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function resolveSubscriptionEnd(subscription, mappedStatus) {
+  if (!subscription) return null;
+  const cancelAt = toDateFromUnix(subscription.cancel_at);
+  const currentPeriodEnd = toDateFromUnix(subscription.current_period_end);
+  const endedAt = toDateFromUnix(subscription.ended_at);
+  const normalizedStatus = typeof subscription.status === 'string' ? subscription.status.toLowerCase() : '';
+  const isCancelled = mappedStatus === 'CANCELLED'
+    || normalizedStatus === 'canceled'
+    || normalizedStatus === 'cancelled';
+
+  if (subscription.cancel_at_period_end) {
+    return cancelAt || currentPeriodEnd;
+  }
+
+  if (isCancelled) {
+    return endedAt || cancelAt || currentPeriodEnd;
+  }
+
+  return null;
+}
+
 async function applySubscriptionUpdate({ userId, orgId, data }) {
   if (!data) return;
 
@@ -247,6 +283,8 @@ export async function webhook(req, res) {
           update.trialEndDate = null;
         }
 
+        update.subscriptionEndsAt = null;
+
         await applySubscriptionUpdate({ userId, orgId, data: update });
         break;
       }
@@ -257,10 +295,12 @@ export async function webhook(req, res) {
         const priceId = subscription.items?.data?.[0]?.price?.id;
         const plan = resolvePlanFromPriceId(priceId, subscription.metadata?.plan);
         const newStatus = mapStripeStatusToAppStatus(subscription.status);
+        const scheduledEnd = resolveSubscriptionEnd(subscription, newStatus);
 
         const data = { subscriptionStatus: newStatus };
         if (plan) data.subscriptionPlan = plan;
         if (newStatus === 'ACTIVE') data.trialEndDate = null;
+        data.subscriptionEndsAt = scheduledEnd;
 
         await applySubscriptionUpdate({ userId, orgId, data });
         break;
@@ -269,6 +309,7 @@ export async function webhook(req, res) {
         const subscription = event.data.object;
         const userId = subscription.metadata?.userId;
         const orgId = subscription.metadata?.orgId;
+        const scheduledEnd = resolveSubscriptionEnd(subscription, 'CANCELLED');
 
         await applySubscriptionUpdate({
           userId,
@@ -277,6 +318,7 @@ export async function webhook(req, res) {
             subscriptionStatus: 'CANCELLED',
             subscriptionPlan: 'FREE_TRIAL',
             trialEndDate: null,
+            subscriptionEndsAt: scheduledEnd,
           },
         });
         break;
