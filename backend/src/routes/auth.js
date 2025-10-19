@@ -289,8 +289,6 @@ router.get('/me', requireAuth, async (req, res) => {
         subscriptionStatus: true,
         subscriptionPlan: true,
         trialEndDate: true,
-        subscriptionCurrentPeriodEnd: true,
-        subscriptionCancelAt: true,
       },
     });
 
