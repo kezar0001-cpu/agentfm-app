@@ -32,6 +32,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining } from '../utils/date.js';
+import { redirectToBillingPortal } from '../utils/billing.js';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -194,7 +195,7 @@ const DashboardPage = () => {
           <Typography variant="body2" sx={{ mr: 2 }}>
             {currentTime.toLocaleTimeString()}
           </Typography>
-          <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
+          <Button color="inherit" size="small" onClick={redirectToBillingPortal}>
             Manage
           </Button>
         </Alert>

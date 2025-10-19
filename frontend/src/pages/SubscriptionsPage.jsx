@@ -21,6 +21,7 @@ import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
 import { calculateDaysRemaining } from '../utils/date.js';
 import { useCurrentUser } from '../context/UserContext.jsx';
+import { redirectToBillingPortal } from '../utils/billing.js';
 
 const normaliseStatus = (status) =>
   typeof status === 'string' ? status.toUpperCase() : '';
@@ -235,9 +236,7 @@ export default function SubscriptionsPage() {
   };
 
   const handleManageBilling = () => {
-    // In a real app, this would redirect to the Stripe Customer Portal
-    // For now, it re-initiates checkout for the current plan
-    startCheckout(planForCheckout);
+    redirectToBillingPortal();
   };
 
   const formatEnumValue = (value, fallback = 'Not available') => {
