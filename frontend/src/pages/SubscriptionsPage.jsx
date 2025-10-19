@@ -105,6 +105,24 @@ const formatDateDisplay = (value) => {
   });
 };
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const firstValidDate = (...values) => {
+  for (const value of values) {
+    const parsed = parseDateValue(value);
+    if (parsed) return parsed;
+  }
+  return null;
+};
+
 const calculateNextBillingDate = (subscription, plan) => {
   if (!subscription?.createdAt || !plan?.interval) return null;
   const start = new Date(subscription.createdAt);
@@ -292,7 +310,86 @@ export default function SubscriptionsPage() {
     subscriptions.find((subscription) => normaliseStatus(subscription.status) === 'ACTIVE') ||
     (hasSubscriptionRecords ? subscriptions[0] : null);
   const nextBillingDate = calculateNextBillingDate(activeSubscriptionRecord, planDetails);
-  const nextBillingLabel = nextBillingDate ? formatDateDisplay(nextBillingDate) : 'Managed via Stripe';
+  const normalisedActiveStatus = normaliseStatus(activeSubscriptionRecord?.status);
+
+  const cancellationIndicators = [
+    activeSubscriptionRecord?.cancelAtPeriodEnd,
+    activeSubscriptionRecord?.cancel_at_period_end,
+    activeSubscriptionRecord?.cancellationPending,
+    activeSubscriptionRecord?.pendingCancellation,
+    activeSubscriptionRecord?.cancellationScheduled,
+    activeSubscriptionRecord?.isCancellationScheduled,
+    activeSubscriptionRecord?.willCancelAtPeriodEnd,
+    activeSubscriptionRecord?.isCancelAtPeriodEnd,
+    activeSubscriptionRecord?.cancelAtEnd,
+    normalisedActiveStatus === 'CANCELLED',
+    normalisedActiveStatus === 'CANCELED',
+    (typeof subscriptionStatus === 'string' && subscriptionStatus.toUpperCase() === 'CANCELLED'),
+  ];
+
+  const hasCancellationFlag = cancellationIndicators.some(Boolean);
+
+  const cancellationDateCandidates = [
+    activeSubscriptionRecord?.cancellationEffectiveDate,
+    activeSubscriptionRecord?.cancellation_effective_date,
+    activeSubscriptionRecord?.cancellationDate,
+    activeSubscriptionRecord?.cancellation_date,
+    activeSubscriptionRecord?.cancelAt,
+    activeSubscriptionRecord?.cancel_at,
+    activeSubscriptionRecord?.cancelledAt,
+    activeSubscriptionRecord?.cancelled_at,
+    activeSubscriptionRecord?.canceledAt,
+    activeSubscriptionRecord?.canceled_at,
+    activeSubscriptionRecord?.endsAt,
+    activeSubscriptionRecord?.ends_at,
+    activeSubscriptionRecord?.endAt,
+    activeSubscriptionRecord?.end_at,
+    activeSubscriptionRecord?.endDate,
+    activeSubscriptionRecord?.end_date,
+    activeSubscriptionRecord?.expiryDate,
+    activeSubscriptionRecord?.expiry_date,
+    activeSubscriptionRecord?.expiresAt,
+    activeSubscriptionRecord?.expires_at,
+  ];
+
+  if (hasCancellationFlag) {
+    cancellationDateCandidates.push(
+      activeSubscriptionRecord?.stripeCurrentPeriodEnd,
+      activeSubscriptionRecord?.currentPeriodEnd,
+      activeSubscriptionRecord?.current_period_end,
+      activeSubscriptionRecord?.periodEnd,
+      activeSubscriptionRecord?.period_end,
+      currentUser?.subscriptionEndsAt,
+      currentUser?.subscriptionEndDate,
+      currentUser?.subscriptionExpiresAt,
+      currentUser?.subscriptionExpiresOn,
+      currentUser?.subscriptionCancelledAt,
+      currentUser?.subscriptionCancelledOn,
+      currentUser?.subscriptionCanceledAt,
+      currentUser?.subscriptionCancellationDate,
+    );
+  }
+
+  const cancellationDate = hasCancellationFlag ? firstValidDate(...cancellationDateCandidates) : null;
+  const cancellationDateLabel = cancellationDate ? formatDateDisplay(cancellationDate) : null;
+  const cancellationHasPassed = cancellationDate ? cancellationDate.getTime() <= Date.now() : false;
+  const isCancellationScheduled = Boolean(hasCancellationFlag && cancellationDate && !cancellationHasPassed);
+  const cancellationEnded = Boolean(hasCancellationFlag && cancellationDate && cancellationHasPassed);
+
+  let nextBillingRowLabel = 'Next renewal';
+  let nextBillingLabel = nextBillingDate ? formatDateDisplay(nextBillingDate) : 'Managed via Stripe';
+
+  if (isCancellationScheduled || cancellationEnded) {
+    nextBillingRowLabel = cancellationEnded ? 'Ended on' : 'Access until';
+    nextBillingLabel = cancellationDateLabel || nextBillingLabel;
+  }
+
+  const cancellationChipLabel = cancellationDateLabel
+    ? cancellationEnded
+      ? `Ended on ${cancellationDateLabel}`
+      : `Access until ${cancellationDateLabel}`
+    : null;
+  const showCancellationAlert = Boolean(isCancellationScheduled && cancellationDateLabel);
   const planDescription = planDetails?.description || '';
   const planFeatures = Array.isArray(planDetails?.features) ? planDetails.features : [];
   const accountOwner = [currentUser?.firstName, currentUser?.lastName]
@@ -342,6 +439,12 @@ export default function SubscriptionsPage() {
           {showCanceled && (
             <Alert severity="info" sx={{ mb: 2 }}>
               Checkout was canceled. No charges were made. You can subscribe anytime.
+            </Alert>
+          )}
+          {showCancellationAlert && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              You've cancelled your subscription. You'll retain access until{' '}
+              <strong>{cancellationDateLabel}</strong>.
             </Alert>
           )}
           {checkoutMutation.isError && (
@@ -400,6 +503,14 @@ export default function SubscriptionsPage() {
                     color={trialDaysRemaining > 0 ? 'warning' : 'default'}
                     variant={trialDaysRemaining > 0 ? 'filled' : 'outlined'}
                     sx={{ alignSelf: 'flex-start' }} // Position chip nicely
+                  />
+                )}
+                {cancellationChipLabel && (
+                  <Chip
+                    label={cancellationChipLabel}
+                    color={cancellationEnded ? 'default' : 'warning'}
+                    variant={cancellationEnded ? 'outlined' : 'filled'}
+                    sx={{ alignSelf: 'flex-start' }}
                   />
                 )}
               </Stack>
@@ -524,7 +635,7 @@ export default function SubscriptionsPage() {
                           />
                           <DetailRow
                             icon={<CalendarMonthIcon fontSize="small" />}
-                            label="Next renewal"
+                            label={nextBillingRowLabel}
                             value={nextBillingLabel}
                           />
                         </Stack>
