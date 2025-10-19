@@ -1,4 +1,4 @@
-export const BILLING_PORTAL_URL = 'https://billing.stripe.com/p/session/test_YWNjdF8xU0hKcWdJaXcyYVc3b0oxLF9UR09hMjNLTlZ2TWcwdWxjd3dpall5Q1hKSUpJb3Rn0100ZNZmZZPx';
+export const BILLING_PORTAL_URL = 'https://billing.stripe.com/p/login/test_bJe28r8uw1hO6Uy7S0fUQ00';
 
 export const redirectToBillingPortal = () => {
   if (typeof window !== 'undefined') {
