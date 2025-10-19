@@ -8,6 +8,7 @@ const router = Router();
 
 router.use('/auth', authRouter);
 router.use('/jobs', jobsRouter);
+router.use('/units', unitsRouter);
 router.use('/properties/:propertyId/units', unitsRouter);
 router.use('/properties', propertiesRouter);
 
