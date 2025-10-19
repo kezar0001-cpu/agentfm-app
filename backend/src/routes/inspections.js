@@ -1,3 +1,8 @@
+import { Router } from 'express';
+import { z } from 'zod';
+
+import prisma from '../config/prismaClient.js';
+import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -367,24 +372,14 @@ async function sendReminderNotifications({ inspection, reminder, recipients, not
   }
 }
 
-const requireAuth = async (req, res, next) => {
+const hydrateInspectionUser = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    } catch (error) {
-      console.error('JWT verification failed:', error?.message);
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
+      where: { id: req.user.id },
       include: {
         managedProperties: { select: { id: true } },
         ownedProperties: { select: { propertyId: true } },
@@ -399,12 +394,13 @@ const requireAuth = async (req, res, next) => {
     req.user = augmentUser(user);
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('Failed to hydrate inspection user', error);
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 };
 
 router.use(requireAuth);
+router.use(hydrateInspectionUser);
 
 router.get('/inspectors', async (req, res) => {
   try {
