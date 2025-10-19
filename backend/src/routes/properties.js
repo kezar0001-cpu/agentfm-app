@@ -270,7 +270,18 @@ router.get('/:id', async (req, res) => {
   try {
     const property = await prisma.property.findUnique({
       where: { id: req.params.id },
-      include: { units: { orderBy: { unitNumber: 'asc' } } },
+      include: {
+        units: { orderBy: { unitNumber: 'asc' } },
+        manager: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
     });
 
     const access = ensurePropertyAccess(property, req.user);
