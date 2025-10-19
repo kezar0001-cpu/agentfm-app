@@ -198,7 +198,6 @@ model User {
   subscriptionPlan   SubscriptionPlan   @default(FREE_TRIAL)
   subscriptionStatus SubscriptionStatus  @default(TRIAL)
   trialEndDate       DateTime?
-  subscriptionEndsAt DateTime?
   emailVerified      Boolean            @default(false)
 
   // NEW: profiles referenced by /me
