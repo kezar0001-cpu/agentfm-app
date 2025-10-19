@@ -122,6 +122,7 @@ app.use('/api/billing', billingRoutes); // This will now correctly ignore the we
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/tenants', tenantsRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/units', unitsRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/inspections', inspectionsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
