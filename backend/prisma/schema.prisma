@@ -224,10 +224,8 @@ model User {
   createdRecommendations  Recommendation[] @relation("CreatedBy")
   approvedRecommendations Recommendation[] @relation("ApprovedBy")
 
-  uploadedAttachments InspectionAttachment[]
-  createdReminders    InspectionReminder[]
-  auditLogs           InspectionAuditLog[]
-  reportRequests    ReportRequest[]
+  inspectionAuditLogs     InspectionAuditLog[] @relation("InspectionAuditLogUser")
+  inspectionReminders     InspectionReminder[] @relation("InspectionReminderUser")
 
   @@index([email])
   @@index([role])
@@ -302,9 +300,9 @@ model Property {
   name            String
   address         String
   city            String
-  state           String?
-  zipCode         String?
-  country         String
+  state           String
+  zipCode         String
+  country         String         @default("USA")
 
   propertyType    String
   yearBuilt       Int?
@@ -329,7 +327,6 @@ model Property {
   plans           MaintenancePlan[]
   serviceRequests ServiceRequest[]
   invites         Invite[]
-  reportRequests ReportRequest[]
 
   @@index([managerId])
   @@index([status])
@@ -383,7 +380,6 @@ model Unit {
   jobs            Job[]
   invites         Invite[]
   serviceRequests ServiceRequest[]
-  reportRequests  ReportRequest[]
 
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
@@ -440,12 +436,17 @@ model Inspection {
   notes           String?          @db.Text
   findings        String?          @db.Text
 
-  photos          Json?
+  photos          String[]         @default([])
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
   report          Report?
+
+  jobs            Job[]
+  attachments     InspectionAttachment[]
+  reminders       InspectionReminder[]
+  auditLogs       InspectionAuditLog[]
 
   @@index([propertyId])
   @@index([unitId])
@@ -505,75 +506,57 @@ model Job {
 // ======================================================
 // INSPECTION ATTACHMENTS
 // ======================================================
-
 model InspectionAttachment {
-  id            String     @id @default(cuid())
+  id            String   @id @default(cuid())
+  fileName      String
+  fileType      String
+  fileUrl       String
+  uploadedAt    DateTime @default(now())
+
   inspectionId  String
   inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
-  url           String
-  name          String
-  mimeType      String
-  size          Int?
-  annotations   Json?
-
-  uploadedById  String?
-  uploadedBy    User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
   @@index([inspectionId])
-  @@index([uploadedById])
 }
 
 // ======================================================
 // INSPECTION REMINDERS
 // ======================================================
-
 model InspectionReminder {
-  id            String     @id @default(cuid())
+  id            String   @id @default(cuid())
+  reminderDate  DateTime
+  sentAt        DateTime?
+  channel       String   // e.g., "EMAIL", "SMS", "APP"
+
   inspectionId  String
   inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
-  remindAt      DateTime
-  channel       String     @default("IN_APP")
-  recipients    String[]   @default([])
-  status        String     @default("PENDING")
-  deliveredAt   DateTime?
-  metadata      Json?
-
-  createdById   String?
-  createdBy     User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
-
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  userId        String
+  user          User     @relation("InspectionReminderUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
-  @@index([remindAt])
-  @@index([status])
+  @@index([userId])
+  @@index([reminderDate])
 }
 
 // ======================================================
 // INSPECTION AUDIT LOGS
 // ======================================================
-
 model InspectionAuditLog {
-  id           String     @id @default(cuid())
-  inspectionId String
-  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  action        String   // e.g., "CREATED", "UPDATED", "COMPLETED"
+  changes       Json?
+  timestamp     DateTime @default(now())
 
-  userId       String?
-  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  inspectionId  String
+  inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
-  action       String
-  changes      Json?
-
-  createdAt    DateTime   @default(now())
+  userId        String
+  user          User     @relation("InspectionAuditLogUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
   @@index([userId])
-  @@index([createdAt])
+  @@index([timestamp])
 }
 
 // ======================================================
@@ -644,33 +627,6 @@ model ServiceRequest {
 // ======================================================
 // REPORTS
 // ======================================================
-enum ReportStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-model ReportRequest {
-  id            String       @id @default(cuid())
-  reportType    String
-  status        ReportStatus @default(PENDING)
-  parameters    Json
-  fileUrl       String?
-  requestedById String
-  requestedBy   User         @relation(fields: [requestedById], references: [id], onDelete: Cascade)
-  propertyId    String
-  property      Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unitId        String?
-  unit          Unit?        @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  @@index([requestedById])
-  @@index([propertyId])
-  @@index([status])
-}
-
 model Report {
   id              String   @id @default(cuid())
   title           String
