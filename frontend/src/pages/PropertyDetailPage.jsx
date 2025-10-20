@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogActions,
   Table,
+  TableContainer,
   TableHead,
   TableRow,
   TableCell,
@@ -151,7 +152,7 @@ export default function PropertyDetailPage() {
   };
 
   return (
-    <Box sx={{ py: 3 }}>
+    <Box sx={{ py: { xs: 2, md: 4 } }}>
       <DataState
         isLoading={propertyQuery.isLoading}
         isError={propertyQuery.isError}
@@ -161,29 +162,38 @@ export default function PropertyDetailPage() {
         {property && (
           <Stack spacing={3}>
             {/* Header with Back Button */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <IconButton onClick={handleBack} size="large">
-                <ArrowBackIcon />
-              </IconButton>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  {property.name}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                  <LocationIcon fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    {formatPropertyAddressLine(property)}
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={{ xs: 2, md: 3 }}
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              justifyContent="space-between"
+            >
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+                <IconButton onClick={handleBack} size="large" sx={{ border: '1px solid', borderColor: 'divider' }}>
+                  <ArrowBackIcon />
+                </IconButton>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {property.name}
                   </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', mt: 0.5 }}>
+                    <LocationIcon fontSize="small" color="action" />
+                    <Typography variant="body2" color="text.secondary">
+                      {formatPropertyAddressLine(property)}
+                    </Typography>
+                  </Box>
                 </Box>
-              </Box>
+              </Stack>
               <Button
                 variant="outlined"
                 startIcon={<EditIcon />}
                 onClick={handleEditProperty}
+                fullWidth
+                sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
               >
                 Edit Property
               </Button>
-            </Box>
+            </Stack>
 
             {/* Property Image */}
             {property.imageUrl ? (
@@ -193,23 +203,24 @@ export default function PropertyDetailPage() {
                 alt={property.name}
                 sx={{
                   width: '100%',
-                  height: 400,
+                  height: { xs: 220, sm: 320, md: 420 },
                   objectFit: 'cover',
-                  borderRadius: 2,
+                  borderRadius: 3,
                 }}
               />
             ) : (
               <Paper
                 sx={{
-                  height: 400,
+                  height: { xs: 220, sm: 320, md: 420 },
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'grey.100',
-                  borderRadius: 2,
+                  borderRadius: 3,
+                  color: 'grey.400',
                 }}
               >
-                <HomeIcon sx={{ fontSize: 120, color: 'grey.400' }} />
+                <HomeIcon sx={{ fontSize: { xs: 72, md: 120 } }} />
               </Paper>
             )}
 
@@ -269,7 +280,14 @@ export default function PropertyDetailPage() {
 
             {/* Tabs */}
             <Paper>
-              <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
+              <Tabs
+                value={currentTab}
+                onChange={(e, v) => setCurrentTab(v)}
+                variant="scrollable"
+                allowScrollButtons="auto"
+                scrollButtons
+                sx={{ '& .MuiTab-root': { textTransform: 'none' } }}
+              >
                 <Tab label="Overview" />
                 <Tab label={`Units (${units.length})`} />
                 <Tab label="Owners" />
@@ -279,7 +297,7 @@ export default function PropertyDetailPage() {
 
             {/* Tab Content */}
             {currentTab === 0 && (
-              <Paper sx={{ p: 3 }}>
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Stack spacing={3}>
                   <Box>
                     <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
@@ -356,8 +374,14 @@ export default function PropertyDetailPage() {
             )}
 
             {currentTab === 1 && (
-              <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={{ xs: 2, md: 0 }}
+                  alignItems={{ xs: 'flex-start', md: 'center' }}
+                  justifyContent="space-between"
+                  sx={{ mb: 3 }}
+                >
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     Units
                   </Typography>
@@ -365,10 +389,12 @@ export default function PropertyDetailPage() {
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={handleAddUnit}
+                    fullWidth
+                    sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
                   >
                     Add Unit
                   </Button>
-                </Box>
+                </Stack>
 
                 {deleteUnitMutation.isError && (
                   <Alert severity="error" sx={{ mb: 2 }}>
@@ -384,12 +410,19 @@ export default function PropertyDetailPage() {
                   emptyMessage="No units yet. Add your first unit to get started!"
                   onRetry={unitsQuery.refetch}
                 >
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2.5}>
                     {units.map((unit) => (
                       <Grid item xs={12} sm={6} md={4} key={unit.id}>
-                        <Card>
-                          <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 1,
+                              }}
+                            >
                               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                 Unit {unit.unitNumber}
                               </Typography>
@@ -403,7 +436,7 @@ export default function PropertyDetailPage() {
 
                             <Stack spacing={1}>
                               <Chip
-                                label={unit.status}
+                                label={unit.status?.replace('_', ' ')}
                                 color={getStatusColor(unit.status)}
                                 size="small"
                               />
@@ -429,7 +462,7 @@ export default function PropertyDetailPage() {
                               {unit.tenants && unit.tenants.length > 0 && (
                                 <Box>
                                   <Typography variant="caption" color="text.secondary">
-                                    Tenant:
+                                    Tenant
                                   </Typography>
                                   <Typography variant="body2">
                                     {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
@@ -447,7 +480,7 @@ export default function PropertyDetailPage() {
             )}
 
             {currentTab === 2 && (
-              <Paper sx={{ p: 3 }}>
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     Property Owners
@@ -462,30 +495,32 @@ export default function PropertyDetailPage() {
                 </Box>
 
                 {property.owners && property.owners.length > 0 ? (
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Ownership %</TableCell>
-                        <TableCell>Since</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {property.owners.map((po) => (
-                        <TableRow key={po.id}>
-                          <TableCell>
-                            {po.owner.firstName} {po.owner.lastName}
-                          </TableCell>
-                          <TableCell>{po.owner.email}</TableCell>
-                          <TableCell>{po.ownershipPercentage}%</TableCell>
-                          <TableCell>
-                            {new Date(po.startDate).toLocaleDateString()}
-                          </TableCell>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Name</TableCell>
+                          <TableCell>Email</TableCell>
+                          <TableCell>Ownership %</TableCell>
+                          <TableCell>Since</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {property.owners.map((po) => (
+                          <TableRow key={po.id}>
+                            <TableCell>
+                              {po.owner.firstName} {po.owner.lastName}
+                            </TableCell>
+                            <TableCell>{po.owner.email}</TableCell>
+                            <TableCell>{po.ownershipPercentage}%</TableCell>
+                            <TableCell>
+                              {new Date(po.startDate).toLocaleDateString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 ) : (
                   <Typography color="text.secondary">
                     No owners assigned yet
@@ -495,7 +530,7 @@ export default function PropertyDetailPage() {
             )}
 
             {currentTab === 3 && (
-              <Paper sx={{ p: 3 }}>
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Recent Activity
                 </Typography>

@@ -139,11 +139,10 @@ export default function EditPropertyPage() {
           </Breadcrumbs>
 
           <Stack
-            direction="row"
+            direction={{ xs: 'column', md: 'row' }}
             justifyContent="space-between"
-            alignItems="center"
-            flexWrap="wrap"
-            gap={2}
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+            spacing={{ xs: 2, md: 0 }}
           >
             <Typography variant="h4" component="h1" fontWeight={700}>
               Edit Property
@@ -153,6 +152,8 @@ export default function EditPropertyPage() {
               startIcon={<ArrowBack />}
               onClick={() => navigate(`/properties/${id}`)}
               disabled={isPending}
+              fullWidth
+              sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
             >
               Back
             </Button>

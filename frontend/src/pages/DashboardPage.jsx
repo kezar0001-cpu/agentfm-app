@@ -131,7 +131,7 @@ const DashboardPage = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState type="loading" message="Loading dashboard..." />
       </Container>
     );
@@ -139,7 +139,7 @@ const DashboardPage = () => {
 
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState
           type="error"
           message="Failed to load dashboard"
@@ -154,9 +154,15 @@ const DashboardPage = () => {
   const activityItems = Array.isArray(activity) ? activity : [];
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2, md: 0 }}
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: { xs: 3, md: 4 }, gap: { xs: 2, md: 0 } }}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Dashboard
@@ -165,19 +171,33 @@ const DashboardPage = () => {
             Welcome back! Here's what's happening with your properties.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          <IconButton onClick={handleRefresh} color="primary">
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}
+        >
+          <IconButton
+            onClick={handleRefresh}
+            color="primary"
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+            }}
+          >
             <RefreshIcon />
           </IconButton>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => navigate('/properties', { state: { openCreateDialog: true } })}
+            fullWidth
+            sx={{ maxWidth: { xs: '100%', md: 'none' } }}
           >
             Add Property
           </Button>
         </Stack>
-      </Box>
+      </Stack>
 
       {/* --- Dynamic Subscription Status Display --- */}
       {showSubscriptionAlert && renderSubscriptionAlert()}
@@ -297,7 +317,7 @@ const DashboardPage = () => {
       <Grid container spacing={3}>
         {/* Recent Activity */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: { xs: 2, md: 3 } }}>
             <Typography variant="h6" gutterBottom>
               Recent Activity
             </Typography>
@@ -321,7 +341,7 @@ const DashboardPage = () => {
 
         {/* Quick Actions */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, mb: 3 }}>
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
               Quick Actions
             </Typography>
@@ -363,7 +383,7 @@ const DashboardPage = () => {
 
           {/* Service Requests Summary (if applicable) */}
           {summary?.serviceRequests && summary.serviceRequests.total > 0 && (
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: { xs: 2, md: 3 } }}>
               <Typography variant="h6" gutterBottom>
                 Service Requests
               </Typography>
@@ -425,20 +445,34 @@ const StatCard = ({ title, value, icon, color, details, onClick }) => {
       sx={{
         cursor: onClick ? 'pointer' : 'default',
         transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': onClick ? {
-          transform: 'translateY(-4px)',
-          boxShadow: 4,
-        } : {},
+        '&:hover': onClick
+          ? {
+              transform: 'translateY(-4px)',
+              boxShadow: 4,
+            }
+          : {},
       }}
       onClick={onClick}
     >
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box>
-            <Typography color="text.secondary" variant="overline" gutterBottom>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'flex-start' },
+            gap: { xs: 2, sm: 3 },
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography color="text.secondary" variant="overline" gutterBottom sx={{ letterSpacing: 0.8 }}>
               {title}
             </Typography>
-            <Typography variant="h3" component="div" sx={{ mb: 2 }}>
+            <Typography
+              variant="h3"
+              component="div"
+              sx={{ mb: 1.5, fontSize: { xs: '2rem', md: '2.5rem' }, fontWeight: 700 }}
+            >
               {value}
             </Typography>
             {detailItems.length > 0 && (
@@ -464,9 +498,11 @@ const StatCard = ({ title, value, icon, color, details, onClick }) => {
               color: 'white',
               borderRadius: 2,
               p: 1.5,
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              fontSize: '1.75rem',
+              alignSelf: { xs: 'flex-start', sm: 'center' },
             }}
           >
             {icon}
@@ -550,8 +586,9 @@ const ActivityItem = ({ item }) => {
     <Box
       sx={{
         display: 'flex',
-        alignItems: 'flex-start',
-        gap: 2,
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'stretch', sm: 'flex-start' },
+        gap: { xs: 1.5, sm: 2 },
         p: 2,
         borderRadius: 1,
         cursor: isClickable ? 'pointer' : 'default',
@@ -570,19 +607,42 @@ const ActivityItem = ({ item }) => {
           color: 'white',
           borderRadius: 1,
           p: 1,
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          width: 44,
+          height: 44,
         }}
       >
         {getIcon(item.type)}
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Typography variant="subtitle2">{item.title}</Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {item.title}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          gutterBottom
+          sx={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
           {item.description || 'No additional details provided.'}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1,
+            rowGap: 0.5,
+            mt: 0.5,
+          }}
+        >
           {statusLabel && (
             <Chip
               label={statusLabel}
