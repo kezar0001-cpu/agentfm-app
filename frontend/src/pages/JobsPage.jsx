@@ -191,7 +191,7 @@ const JobsPage = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState type="loading" message="Loading jobs..." />
       </Container>
     );
@@ -199,7 +199,7 @@ const JobsPage = () => {
 
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState
           type="error"
           message="Failed to load jobs"
@@ -210,9 +210,15 @@ const JobsPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2, md: 0 }}
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Jobs
@@ -225,13 +231,21 @@ const JobsPage = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreate}
+          fullWidth
+          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
         >
           Create Job
         </Button>
-      </Box>
+      </Stack>
 
       {/* Search and View Toggle */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
         <TextField
           variant="outlined"
           placeholder="Search jobs..."
@@ -243,13 +257,15 @@ const JobsPage = () => {
               <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
             ),
           }}
-          sx={{ width: '40%' }}
+          sx={{ width: { xs: '100%', md: 320 } }}
         />
         <ToggleButtonGroup
           value={view}
           exclusive
           onChange={handleViewChange}
           aria-label="view toggle"
+          size="small"
+          sx={{ flexWrap: 'wrap' }}
         >
           <ToggleButton value="card" aria-label="card view">
             <ViewModuleIcon />
@@ -261,7 +277,7 @@ const JobsPage = () => {
             <CalendarTodayIcon />
           </ToggleButton>
         </ToggleButtonGroup>
-      </Box>
+      </Stack>
 
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
@@ -361,7 +377,7 @@ const JobsPage = () => {
       ) : (
         <>
           {view === 'card' && (
-            <Grid container spacing={3}>
+            <Grid container spacing={{ xs: 2, md: 3 }}>
               {filteredJobs.map((job) => (
                 <Grid item xs={12} md={6} lg={4} key={job.id}>
                   <Card
@@ -372,19 +388,28 @@ const JobsPage = () => {
                       transition: 'transform 0.2s, box-shadow 0.2s',
                       borderLeft: isOverdue(job) ? '4px solid' : 'none',
                       borderLeftColor: 'error.main',
+                      borderRadius: 3,
                       '&:hover': {
                         transform: 'translateY(-4px)',
                         boxShadow: 4,
                       },
                     }}
                   >
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                        <Box sx={{ flex: 1 }}>
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          justifyContent: 'space-between',
+                          alignItems: { xs: 'flex-start', sm: 'flex-start' },
+                          gap: { xs: 1, sm: 2 },
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography variant="h6" gutterBottom>
                             {job.title}
                           </Typography>
-                          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
                             <Chip
                               label={job.status.replace('_', ' ')}
                               color={getStatusColor(job.status)}
@@ -407,7 +432,7 @@ const JobsPage = () => {
                             />
                           )}
                         </Box>
-                        <Box>
+                        <Stack direction="row" spacing={1}>
                           <IconButton
                             size="small"
                             color="default"
@@ -422,14 +447,19 @@ const JobsPage = () => {
                           >
                             <EditIcon />
                           </IconButton>
-                        </Box>
+                        </Stack>
                       </Box>
 
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mb: 2 }}
-                        noWrap
+                        sx={{
+                          mb: 1,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
                       >
                         {job.description}
                       </Typography>
@@ -453,10 +483,10 @@ const JobsPage = () => {
 
           {view === 'kanban' && (
             <DragDropContext onDragEnd={onDragEnd}>
-              <Grid container spacing={2}>
+              <Grid container spacing={{ xs: 2, md: 3 }}>
                 {['OPEN', 'IN_PROGRESS', 'COMPLETED'].map((status) => (
                   <Grid item xs={12} md={4} key={status}>
-                    <Paper sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
+                    <Paper sx={{ p: { xs: 2, md: 3 }, backgroundColor: '#f5f5f5' }}>
                       <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
                         {status.replace('_', ' ')}
                       </Typography>
@@ -511,7 +541,7 @@ const JobsPage = () => {
           )}
 
           {view === 'calendar' && (
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: { xs: 2, md: 3 } }}>
               <Calendar
                 localizer={localizer}
                 events={filteredJobs

@@ -140,7 +140,7 @@ export default function ReportsPage() {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3, maxWidth: 700 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 }, maxWidth: 700 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Generate New Report
         </Typography>
@@ -255,7 +255,7 @@ export default function ReportsPage() {
         </form>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Generated Reports
         </Typography>

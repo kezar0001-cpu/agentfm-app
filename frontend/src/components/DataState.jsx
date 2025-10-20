@@ -32,7 +32,8 @@ export default function DataState({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: 300,
+          minHeight: { xs: 200, md: 300 },
+          px: 2,
         }}
       >
         <CircularProgress />
@@ -48,10 +49,11 @@ export default function DataState({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: 300,
+          minHeight: { xs: 220, md: 320 },
+          px: 2,
         }}
       >
-        <Stack spacing={2} alignItems="center" sx={{ maxWidth: 500 }}>
+        <Stack spacing={2} alignItems="center" sx={{ maxWidth: 500, textAlign: 'center' }}>
           <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main' }} />
           <Typography variant="h6" color="error">
             Something went wrong
@@ -77,7 +79,8 @@ export default function DataState({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: 300,
+          minHeight: { xs: 200, md: 300 },
+          px: 2,
         }}
       >
         <Stack spacing={2} alignItems="center" sx={{ maxWidth: 400, textAlign: 'center' }}>

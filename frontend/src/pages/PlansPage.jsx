@@ -3,6 +3,7 @@ import {
   Typography,
   Paper,
   Table,
+  TableContainer,
   TableHead,
   TableRow,
   TableCell,
@@ -61,7 +62,7 @@ export default function PlansPage() {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           {t('actions.create')} {t('plans.title')}
         </Typography>
@@ -107,7 +108,7 @@ export default function PlansPage() {
         </form>
       </Paper>
 
-      <Paper>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <DataState
           isLoading={query.isLoading}
           isError={query.isError}
@@ -115,24 +116,26 @@ export default function PlansPage() {
           isEmpty={!query.isLoading && !query.isError && plans.length === 0}
           onRetry={query.refetch}
         >
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>{t('plans.name')}</TableCell>
-                <TableCell>{t('plans.frequency')}</TableCell>
-                <TableCell>Description</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {plans.map((plan) => (
-                <TableRow key={plan.id || plan.name}>
-                  <TableCell>{plan.name}</TableCell>
-                  <TableCell>{plan.frequency}</TableCell>
-                  <TableCell>{plan.description}</TableCell>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t('plans.name')}</TableCell>
+                  <TableCell>{t('plans.frequency')}</TableCell>
+                  <TableCell>Description</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {plans.map((plan) => (
+                  <TableRow key={plan.id || plan.name}>
+                    <TableCell>{plan.name}</TableCell>
+                    <TableCell>{plan.frequency}</TableCell>
+                    <TableCell>{plan.description}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </DataState>
       </Paper>
     </Stack>

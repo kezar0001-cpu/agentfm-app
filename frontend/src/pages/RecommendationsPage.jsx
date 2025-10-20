@@ -8,6 +8,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   Button,
   Stack,
   Chip,
@@ -45,7 +46,7 @@ export default function RecommendationsPage() {
         </Typography>
       </Box>
 
-      <Paper>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         {mutation.isError && (
           <Alert severity="error" sx={{ mx: 2, mt: 2 }}>
             {mutation.error.message}
@@ -58,45 +59,47 @@ export default function RecommendationsPage() {
           isEmpty={!query.isLoading && !query.isError && recommendations.length === 0}
           onRetry={query.refetch}
         >
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>{t('reports.property')}</TableCell>
-                <TableCell>{t('recommendations.priority')}</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {recommendations.map((recommendation) => (
-                <TableRow key={recommendation.id}>
-                  <TableCell>{recommendation.id}</TableCell>
-                  <TableCell>{recommendation.propertyName || recommendation.propertyId}</TableCell>
-                  <TableCell>
-                    {recommendation.priority && (
-                      <Chip
-                        size="small"
-                        label={recommendation.priority}
-                        color={recommendation.priority === 'high' ? 'error' : 'default'}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>{recommendation.description}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => handleConvert(recommendation.id)}
-                      disabled={mutation.isPending}
-                    >
-                      Convert to job
-                    </Button>
-                  </TableCell>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>{t('reports.property')}</TableCell>
+                  <TableCell>{t('recommendations.priority')}</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {recommendations.map((recommendation) => (
+                  <TableRow key={recommendation.id}>
+                    <TableCell>{recommendation.id}</TableCell>
+                    <TableCell>{recommendation.propertyName || recommendation.propertyId}</TableCell>
+                    <TableCell>
+                      {recommendation.priority && (
+                        <Chip
+                          size="small"
+                          label={recommendation.priority}
+                          color={recommendation.priority === 'high' ? 'error' : 'default'}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>{recommendation.description}</TableCell>
+                    <TableCell align="right">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleConvert(recommendation.id)}
+                        disabled={mutation.isPending}
+                      >
+                        Convert to job
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </DataState>
       </Paper>
     </Stack>
