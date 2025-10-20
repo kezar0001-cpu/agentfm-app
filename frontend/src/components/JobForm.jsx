@@ -178,6 +178,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
+              id="job-form-title"
+              name="title"
               label="Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -191,6 +193,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
+              id="job-form-description"
+              name="description"
               label="Description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
@@ -207,6 +211,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="job-form-priority"
+              name="priority"
               label="Priority"
               value={formData.priority}
               onChange={(e) => handleChange('priority', e.target.value)}
@@ -224,6 +230,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               <TextField
                 select
                 fullWidth
+                id="job-form-status"
+                name="status"
                 label="Status"
                 value={formData.status}
                 onChange={(e) => handleChange('status', e.target.value)}
@@ -242,6 +250,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="job-form-property"
+              name="propertyId"
               label="Property"
               value={formData.propertyId}
               onChange={(e) => handleChange('propertyId', e.target.value)}
@@ -262,6 +272,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="job-form-unit"
+              name="unitId"
               label="Unit (Optional)"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
@@ -280,6 +292,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             <TextField
               select
               fullWidth
+              id="job-form-assigned-to"
+              name="assignedToId"
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
               onChange={(e) => handleChange('assignedToId', e.target.value)}
@@ -296,6 +310,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
+              id="job-form-scheduled-date"
+              name="scheduledDate"
               label="Scheduled Date (Optional)"
               type="datetime-local"
               value={formData.scheduledDate}
@@ -307,6 +323,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
+              id="job-form-estimated-cost"
+              name="estimatedCost"
               label="Estimated Cost (Optional)"
               type="number"
               value={formData.estimatedCost}
@@ -324,6 +342,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
+              id="job-form-notes"
+              name="notes"
               label="Notes (Optional)"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}

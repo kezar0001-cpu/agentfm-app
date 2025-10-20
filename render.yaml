@@ -1,41 +1,51 @@
-# render.yaml (at repo root)
+# render.yaml — AgentFM (backend + frontend)
+
 services:
-  # --------------------------
+  # -----------------------------
   # Backend (Express + Prisma)
-  # --------------------------
+  # -----------------------------
   - type: web
     name: agentfm-backend
-    env: node
+    runtime: node
     rootDir: backend
     plan: free
-    buildCommand: |
-      npm ci
-      npx prisma migrate deploy
+    # Run migrations during build (preDeploy not available on Free)
+    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
     startCommand: node src/index.js
-    autoDeploy: true
+    healthCheckPath: /health
     envVars:
-      # Set these in the Render dashboard (don’t put values here)
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
-        sync: false
-      # FRONTEND_URL will be set after the frontend creates a URL; you can leave
-      # this blank for the first deploy and set it in the dashboard afterward.
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      # Optional: if your backend enforces CORS against a specific origin,
+      # set it explicitly (no fromService:url on Free).
       - key: FRONTEND_URL
-        sync: false
+        value: https://agentfm-frontend.onrender.com
 
-  # --------------------------
-  # Frontend (Vite static)
-  # --------------------------
-  - type: static
+  # -----------------------------
+  # Frontend (Vite static site)
+  # -----------------------------
+  - type: web
     name: agentfm-frontend
+    runtime: static
     rootDir: frontend
-    buildCommand: |
-      npm ci
-      npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    autoDeploy: true
+    routes:
+      # Proxy API calls to the backend's public URL
+      - type: rewrite
+        source: /api/*
+        destination: https://agentfm-backend.onrender.com/api/*
+      # SPA fallback
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
-      # VITE needs the backend base URL at build time
+      # Point Vite to the backend directly (can't derive `url` via fromService)
       - key: VITE_API_BASE_URL
-        sync: false
+        value: https://agentfm-backend.onrender.com

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -31,17 +31,19 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
 import { normaliseArray } from '../utils/error';
+import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 
 export default function PropertiesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -50,6 +52,17 @@ export default function PropertiesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    if (!location.state?.openCreateDialog) {
+      return;
+    }
+
+    setEditMode(false);
+    setSelectedProperty(null);
+    setDialogOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state?.openCreateDialog, location.pathname, navigate]);
 
   // Fetch properties
   const query = useApiQuery({
@@ -168,6 +181,8 @@ export default function PropertiesPage() {
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
+                id="properties-search-term"
+                name="searchTerm"
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -184,6 +199,8 @@ export default function PropertiesPage() {
               <TextField
                 fullWidth
                 select
+                id="properties-filter-status"
+                name="filterStatus"
                 label="Status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -273,7 +290,7 @@ export default function PropertiesPage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <LocationIcon fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          {property.address}, {property.city}, {property.state}
+                          {formatPropertyAddressLine(property)}
                         </Typography>
                       </Box>
 

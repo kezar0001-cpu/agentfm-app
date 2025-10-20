@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -32,6 +32,7 @@ import ServiceRequestForm from '../components/ServiceRequestForm';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState({
     status: '',
     category: '',
@@ -73,6 +74,9 @@ const ServiceRequestsPage = () => {
     },
   });
 
+  const requestList = Array.isArray(requests) ? requests : [];
+  const propertyOptions = Array.isArray(properties) ? properties : [];
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -89,6 +93,13 @@ const ServiceRequestsPage = () => {
     refetch();
     handleCloseDialog();
   };
+
+  useEffect(() => {
+    if (location.state?.openCreateDialog) {
+      setOpenDialog(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const handleReview = (request) => {
     setReviewDialog(request);
@@ -174,6 +185,8 @@ const ServiceRequestsPage = () => {
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={4}>
               <TextField
+                id="service-requests-filter-status"
+                name="status"
                 select
                 fullWidth
                 label="Status"
@@ -192,6 +205,8 @@ const ServiceRequestsPage = () => {
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <TextField
+                id="service-requests-filter-category"
+                name="category"
                 select
                 fullWidth
                 label="Category"
@@ -214,6 +229,8 @@ const ServiceRequestsPage = () => {
             {userRole !== 'TENANT' && (
               <Grid item xs={12} sm={6} md={4}>
                 <TextField
+                  id="service-requests-filter-property"
+                  name="propertyId"
                   select
                   fullWidth
                   label="Property"
@@ -222,7 +239,7 @@ const ServiceRequestsPage = () => {
                   size="small"
                 >
                   <MenuItem value="">All Properties</MenuItem>
-                  {properties?.map((property) => (
+                  {propertyOptions.map((property) => (
                     <MenuItem key={property.id} value={property.id}>
                       {property.name}
                     </MenuItem>
@@ -235,7 +252,7 @@ const ServiceRequestsPage = () => {
       </Card>
 
       {/* Service Requests List */}
-      {!requests || requests.length === 0 ? (
+      {requestList.length === 0 ? (
         <DataState
           type="empty"
           message="No service requests found"
@@ -251,8 +268,19 @@ const ServiceRequestsPage = () => {
         />
       ) : (
         <Grid container spacing={3}>
-          {requests.map((request) => (
-            <Grid item xs={12} md={6} lg={4} key={request.id}>
+          {requestList.map((request) => {
+            const description = typeof request.description === 'string' ? request.description : '';
+            const displayDescription = description
+              ? description.length > 100
+                ? `${description.substring(0, 100)}...`
+                : description
+              : 'No description provided.';
+            const statusLabel = request.status ? request.status.replace(/_/g, ' ') : 'Unknown';
+            const categoryLabel = request.category ? request.category.replace(/_/g, ' ') : 'Uncategorized';
+            const priorityLabel = request.priority ? request.priority.replace(/_/g, ' ') : null;
+
+            return (
+              <Grid item xs={12} md={6} lg={4} key={request.id}>
               <Card
                 sx={{
                   height: '100%',
@@ -272,20 +300,22 @@ const ServiceRequestsPage = () => {
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                       <Chip
-                        label={request.status.replace('_', ' ')}
+                        label={statusLabel}
                         color={getStatusColor(request.status)}
                         size="small"
                       />
                       <Chip
-                        label={request.category.replace('_', ' ')}
+                        label={categoryLabel}
                         color={getCategoryColor(request.category)}
                         size="small"
                         variant="outlined"
                       />
-                      <Chip
-                        label={request.priority}
-                        size="small"
-                      />
+                      {priorityLabel && (
+                        <Chip
+                          label={priorityLabel}
+                          size="small"
+                        />
+                      )}
                     </Stack>
                   </Box>
 
@@ -294,9 +324,7 @@ const ServiceRequestsPage = () => {
                     color="text.secondary"
                     sx={{ mb: 2 }}
                   >
-                    {request.description.length > 100
-                      ? `${request.description.substring(0, 100)}...`
-                      : request.description}
+                    {displayDescription}
                   </Typography>
 
                   <Stack spacing={1}>
@@ -376,8 +404,9 @@ const ServiceRequestsPage = () => {
                   </Box>
                 )}
               </Card>
-            </Grid>
-          ))}
+              </Grid>
+            );
+          })}
         </Grid>
       )}
 
@@ -448,6 +477,8 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
+              id="service-requests-review-status"
+              name="status"
               select
               fullWidth
               label="Status"
@@ -459,6 +490,8 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
               <MenuItem value="REJECTED">Rejected</MenuItem>
             </TextField>
             <TextField
+              id="service-requests-review-notes"
+              name="reviewNotes"
               fullWidth
               label="Review Notes"
               value={formData.reviewNotes}
@@ -524,6 +557,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               This will create a new job and update the service request status.
             </Alert>
             <TextField
+              id="service-requests-convert-technician"
+              name="assignedToId"
               select
               fullWidth
               label="Assign to Technician (Optional)"
@@ -538,6 +573,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               ))}
             </TextField>
             <TextField
+              id="service-requests-convert-scheduled-date"
+              name="scheduledDate"
               fullWidth
               label="Scheduled Date (Optional)"
               type="datetime-local"
@@ -546,6 +583,8 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               InputLabelProps={{ shrink: true }}
             />
             <TextField
+              id="service-requests-convert-estimated-cost"
+              name="estimatedCost"
               fullWidth
               label="Estimated Cost (Optional)"
               type="number"

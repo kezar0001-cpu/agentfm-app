@@ -145,6 +145,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
         <Grid container spacing={2}>
           <Grid item xs={12}>
             <TextField
+              id="service-request-form-title"
+              name="title"
               fullWidth
               label="Title"
               value={formData.title}
@@ -158,6 +160,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
           <Grid item xs={12}>
             <TextField
+              id="service-request-form-description"
+              name="description"
               fullWidth
               label="Description"
               value={formData.description}
@@ -173,6 +177,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
           <Grid item xs={12} sm={6}>
             <TextField
+              id="service-request-form-category"
+              name="category"
               select
               fullWidth
               label="Category"
@@ -196,6 +202,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
           <Grid item xs={12} sm={6}>
             <TextField
+              id="service-request-form-priority"
+              name="priority"
               select
               fullWidth
               label="Priority"
@@ -212,6 +220,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
           <Grid item xs={12} sm={6}>
             <TextField
+              id="service-request-form-property"
+              name="propertyId"
               select
               fullWidth
               label="Property"
@@ -232,6 +242,8 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
           <Grid item xs={12} sm={6}>
             <TextField
+              id="service-request-form-unit"
+              name="unitId"
               select
               fullWidth
               label="Unit"
