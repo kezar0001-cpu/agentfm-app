@@ -204,7 +204,7 @@ exports.createProperty = async (req, res) => {
       city,
       state,
       zipCode,
-      country = 'USA',
+      country,
       propertyType,
       yearBuilt,
       totalUnits = 0,
@@ -212,26 +212,43 @@ exports.createProperty = async (req, res) => {
       description,
       imageUrl,
     } = req.body;
-    
+
+    const trimmedName = name?.trim();
+    const trimmedAddress = address?.trim();
+    const trimmedCity = city?.trim();
+    const trimmedState = state?.trim() || null;
+    const trimmedZip = zipCode?.trim() || null;
+    const trimmedCountry = country?.trim();
+    const trimmedPropertyType = propertyType?.trim();
+
     // Validation
-    if (!name || !address || !city || !state || !zipCode || !propertyType) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: name, address, city, state, zipCode, propertyType' 
+    if (!trimmedName || !trimmedAddress || !trimmedCity || !trimmedCountry || !trimmedPropertyType) {
+      return res.status(400).json({
+        error: 'Missing required fields: name, address, city, country, propertyType'
       });
     }
-    
+
+    const normalisedTotalUnits =
+      totalUnits === undefined || totalUnits === null || totalUnits === ''
+        ? 0
+        : parseInt(totalUnits, 10);
+    const normalisedTotalArea =
+      totalArea === undefined || totalArea === null || totalArea === ''
+        ? null
+        : parseFloat(totalArea);
+
     const property = await prisma.property.create({
       data: {
-        name,
-        address,
-        city,
-        state,
-        zipCode,
-        country,
-        propertyType,
-        yearBuilt: yearBuilt ? parseInt(yearBuilt) : null,
-        totalUnits: parseInt(totalUnits),
-        totalArea: totalArea ? parseFloat(totalArea) : null,
+        name: trimmedName,
+        address: trimmedAddress,
+        city: trimmedCity,
+        state: trimmedState,
+        zipCode: trimmedZip,
+        country: trimmedCountry,
+        propertyType: trimmedPropertyType,
+        yearBuilt: yearBuilt ? parseInt(yearBuilt, 10) : null,
+        totalUnits: Number.isNaN(normalisedTotalUnits) ? 0 : normalisedTotalUnits,
+        totalArea: Number.isNaN(normalisedTotalArea) ? null : normalisedTotalArea,
         description,
         imageUrl,
         managerId: userId,
@@ -296,23 +313,55 @@ exports.updateProperty = async (req, res) => {
       description,
       imageUrl,
     } = req.body;
-    
+
+    const trimmedName = name !== undefined ? name?.trim() : undefined;
+    const trimmedAddress = address !== undefined ? address?.trim() : undefined;
+    const trimmedCity = city !== undefined ? city?.trim() : undefined;
+    const trimmedState = state !== undefined ? state?.trim() || null : undefined;
+    const trimmedZip = zipCode !== undefined ? zipCode?.trim() || null : undefined;
+    const trimmedCountry = country !== undefined ? country?.trim() : undefined;
+    const trimmedPropertyType = propertyType !== undefined ? propertyType?.trim() : undefined;
+    const normalisedYearBuilt =
+      yearBuilt !== undefined ? (yearBuilt ? parseInt(yearBuilt, 10) : null) : undefined;
+    const normalisedTotalUnits =
+      totalUnits !== undefined
+        ? totalUnits === null || totalUnits === ''
+          ? 0
+          : (() => {
+              const parsed = parseInt(totalUnits, 10);
+              return Number.isNaN(parsed) ? existingProperty.totalUnits : parsed;
+            })()
+        : undefined;
+    const normalisedTotalArea =
+      totalArea !== undefined
+        ? totalArea === null || totalArea === ''
+          ? null
+          : (() => {
+              const parsed = parseFloat(totalArea);
+              return Number.isNaN(parsed) ? existingProperty.totalArea : parsed;
+            })()
+        : undefined;
+
+    const trimmedDescription =
+      description !== undefined ? description?.trim() || null : undefined;
+    const trimmedImageUrl = imageUrl !== undefined ? imageUrl?.trim() || null : undefined;
+
     const property = await prisma.property.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(address && { address }),
-        ...(city && { city }),
-        ...(state && { state }),
-        ...(zipCode && { zipCode }),
-        ...(country && { country }),
-        ...(propertyType && { propertyType }),
-        ...(yearBuilt !== undefined && { yearBuilt: yearBuilt ? parseInt(yearBuilt) : null }),
-        ...(totalUnits !== undefined && { totalUnits: parseInt(totalUnits) }),
-        ...(totalArea !== undefined && { totalArea: totalArea ? parseFloat(totalArea) : null }),
+        ...(trimmedName !== undefined && { name: trimmedName }),
+        ...(trimmedAddress !== undefined && { address: trimmedAddress }),
+        ...(trimmedCity !== undefined && { city: trimmedCity }),
+        ...(trimmedState !== undefined && { state: trimmedState }),
+        ...(trimmedZip !== undefined && { zipCode: trimmedZip }),
+        ...(trimmedCountry !== undefined && { country: trimmedCountry }),
+        ...(trimmedPropertyType !== undefined && { propertyType: trimmedPropertyType }),
+        ...(normalisedYearBuilt !== undefined && { yearBuilt: normalisedYearBuilt }),
+        ...(normalisedTotalUnits !== undefined && { totalUnits: normalisedTotalUnits }),
+        ...(normalisedTotalArea !== undefined && { totalArea: normalisedTotalArea }),
         ...(status && { status }),
-        ...(description !== undefined && { description }),
-        ...(imageUrl !== undefined && { imageUrl }),
+        ...(trimmedDescription !== undefined && { description: trimmedDescription }),
+        ...(trimmedImageUrl !== undefined && { imageUrl: trimmedImageUrl }),
       },
       include: {
         units: {

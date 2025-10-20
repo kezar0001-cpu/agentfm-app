@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
-  IconButton, InputAdornment
+  IconButton, InputAdornment, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { saveTokenFromUrl } from '../lib/auth';
+import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { api } from '../api.js';
 
 export default function SignIn() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  // MINIMAL CHANGE: Add 'role' to the initial state with a default value
+  const [formData, setFormData] = useState({ email: '', password: '', role: 'PROPERTY_MANAGER' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -43,24 +44,24 @@ export default function SignIn() {
     setLoading(true);
     setError('');
     try {
+      // MINIMAL CHANGE: Add the 'role' to the submitted data
       const res = await api.post('/api/auth/login', {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
+        role: formData.role,
       });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
       localStorage.setItem('auth_token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
+      setCurrentUser(res.user);
       navigate('/dashboard');
     } catch (err) {
-      // Try to extract server message
       const msg =
         err?.response?.data?.message ||
         err?.message ||
         'Login failed. Please try again.';
       setError(msg);
-      // eslint-disable-next-line no-console
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -143,6 +144,25 @@ export default function SignIn() {
                 )
               }}
             />
+            
+            {/* MINIMAL CHANGE: Add the Role selection dropdown */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="role-select-label">Role</InputLabel>
+              <Select
+                labelId="role-select-label"
+                id="role"
+                name="role"
+                value={formData.role}
+                label="Role"
+                onChange={handleChange}
+                disabled={loading}
+              >
+                <MenuItem value="PROPERTY_MANAGER">Property Manager</MenuItem>
+                <MenuItem value="OWNER">Owner</MenuItem>
+                <MenuItem value="TENANT">Tenant</MenuItem>
+                <MenuItem value="TECHNICIAN">Technician</MenuItem>
+              </Select>
+            </FormControl>
 
             <Box sx={{ textAlign: 'right', mb: 2 }}>
               <Button component={Link} to="/forgot-password" variant="text" size="small" sx={{ textTransform: 'none' }} disabled={loading}>

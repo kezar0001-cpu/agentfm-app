@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 
 import prisma from '../config/prismaClient.js';
 import { requireRole, ROLES } from '../../middleware/roleAuth.js';
+import unitsRouter from './units.js';
 
 const router = Router();
 
@@ -47,6 +48,7 @@ const requireAuth = async (req, res, next) => {
 
 router.use(requireAuth);
 router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
+router.use('/:id/units', unitsRouter);
 
 // ---------------------------------------------------------------------------
 // Zod helpers
@@ -102,7 +104,7 @@ const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
     address: requiredString('Address is required'),
     city: requiredString('City is required'),
-    state: requiredString('State is required'),
+    state: optionalString(),
     zipCode: optionalString(),
     postcode: optionalString(),
     country: requiredString('Country is required'),
@@ -130,14 +132,6 @@ const basePropertySchema = z.object({
 
 const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
   schema.superRefine((data, ctx) => {
-    if (requireCoreFields && !data.zipCode && !data.postcode) {
-      ctx.addIssue({
-        path: ['zipCode'],
-        code: z.ZodIssueCode.custom,
-        message: 'ZIP code is required',
-      });
-    }
-
     if (requireCoreFields && !data.propertyType && !data.type) {
       ctx.addIssue({
         path: ['propertyType'],
@@ -276,7 +270,18 @@ router.get('/:id', async (req, res) => {
   try {
     const property = await prisma.property.findUnique({
       where: { id: req.params.id },
-      include: { units: { orderBy: { unitNumber: 'asc' } } },
+      include: {
+        units: { orderBy: { unitNumber: 'asc' } },
+        manager: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
     });
 
     const access = ensurePropertyAccess(property, req.user);

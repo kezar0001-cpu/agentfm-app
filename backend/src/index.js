@@ -1,11 +1,11 @@
-// backend/src/index.js
+console.log('>>> STARTING index.js - Webhook Fix Deployed <<<');
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
-import path from 'path'; // Your existing code has this
+import path from 'path';
 import fs from 'fs';
 import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
 
@@ -23,7 +23,6 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 
 // ---- CORS
-// ... (your existing CORS configuration remains the same)
 const allowlist = new Set(
   (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
     .map((s) => s && s.trim())
@@ -68,11 +67,6 @@ if (!fs.existsSync(uploadPath)) {
 app.use('/uploads', express.static(uploadPath));
 
 // ---- Session
-// Session configuration for cross-domain authentication
-// - secure: true in production (HTTPS only)
-// - httpOnly: true prevents XSS attacks
-// - sameSite: 'none' in production allows cross-domain cookies (required for api.buildstate.com.au → www.buildstate.com.au)
-// - maxAge: 7 days
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'replace-this-session-secret',
@@ -92,7 +86,7 @@ import './config/passport.js';
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ---- Routes
+// ---- Routes (Import all route handlers)
 import authRoutes from './routes/auth.js';
 import billingRoutes, { webhook as stripeWebhook } from './routes/billing.js';
 import propertiesRoutes from './routes/properties.js';
@@ -104,25 +98,28 @@ import inspectionsRoutes from './routes/inspections.js';
 import subscriptionsRoutes from './routes/subscriptions.js';
 import uploadsRoutes from './routes/uploads.js';
 import reportsRoutes from './routes/reports.js';
-// 👇 MINIMAL CHANGE START: Corrected the broken import statement
 import recommendationsRoutes from './routes/recommendations.js';
-// 👆 MINIMAL CHANGE END
 import plansRoutes from './routes/plans.js';
 import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
+import usersRouter from './routes/users.js';
 
-// ---- Stripe webhook
+// ===================================================================
+//
+// ⚠️ CRITICAL FIX: Stripe webhook MUST come before express.json()
+//    and before app.use('/api/billing', billingRoutes)
+//
+// ===================================================================
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
-// ---- Body parsers
+// ---- Body parsers (MUST come AFTER webhook but BEFORE other routes)
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ---- Mount routes
+// ---- Mount routes (MUST come AFTER body parsers)
 app.use('/api/auth', authRoutes);
-app.use('/api/billing', billingRoutes);
+app.use('/api/billing', billingRoutes); // This will now correctly ignore the webhook path
 app.use('/api/properties', propertiesRoutes);
-// ... (rest of your existing app.use statements remain the same)
 app.use('/api/tenants', tenantsRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/units', unitsRoutes);
@@ -134,7 +131,8 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/recommendations', recommendationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/serviceRequests', serviceRequestsRoutes);
+app.use('/api/service-requests', serviceRequestsRoutes);
+app.use('/api/users', usersRouter);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
@@ -170,7 +168,6 @@ app.use((err, _req, res, _next) => {
 
 async function startServer() {
   try {
-
     const server = app.listen(PORT, () => {
       console.log(`✅ AgentFM backend listening on port ${PORT}`);
     });
@@ -179,15 +176,12 @@ async function startServer() {
     const shutdown = async (signal) => {
       if (shuttingDown) return;
       shuttingDown = true;
-
       console.log(`Received ${signal}. Shutting down gracefully...`);
-
       const closeServer = new Promise((resolve) => {
         server.close(() => {
           resolve();
         });
       });
-
       try {
         await Promise.allSettled([closeServer, prisma.$disconnect()]);
         console.log('Shutdown complete. Goodbye!');

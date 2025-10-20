@@ -2,16 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
-  IconButton, InputAdornment, Grid
+  IconButton, InputAdornment, Grid, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { saveTokenFromUrl } from '../lib/auth';
+import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { api } from '../api.js';
 
 export default function SignUp() {
   const navigate = useNavigate();
+  // MINIMAL CHANGE: Add 'role' to the initial state
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: ''
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: '', role: 'PROPERTY_MANAGER'
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,15 +60,14 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      // Aligns with your Prisma schema: firstName + lastName
+      // MINIMAL CHANGE: Include the selected 'role' from the form data
       const payload = {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         phone: formData.phone.trim() || undefined,
-        role: 'PROPERTY_MANAGER',          // self-signup role
-        // company: formData.company.trim() // optional: send only if you’ll store it server-side
+        role: formData.role,
       };
 
       const res = await api.post('/api/auth/register', payload);
@@ -75,17 +75,15 @@ export default function SignUp() {
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
       localStorage.setItem('auth_token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
+      setCurrentUser(res.user);
       navigate('/dashboard');
     } catch (err) {
-      // Try to pick the first Zod error message if available
       const msg =
         err?.response?.data?.errors?.[0]?.message ||
         err?.response?.data?.message ||
         err?.message ||
         'Registration failed. Please try again.';
       setError(msg);
-      // eslint-disable-next-line no-console
       console.error('Registration error:', err);
     } finally {
       setLoading(false);
@@ -157,16 +155,28 @@ export default function SignUp() {
 
             <TextField
               margin="normal" fullWidth id="phone" label="Phone Number" name="phone"
-              type="tel" autoComplete="tel" placeholder="+61 400 000 000"
+              type="tel" autoComplete="tel" placeholder="e.g., +1 555 123 4567"
               value={formData.phone} onChange={handleChange} disabled={loading}
             />
 
-            {/* Optional field for your UI — not required by schema */}
-            <TextField
-              margin="normal" fullWidth id="company" label="Company / Organization" name="company"
-              autoComplete="organization" value={formData.company}
-              onChange={handleChange} disabled={loading}
-            />
+            {/* MINIMAL CHANGE: Add the Role selection dropdown */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="role-select-label">I am a...</InputLabel>
+              <Select
+                labelId="role-select-label"
+                id="role"
+                name="role"
+                value={formData.role}
+                label="I am a..."
+                onChange={handleChange}
+                disabled={loading}
+              >
+                <MenuItem value="PROPERTY_MANAGER">Property Manager</MenuItem>
+                <MenuItem value="OWNER">Owner</MenuItem>
+                <MenuItem value="TENANT">Tenant</MenuItem>
+                <MenuItem value="TECHNICIAN">Technician</MenuItem>
+              </Select>
+            </FormControl>
 
             <TextField
               margin="normal" required fullWidth name="password" label="Password"

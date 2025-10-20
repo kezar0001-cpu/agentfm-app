@@ -93,7 +93,13 @@ const registerSchema = z.object({
   lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
-  phone: z.string().optional(),
+  phone: z.string().optional().refine((phone) => {
+    if (!phone) return true;
+    return /^\+[1-9]\d{1,14}$/.test(phone.replace(/[\s\-\(\)]/g, ''));
+  }, {
+    message: "Phone number must be in a valid international format, e.g., +971 4 xxx-xxxx",
+  }), // 👈 COMMA ADDED HERE
+  role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional(),
 });
 
 // ========================================

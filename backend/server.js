@@ -1,8 +1,8 @@
 // backend/server.js
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const propertyRoutes = require('./routes/routes');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import propertyRoutes from './src/routes/index.js';
 dotenv.config();
 
 
