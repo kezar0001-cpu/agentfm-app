@@ -153,10 +153,15 @@ export default function PropertiesPage() {
   };
 
   return (
-    <Box sx={{ py: 3 }}>
+    <Box sx={{ py: { xs: 2, md: 4 } }}>
       <Stack spacing={3}>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={{ xs: 2, md: 0 }}
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          justifyContent="space-between"
+        >
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
               Properties
@@ -170,13 +175,15 @@ export default function PropertiesPage() {
             startIcon={<AddIcon />}
             onClick={handleCreate}
             size="large"
+            fullWidth
+            sx={{ maxWidth: { xs: '100%', md: 'none' } }}
           >
             Add Property
           </Button>
-        </Box>
+        </Stack>
 
         {/* Search and Filter */}
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 } }}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={8}>
               <TextField
@@ -246,6 +253,7 @@ export default function PropertiesPage() {
                       transform: 'translateY(-4px)',
                       boxShadow: 4,
                     },
+                    borderRadius: 3,
                   }}
                   onClick={() => handleCardClick(property.id)}
                 >
@@ -255,32 +263,40 @@ export default function PropertiesPage() {
                       src={property.imageUrl}
                       alt={property.name}
                       sx={{
-                        height: 200,
+                        height: { xs: 180, sm: 200 },
                         objectFit: 'cover',
                       }}
                     />
                   ) : (
                     <Box
                       sx={{
-                        height: 200,
+                        height: { xs: 180, sm: 200 },
                         bgcolor: 'grey.100',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        color: 'grey.400',
                       }}
                     >
-                      <HomeIcon sx={{ fontSize: 80, color: 'grey.400' }} />
+                      <HomeIcon sx={{ fontSize: 64 }} />
                     </Box>
                   )}
 
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Stack spacing={1.5}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          {property.name}
-                        </Typography>
-                        <IconButton
-                          size="small"
+                  <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {property.name}
+                      </Typography>
+                      <IconButton
+                        size="small"
                           onClick={(e) => handleMenuOpen(e, property)}
                         >
                           <MoreVertIcon />
@@ -289,7 +305,11 @@ export default function PropertiesPage() {
 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <LocationIcon fontSize="small" color="action" />
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ flexGrow: 1, minWidth: 0 }}
+                        >
                           {formatPropertyAddressLine(property)}
                         </Typography>
                       </Box>
@@ -322,10 +342,44 @@ export default function PropertiesPage() {
                           {property.description}
                         </Typography>
                       )}
-                    </Stack>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                      <LocationIcon fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                        {formatPropertyAddressLine(property)}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        size="small"
+                        label={property.status?.replace('_', ' ') || ''}
+                        color={getStatusColor(property.status || '')}
+                      />
+                      <Chip
+                        size="small"
+                        icon={<ApartmentIcon />}
+                        label={`${property.totalUnits} units`}
+                        variant="outlined"
+                      />
+                    </Box>
+
+                    {property.description && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {property.description}
+                      </Typography>
+                    )}
                   </CardContent>
 
-                  <CardActions sx={{ px: 2, pb: 2 }}>
+                  <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
                     <Stack spacing={0.5} sx={{ width: '100%' }}>
                       <Typography variant="caption" color="text.secondary">
                         Type: {property.propertyType}

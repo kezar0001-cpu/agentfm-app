@@ -138,7 +138,7 @@ const ServiceRequestsPage = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState type="loading" message="Loading service requests..." />
       </Container>
     );
@@ -146,7 +146,7 @@ const ServiceRequestsPage = () => {
 
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState
           type="error"
           message="Failed to load service requests"
@@ -157,9 +157,15 @@ const ServiceRequestsPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2, md: 0 }}
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Service Requests
@@ -174,14 +180,16 @@ const ServiceRequestsPage = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreate}
+          fullWidth
+          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
         >
           {userRole === 'TENANT' ? 'Submit Request' : 'Create Request'}
         </Button>
-      </Box>
+      </Stack>
 
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={4}>
               <TextField
@@ -267,7 +275,7 @@ const ServiceRequestsPage = () => {
           }
         />
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           {requestList.map((request) => {
             const description = typeof request.description === 'string' ? request.description : '';
             const displayDescription = description
@@ -281,51 +289,57 @@ const ServiceRequestsPage = () => {
 
             return (
               <Grid item xs={12} md={6} lg={4} key={request.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="h6" gutterBottom>
-                      {request.title}
-                    </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-                      <Chip
-                        label={statusLabel}
-                        color={getStatusColor(request.status)}
-                        size="small"
-                      />
-                      <Chip
-                        label={categoryLabel}
-                        color={getCategoryColor(request.category)}
-                        size="small"
-                        variant="outlined"
-                      />
-                      {priorityLabel && (
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    borderRadius: 3,
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                    },
+                  }}
+                >
+                  <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box>
+                      <Typography variant="h6" gutterBottom>
+                        {request.title}
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
                         <Chip
-                          label={priorityLabel}
+                          label={statusLabel}
+                          color={getStatusColor(request.status)}
                           size="small"
                         />
-                      )}
-                    </Stack>
-                  </Box>
+                        <Chip
+                          label={categoryLabel}
+                          color={getCategoryColor(request.category)}
+                          size="small"
+                          variant="outlined"
+                        />
+                        {priorityLabel && (
+                          <Chip
+                            label={priorityLabel}
+                            size="small"
+                          />
+                        )}
+                      </Stack>
+                    </Box>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 2 }}
-                  >
-                    {displayDescription}
-                  </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {displayDescription}
+                    </Typography>
 
                   <Stack spacing={1}>
                     <Box>
@@ -382,28 +396,36 @@ const ServiceRequestsPage = () => {
                   </Stack>
                 </CardContent>
 
-                {userRole !== 'TENANT' && request.status === 'SUBMITTED' && (
-                  <Box sx={{ p: 2, pt: 0, display: 'flex', gap: 1 }}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handleReview(request)}
+                  {userRole !== 'TENANT' && request.status === 'SUBMITTED' && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        pt: 0,
+                        display: 'flex',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                      }}
                     >
-                      Review
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      size="small"
-                      startIcon={<BuildIcon />}
-                      onClick={() => handleConvert(request)}
-                    >
-                      Convert to Job
-                    </Button>
-                  </Box>
-                )}
-              </Card>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleReview(request)}
+                      >
+                        Review
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        size="small"
+                        startIcon={<BuildIcon />}
+                        onClick={() => handleConvert(request)}
+                      >
+                        Convert to Job
+                      </Button>
+                    </Box>
+                  )}
+                </Card>
               </Grid>
             );
           })}
