@@ -50,39 +50,68 @@ function NavBar() {
 
   return (
     <AppBar
-      position="static"
+      position="sticky"
+      elevation={0}
       sx={{
-        backgroundColor: 'white',
-        color: 'black',
-        boxShadow: 2,
+        top: 0,
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+        backdropFilter: 'blur(6px)',
       }}
     >
       <Toolbar
         sx={{
+          minHeight: { xs: 64, sm: 72 },
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
-          flexWrap: { xs: 'wrap', sm: 'nowrap' },
-          py: { xs: 1, md: 0 },
+          gap: { xs: 1.5, md: 2 },
+          flexWrap: 'wrap',
         }}
       >
-        <Typography
-          variant="h6"
+        <Box
           sx={{
-            flexGrow: 0,
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            mr: { xs: 0, md: 4 },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: { xs: '100%', md: 'auto' },
+            gap: 1.5,
           }}
-          onClick={() => navigate('/dashboard')}
         >
-          AgentFM
-        </Typography>
+          <Typography
+            variant="h6"
+            onClick={() => navigate('/dashboard')}
+            sx={{
+              fontWeight: 700,
+              cursor: 'pointer',
+              letterSpacing: 0.4,
+            }}
+          >
+            AgentFM
+          </Typography>
+
+          <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
+            <IconButton
+              size="large"
+              aria-label="open navigation menu"
+              aria-controls="mobile-menu"
+              aria-haspopup="true"
+              onClick={handleOpenMobileMenu}
+              color="inherit"
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
+        </Box>
 
         <Box
           sx={{
             flexGrow: 1,
             display: { xs: 'none', md: 'flex' },
+            alignItems: 'center',
+            justifyContent: 'center',
             gap: 1,
             flexWrap: 'wrap',
           }}
@@ -94,12 +123,13 @@ function NavBar() {
               onClick={() => handleNavigation(item.href)}
               sx={{
                 textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: isActive(item.href) ? 'bold' : 'normal',
-                borderBottom: isActive(item.href) ? '2px solid #1976d2' : 'none',
-                borderRadius: 0,
-                minWidth: 'auto',
+                fontSize: '0.95rem',
+                fontWeight: isActive(item.href) ? 700 : 500,
+                borderBottom: isActive(item.href) ? '2px solid' : '2px solid transparent',
+                borderColor: isActive(item.href) ? 'primary.main' : 'transparent',
+                borderRadius: 999,
                 px: 2,
+                py: 0.5,
               }}
             >
               {item.name}
@@ -107,56 +137,7 @@ function NavBar() {
           ))}
         </Box>
 
-        {/* Mobile menu button */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' }, marginLeft: 'auto' }}>
-          <IconButton
-            size="large"
-            aria-label="open navigation menu"
-            aria-controls="mobile-menu"
-            aria-haspopup="true"
-            onClick={handleOpenMobileMenu}
-            color="inherit"
-          >
-            <MenuIcon />
-          </IconButton>
-          <Menu
-            id="mobile-menu"
-            anchorEl={mobileMenuAnchor}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            open={Boolean(mobileMenuAnchor)}
-            onClose={handleCloseMobileMenu}
-            keepMounted
-            sx={{
-              '& .MuiPaper-root': {
-                minWidth: 220,
-              },
-            }}
-          >
-            {navigation.map((item) => (
-              <MenuItem
-                key={item.name}
-                onClick={() => handleNavigation(item.href)}
-                selected={isActive(item.href)}
-              >
-                {item.name}
-              </MenuItem>
-            ))}
-            <Divider sx={{ my: 1 }} />
-            <Box sx={{ px: 2, pb: 1 }}>
-              <LogoutButton
-                fullWidth
-                variant="outlined"
-                color="error"
-                size="small"
-                sx={{ textTransform: 'none' }}
-              />
-            </Box>
-          </Menu>
-        </Box>
-
-        {/* Desktop logout button */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
           <LogoutButton
             variant="outlined"
             color="error"
@@ -164,6 +145,43 @@ function NavBar() {
             sx={{ textTransform: 'none' }}
           />
         </Box>
+
+        <Menu
+          id="mobile-menu"
+          anchorEl={mobileMenuAnchor}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          open={Boolean(mobileMenuAnchor)}
+          onClose={handleCloseMobileMenu}
+          keepMounted
+          sx={{
+            '& .MuiPaper-root': {
+              minWidth: 240,
+              borderRadius: 2,
+            },
+          }}
+        >
+          {navigation.map((item) => (
+            <MenuItem
+              key={item.name}
+              onClick={() => handleNavigation(item.href)}
+              selected={isActive(item.href)}
+              sx={{ fontWeight: isActive(item.href) ? 600 : 500 }}
+            >
+              {item.name}
+            </MenuItem>
+          ))}
+          <Divider sx={{ my: 1 }} />
+          <Box sx={{ px: 2, pb: 1 }}>
+            <LogoutButton
+              fullWidth
+              variant="outlined"
+              color="error"
+              size="medium"
+              sx={{ textTransform: 'none' }}
+            />
+          </Box>
+        </Menu>
       </Toolbar>
     </AppBar>
   );

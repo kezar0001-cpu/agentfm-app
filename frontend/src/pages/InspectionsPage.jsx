@@ -120,7 +120,7 @@ const InspectionsPage = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState type="loading" message="Loading inspections..." />
       </Container>
     );
@@ -128,7 +128,7 @@ const InspectionsPage = () => {
 
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState
           type="error"
           message="Failed to load inspections"
@@ -139,9 +139,15 @@ const InspectionsPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2, md: 0 }}
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Inspections
@@ -154,14 +160,16 @@ const InspectionsPage = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreate}
+          fullWidth
+          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
         >
           Schedule Inspection
         </Button>
-      </Box>
+      </Stack>
 
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={3}>
               <TextField
@@ -238,7 +246,7 @@ const InspectionsPage = () => {
           }
         />
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           {inspections.map((inspection) => (
             <Grid item xs={12} md={6} lg={4} key={inspection.id}>
               <Card
@@ -251,10 +259,19 @@ const InspectionsPage = () => {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
+                  borderRadius: 3,
                 }}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      justifyContent: 'space-between',
+                      alignItems: { xs: 'flex-start', sm: 'flex-start' },
+                      gap: { xs: 1, sm: 2 },
+                    }}
+                  >
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" gutterBottom>
                         {inspection.title}
@@ -271,6 +288,7 @@ const InspectionsPage = () => {
                       label={inspection.type}
                       size="small"
                       variant="outlined"
+                      sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                     />
                   </Box>
 
@@ -328,7 +346,16 @@ const InspectionsPage = () => {
                   </Stack>
                 </CardContent>
 
-                <Box sx={{ p: 2, pt: 0, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    pt: 0,
+                    display: 'flex',
+                    gap: 1,
+                    justifyContent: 'flex-end',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <Tooltip title="View Details">
                     <IconButton
                       size="small"
