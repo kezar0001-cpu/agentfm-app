@@ -373,4 +373,4 @@ const InspectionsPage = () => {
   );
 };
 
-export default router;
+export default InspectionsPage;
