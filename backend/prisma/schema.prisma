@@ -417,8 +417,8 @@ model Inspection {
   scheduledDate   DateTime
   completedDate   DateTime?
 
-  propertyId      String?
-  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId      String
+  property        Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   unitId          String?
   unit            Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -433,7 +433,7 @@ model Inspection {
   notes           String?          @db.Text
   findings        String?          @db.Text
 
-  photos          Json?
+  photos          String[]         @default([])
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -539,7 +539,7 @@ model ServiceRequest {
   requestedById   String
   requestedBy     User                 @relation(fields: [requestedById], references: [id], onDelete: Cascade)
 
-  photos          Json?
+  photos          String[]             @default([])
 
   reviewNotes     String?              @db.Text
   reviewedAt      DateTime?
