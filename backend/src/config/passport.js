@@ -12,8 +12,6 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback';
 
 // Only configure Google OAuth if credentials are provided
-const OAUTH_TRIAL_DAYS = 14;
-
 function deriveNameParts(profile, email) {
   const givenName = profile?.name?.givenName?.trim();
   const familyName = profile?.name?.familyName?.trim();
@@ -58,12 +56,6 @@ async function generatePlaceholderPasswordHash() {
   return bcrypt.hash(randomSecret, 10);
 }
 
-function calculateTrialEndDate() {
-  const trialEnd = new Date();
-  trialEnd.setDate(trialEnd.getDate() + OAUTH_TRIAL_DAYS);
-  return trialEnd;
-}
-
 if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
   console.log('✅ Google OAuth enabled');
 
@@ -77,7 +69,10 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
       },
       async (req, accessToken, refreshToken, profile, done) => {
         try {
-          const email = profile.emails[0].value;
+          const email = profile?.emails?.[0]?.value;
+          if (!email) {
+            return done(new Error('Google account does not include an email address'), null);
+          }
           const { firstName, lastName } = deriveNameParts(profile, email);
           const role = req.query.state || 'PROPERTY_MANAGER';
 
@@ -88,10 +83,6 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
 
           if (user) {
             const updates = {};
-
-            if (!user.emailVerified) {
-              updates.emailVerified = true;
-            }
 
             if ((!user.firstName || !user.firstName.trim()) && firstName) {
               updates.firstName = firstName;
@@ -116,16 +107,6 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
             return done(new Error('Google signup is only available for Property Managers'), null);
           }
 
-          // Create organization
-          const org = await prisma.org.create({
-            data: {
-              name: `${firstName}'s Organization`
-            }
-          });
-
-          // Calculate trial end date (14 days)
-          const trialEndDate = calculateTrialEndDate();
-
           const passwordHash = await generatePlaceholderPasswordHash();
 
           // Create user
@@ -136,26 +117,6 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
               lastName,
               passwordHash,
               role: 'PROPERTY_MANAGER',
-              emailVerified: true, // Google emails are verified
-              subscriptionPlan: 'FREE_TRIAL',
-              subscriptionStatus: 'TRIAL',
-              trialEndDate,
-              orgId: org.id
-            }
-          });
-
-          // Create Property Manager profile
-          await prisma.propertyManagerProfile.create({
-            data: {
-              userId: user.id,
-              managedProperties: [],
-              permissions: {
-                canCreateProperties: true,
-                canManageTenants: true,
-                canAssignJobs: true,
-                canViewReports: true
-              },
-              updatedAt: new Date()
             }
           });
 
@@ -181,8 +142,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id },
-      include: { org: true }
+      where: { id }
     });
     done(null, user);
   } catch (error) {
