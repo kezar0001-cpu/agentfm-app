@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../src/config/prismaClient.js';
 
 async function migrateRoles() {
   console.log('🚀 Starting role migration to RBAC system...\n');

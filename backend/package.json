@@ -24,6 +24,7 @@
     "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.16.3",
     "stripe": "^19.1.0",
     "zod": "^3.23.8"
   },
