@@ -116,6 +116,30 @@ enum NotificationType {
 }
 
 // ============================================
+// ORGANIZATION
+// ============================================
+
+model Org {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  imageUrl    String?
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  users         User[]
+  properties    Property[]
+  subscriptions Subscription[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+// ============================================
 // USER & AUTHENTICATION
 // ============================================
 
@@ -132,6 +156,9 @@ model User {
   lastLoginAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  orgId         String?
+  org           Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   // Relationships by role
   managedProperties   Property[]       @relation("PropertyManager")
@@ -156,6 +183,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([orgId])
 }
 
 model Invite {
@@ -192,7 +220,10 @@ model Subscription {
   id                String             @id @default(cuid())
   userId            String
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  orgId             String?
+  org               Org?               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   planId            String
   planName          String
   status            SubscriptionStatus @default(TRIAL)
@@ -215,6 +246,7 @@ model Subscription {
 
   @@index([userId])
   @@index([status])
+  @@index([orgId])
 }
 
 // ============================================
@@ -245,7 +277,10 @@ model Property {
   
   managerId       String
   manager         User           @relation("PropertyManager", fields: [managerId], references: [id], onDelete: Cascade)
-  
+
+  orgId           String?
+  org             Org?           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   units           Unit[]
   owners          PropertyOwner[]
   inspections     Inspection[]
@@ -257,6 +292,7 @@ model Property {
   @@index([managerId])
   @@index([status])
   @@index([city, state])
+  @@index([orgId])
 }
 
 model PropertyOwner {
