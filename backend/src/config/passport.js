@@ -144,20 +144,31 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
             }
           });
 
-          // Create Property Manager profile
-          await prisma.propertyManagerProfile.create({
-            data: {
-              userId: user.id,
-              managedProperties: [],
-              permissions: {
-                canCreateProperties: true,
-                canManageTenants: true,
-                canAssignJobs: true,
-                canViewReports: true
-              },
-              updatedAt: new Date()
-            }
-          });
+          // Create Property Manager profile when the model is available.
+          // Some deployments may still be on an earlier Prisma schema where
+          // the PropertyManagerProfile model has not been generated. In that
+          // case prisma.propertyManagerProfile will be undefined, which used
+          // to throw an error and stop the OAuth callback flow.
+          if (prisma.propertyManagerProfile?.create) {
+            await prisma.propertyManagerProfile.create({
+              data: {
+                userId: user.id,
+                managedProperties: [],
+                permissions: {
+                  canCreateProperties: true,
+                  canManageTenants: true,
+                  canAssignJobs: true,
+                  canViewReports: true
+                },
+                updatedAt: new Date()
+              }
+            });
+          } else {
+            console.warn(
+              'PropertyManagerProfile model is not available in Prisma client; skipping profile creation for user',
+              user.id
+            );
+          }
 
           return done(null, user);
         } catch (error) {
