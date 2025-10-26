@@ -1,5 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { prisma } from '../config/prismaClient.js';
 
 // ========================================
@@ -10,9 +12,61 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback';
 
 // Only configure Google OAuth if credentials are provided
+const OAUTH_TRIAL_DAYS = 14;
+
+function deriveNameParts(profile, email) {
+  const givenName = profile?.name?.givenName?.trim();
+  const familyName = profile?.name?.familyName?.trim();
+
+  if (givenName || familyName) {
+    return {
+      firstName: givenName || familyName || 'Google',
+      lastName: familyName || givenName || 'User',
+    };
+  }
+
+  const displayName = profile?.displayName?.trim();
+  if (displayName) {
+    const parts = displayName.split(/\s+/);
+    const firstName = parts.shift();
+    const lastName = parts.join(' ') || 'User';
+    return {
+      firstName: firstName || 'Google',
+      lastName,
+    };
+  }
+
+  const [localPart] = email.split('@');
+  if (localPart) {
+    const cleaned = localPart.replace(/[._-]+/g, ' ').trim();
+    if (cleaned) {
+      const parts = cleaned.split(/\s+/);
+      const firstName = parts.shift();
+      const lastName = parts.join(' ') || 'User';
+      return {
+        firstName: firstName || 'Google',
+        lastName,
+      };
+    }
+  }
+
+  return { firstName: 'Google', lastName: 'User' };
+}
+
+async function generatePlaceholderPasswordHash() {
+  const randomSecret = crypto.randomBytes(32).toString('hex');
+  return bcrypt.hash(randomSecret, 10);
+}
+
+function calculateTrialEndDate() {
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + OAUTH_TRIAL_DAYS);
+  return trialEnd;
+}
+
 if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
   console.log('✅ Google OAuth enabled');
-  
+
   passport.use(
     new GoogleStrategy(
       {
@@ -24,25 +78,36 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
       async (req, accessToken, refreshToken, profile, done) => {
         try {
           const email = profile.emails[0].value;
-          const name = profile.displayName;
-          const googleId = profile.id;
+          const { firstName, lastName } = deriveNameParts(profile, email);
           const role = req.query.state || 'PROPERTY_MANAGER';
 
           // Check if user exists
           let user = await prisma.user.findUnique({
-            where: { email },
-            include: { org: true }
+            where: { email }
           });
 
           if (user) {
-            // User exists, update Google ID if needed
-            if (!user.googleId) {
+            const updates = {};
+
+            if (!user.emailVerified) {
+              updates.emailVerified = true;
+            }
+
+            if ((!user.firstName || !user.firstName.trim()) && firstName) {
+              updates.firstName = firstName;
+            }
+
+            if ((!user.lastName || !user.lastName.trim()) && lastName) {
+              updates.lastName = lastName;
+            }
+
+            if (Object.keys(updates).length > 0) {
               user = await prisma.user.update({
                 where: { id: user.id },
-                data: { googleId },
-                include: { org: true }
+                data: updates
               });
             }
+
             return done(null, user);
           }
 
@@ -54,28 +119,29 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
           // Create organization
           const org = await prisma.org.create({
             data: {
-              name: `${name}'s Organization`
+              name: `${firstName}'s Organization`
             }
           });
 
           // Calculate trial end date (14 days)
-          const trialEndDate = new Date();
-          trialEndDate.setDate(trialEndDate.getDate() + 14);
+          const trialEndDate = calculateTrialEndDate();
+
+          const passwordHash = await generatePlaceholderPasswordHash();
 
           // Create user
           user = await prisma.user.create({
             data: {
               email,
-              name,
-              googleId,
+              firstName,
+              lastName,
+              passwordHash,
               role: 'PROPERTY_MANAGER',
               emailVerified: true, // Google emails are verified
               subscriptionPlan: 'FREE_TRIAL',
               subscriptionStatus: 'TRIAL',
               trialEndDate,
               orgId: org.id
-            },
-            include: { org: true }
+            }
           });
 
           // Create Property Manager profile
@@ -88,7 +154,8 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
                 canManageTenants: true,
                 canAssignJobs: true,
                 canViewReports: true
-              }
+              },
+              updatedAt: new Date()
             }
           });
 
