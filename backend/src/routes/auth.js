@@ -100,6 +100,7 @@ const registerSchema = z.object({
     message: "Phone number must be in a valid international format, e.g., +971 4 xxx-xxxx",
   }), // 👈 COMMA ADDED HERE
   role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional(),
+  inviteToken: z.string().optional(), // Support for invite-based registration
 });
 
 // ========================================
@@ -107,17 +108,46 @@ const registerSchema = z.object({
 // ========================================
 router.post('/register', async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone } = registerSchema.parse(req.body);
+    const { firstName, lastName, email, password, phone, inviteToken } = registerSchema.parse(req.body);
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
+    let userRole = 'PROPERTY_MANAGER'; // Default role for direct signup
+    let invite = null;
+
+    // If registering via invite, verify the invite
+    if (inviteToken) {
+      invite = await prisma.invite.findUnique({
+        where: { token: inviteToken },
+        include: {
+          property: true,
+          unit: true,
+        },
+      });
+
+      if (!invite) {
+        return res.status(400).json({ success: false, message: 'Invalid invite token' });
+      }
+
+      if (invite.status !== 'PENDING') {
+        return res.status(400).json({ success: false, message: 'Invite has already been used' });
+      }
+
+      if (new Date() > new Date(invite.expiresAt)) {
+        return res.status(400).json({ success: false, message: 'Invite has expired' });
+      }
+
+      if (invite.email !== email) {
+        return res.status(400).json({ success: false, message: 'Email does not match invite' });
+      }
+
+      userRole = invite.role;
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
-
-    // (trial/subscription/org removed – not in schema)
-
     const trialEndDate = calculateTrialEndDate();
 
     const user = await prisma.user.create({
@@ -127,14 +157,49 @@ router.post('/register', async (req, res) => {
         email,
         passwordHash,
         phone,
-        role: 'PROPERTY_MANAGER',
+        role: userRole,
         subscriptionPlan: 'FREE_TRIAL',
         subscriptionStatus: 'TRIAL',
         trialEndDate,
       },
     });
 
-    // ❌ Removed: propertyManagerProfile create (model not in schema)
+    // If this was an invite-based signup, update the invite status
+    if (invite) {
+      await prisma.invite.update({
+        where: { id: invite.id },
+        data: {
+          status: 'ACCEPTED',
+          invitedUserId: user.id,
+        },
+      });
+
+      // If the invite was for a specific unit (tenant), create UnitTenant relationship
+      if (userRole === 'TENANT' && invite.unitId) {
+        await prisma.unitTenant.create({
+          data: {
+            unitId: invite.unitId,
+            tenantId: user.id,
+            leaseStart: new Date(),
+            leaseEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year default
+            rentAmount: 0, // To be filled in later
+            isActive: true,
+          },
+        });
+      }
+
+      // If the invite was for a property (owner), create PropertyOwner relationship
+      if (userRole === 'OWNER' && invite.propertyId) {
+        await prisma.propertyOwner.create({
+          data: {
+            propertyId: invite.propertyId,
+            ownerId: user.id,
+            ownershipPercentage: 100,
+            startDate: new Date(),
+          },
+        });
+      }
+    }
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -261,7 +326,9 @@ router.get(
 
       const nextPath = dashboardRoutes[user.role] || '/dashboard';
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/signin?token=${token}&next=${encodeURIComponent(nextPath)}`);
+
+      // Redirect to auth/callback page which will handle token storage
+      res.redirect(`${frontendUrl}/auth/callback?token=${token}&next=${encodeURIComponent(nextPath)}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
