@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import jwt from 'jsonwebtoken';
-import getJwtSecret from '../utils/jwt.js';
+import getJwtSecret from '../utils/getJwtSecret.js';
 
 const router = Router();
 
