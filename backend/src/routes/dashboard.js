@@ -1,44 +1,39 @@
 import express from 'express';
-// 👇 This path needs to be correct
+// ✅ FIX: Changed path from ../ to ../../
 import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js'; 
-import jwt from 'jsonwebtoken';
-import { prisma } from '../config/prismaClient.js';
+import { requireAuth } from '../middleware/auth.js'; // This path is correct
 
 const router = express.Router();
 
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true },
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
-
+/**
+ * All routes below are protected by JWT authentication.
+ * The requireAuth middleware verifies the token,
+ * attaches the user to req.user, and proceeds if valid.
+ */
 router.use(requireAuth);
 
-// Wires up the /summary route
-router.get('/summary', getDashboardSummary);
+// ✅ GET /api/dashboard/summary
+// Returns dashboard summary data for the logged-in user
+router.get('/summary', async (req, res, next) => {
+  try {
+    const data = await getDashboardSummary(req, res);
+    return data;
+  } catch (err) {
+    console.error('Error in /summary route:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
-// 👇 Adds the missing /activity route
-router.get('/activity', getRecentActivity);
+// ✅ GET /api/dashboard/activity
+// Returns recent activity data for the logged-in user
+router.get('/activity', async (req, res, next) => {
+  try {
+    const data = await getRecentActivity(req, res);
+    return data;
+  } catch (err) {
+    console.error('Error in /activity route:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 export default router;
