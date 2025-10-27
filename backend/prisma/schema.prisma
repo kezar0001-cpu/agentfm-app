@@ -163,6 +163,9 @@ model User {
   createdRecommendations  Recommendation[] @relation("CreatedBy")
   approvedRecommendations Recommendation[] @relation("ApprovedBy")
 
+  // Security
+  passwordResets    PasswordReset[]
+
   @@index([email])
   @@index([role])
 }
@@ -198,6 +201,29 @@ model Invite {
   @@index([email])
   @@index([token])
   @@index([status])
+}
+
+// ===============================
+// Password Reset
+// ===============================
+
+model PasswordReset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Selector and verifier pattern for secure token validation
+  selector    String   @unique     // Public identifier (unhashed)
+  verifier    String                // Hashed token (using bcrypt/argon2)
+
+  expiresAt   DateTime              // 20 minutes from creation
+  usedAt      DateTime?             // Timestamp when token was used
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([selector])
+  @@index([expiresAt])
 }
 
 // ===============================
