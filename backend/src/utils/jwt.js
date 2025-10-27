@@ -1,4 +1,4 @@
-const DEFAULT_JWT_SECRET = 'your-secret-key';
+const DEFAULT_JWT_SECRET = 'ed4579c94dee0cf3ecffc3dbbfe7ab0b';
 
 export function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
