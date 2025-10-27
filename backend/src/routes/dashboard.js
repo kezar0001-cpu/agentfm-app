@@ -1,6 +1,7 @@
 import express from 'express';
-import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js';
-import { requireAuth } from '../../src/middleware/auth.js'; // ✅ Centralized JWT middleware
+// ✅ FIX: Changed path from ../ to ../../
+import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js'; 
+import { requireAuth } from '../middleware/auth.js'; // This path is correct
 
 const router = express.Router();
 
