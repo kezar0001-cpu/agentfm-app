@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
+<<<<<<< HEAD:backend/src/routes/maintenance.js.unused
 import { requireAuth } from '../middleware/auth.js';
+=======
+import jwt from 'jsonwebtoken';
+import getJwtSecret from '../utils/getJwtSecret.js';
+>>>>>>> 8ee718f (Use canonical getJwtSecret route imports):backend/src/routes/maintenance.js
 
 const router = Router();
 
