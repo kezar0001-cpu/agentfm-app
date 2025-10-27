@@ -1,3 +1,6 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const app = express();
 const cors = require('cors');
@@ -12,6 +15,10 @@ const protect = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ msg: 'No token' });
   try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT secret not configured');
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = User.findById(decoded.id).select('-password'); // Adjust for Prisma
     next();

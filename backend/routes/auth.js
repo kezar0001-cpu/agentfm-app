@@ -7,14 +7,36 @@ const protect = require('../middleware/auth');
 
 // Register
 router.post('/register', async (req, res) => {
-  // ... hash password, save user ...
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ msg: 'JWT secret not configured' });
+  }
+
+  const { email, name } = req.body || {};
+  // Temporary stub user until persistence is implemented
+  const user = {
+    _id: 'stub-register-user',
+    name: name || 'New User',
+    email: email || 'new.user@example.com',
+  };
+
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '5d' });
   res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
 });
 
 // Login
 router.post('/login', async (req, res) => {
-  // ... check credentials ...
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ msg: 'JWT secret not configured' });
+  }
+
+  const { email, name } = req.body || {};
+  // Temporary stub user until persistence is implemented
+  const user = {
+    _id: 'stub-login-user',
+    name: name || 'Existing User',
+    email: email || 'existing.user@example.com',
+  };
+
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '5d' });
   res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
 });
