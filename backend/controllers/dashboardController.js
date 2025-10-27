@@ -1,4 +1,4 @@
-import prisma from '../config/prismaClient.js';
+import prisma from '../src/config/prismaClient.js';
 
 // ============================================
 // DASHBOARD CONTROLLER
