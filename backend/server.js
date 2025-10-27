@@ -1,63 +1,30 @@
-// backend/server.js
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import propertyRoutes from './src/routes/index.js';
-dotenv.config();
-
-
+const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 5000;
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const User = require('./models/User'); // Adjust if using Prisma
 
-// middleware
-const allowlist = new Set(
-  (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
-    .map((origin) => origin && origin.trim())
-    .filter(Boolean)
-);
-
-[
-  process.env.FRONTEND_URL,
-  'https://www.buildstate.com.au',
-  'https://buildstate.com.au',
-  'https://api.buildstate.com.au',
-  'https://agentfm.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-].forEach((origin) => {
-  if (origin) allowlist.add(origin.trim());
-});
-
-const dynamicOriginMatchers = [
-  /https:\/\/.+\.vercel\.app$/,
-];
-
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowlist.has(origin)) return callback(null, true);
-    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
-      return callback(null, true);
-    }
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['set-cookie'],
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
-// API routes
-app.use('/api', propertyRoutes);
+// Auth middleware (create in backend/middleware/auth.js if missing)
+const protect = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ msg: 'No token' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = User.findById(decoded.id).select('-password'); // Adjust for Prisma
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: 'Invalid token' });
+  }
+};
 
-// test route
-app.get('/', (req, res) => {
-  res.send('✅ AgentFM backend API is running...');
-});
+// Routes (update backend/routes/auth.js)
+const authRouter = require('./routes/auth');
+app.use('/auth', authRouter);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Add other protected routes like /dashboard, /activity with app.use('/dashboard', protect, dashboardRouter); etc.
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server on port ${PORT}`));
