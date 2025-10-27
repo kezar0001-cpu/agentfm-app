@@ -108,7 +108,7 @@ const registerSchema = z.object({
 // ========================================
 router.post('/register', async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone, inviteToken } = registerSchema.parse(req.body);
+    const { firstName, lastName, email, password, phone, role, inviteToken } = registerSchema.parse(req.body);
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -117,6 +117,17 @@ router.post('/register', async (req, res) => {
 
     let userRole = 'PROPERTY_MANAGER'; // Default role for direct signup
     let invite = null;
+
+    // RESTRICTION: Only PROPERTY_MANAGER can sign up without an invite
+    // All other roles (OWNER, TENANT, TECHNICIAN) require an invite token
+    const requestedRole = role || 'PROPERTY_MANAGER';
+
+    if (requestedRole !== 'PROPERTY_MANAGER' && !inviteToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only Property Managers can sign up directly. Other roles require an invitation.'
+      });
+    }
 
     // If registering via invite, verify the invite
     if (inviteToken) {
@@ -145,6 +156,9 @@ router.post('/register', async (req, res) => {
       }
 
       userRole = invite.role;
+    } else {
+      // For non-invite signups, ensure role is PROPERTY_MANAGER
+      userRole = 'PROPERTY_MANAGER';
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
