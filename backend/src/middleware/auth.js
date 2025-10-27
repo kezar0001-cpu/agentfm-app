@@ -12,7 +12,7 @@ export const requireAuth = async (req, res, next) => {
     let decoded;
 
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
     } catch (error) {
       console.error('JWT verification failed:', {
         name: error?.name,
