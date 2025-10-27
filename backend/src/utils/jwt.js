@@ -1,14 +1,10 @@
-const DEFAULT_JWT_SECRET = 'ed4579c94dee0cf3ecffc3dbbfe7ab0b';
-
+// backend/src/utils/jwt.js
 export function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
-  if (typeof secret === 'string') {
-    const trimmed = secret.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
+  if (!secret || !secret.trim()) {
+    throw new Error('JWT_SECRET is not set in environment');
   }
-  return DEFAULT_JWT_SECRET;
+  return secret.trim();
 }
 
 export default getJwtSecret;

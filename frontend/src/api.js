@@ -1,24 +1,17 @@
 // frontend/src/api.js
-// Production-ready API client (absolute base + credentials included)
+// Production-ready API client (absolute base + auth header + safe /api prefixing)
 
-// Determine an appropriate API base URL. Use the environment variable when
-// available; otherwise fall back to a sensible default. In development we
-// assume a local backend on port 3000; in production we point to the
-// hosted API subdomain. Without this fallback, API_BASE would be an empty
-// string and fetch calls would incorrectly target the front-end domain.
 const defaultBase =
   import.meta.env.MODE === 'development'
     ? 'http://localhost:3000'
     : 'https://api.buildstate.com.au';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || defaultBase).replace(
-  /\/+$/,
-  ''
-);
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || defaultBase).replace(/\/+$/, '');
+const BASE_HAS_API = /\/api$/i.test(API_BASE);
+
 if (!API_BASE) {
   // eslint-disable-next-line no-console
-  console.warn(
-    'Neither VITE_API_BASE_URL nor a default API_BASE could be determined; API calls may fail.'
-  );
+  console.warn('Neither VITE_API_BASE_URL nor a default API_BASE could be determined; API calls may fail.');
 }
 
 function joinUrl(path) {
@@ -37,13 +30,20 @@ function getAuthToken() {
 async function apiCall(url, options = {}) {
   const token = getAuthToken();
 
-  const path =
-    url.startsWith('/api') || url.startsWith('api')
-      ? url
-      : `/api${url.startsWith('/') ? url : '/' + url}`;
-  const fullUrl = url.startsWith('http') ? url : joinUrl(path);
+  // Build a full URL:
+  // - If absolute (http/https), use as-is
+  // - Else, ensure exactly one '/api' prefix unless API_BASE already ends with '/api'
+  let fullUrl;
+  if (/^https?:\/\//i.test(url)) {
+    fullUrl = url;
+  } else {
+    const clean = url.replace(/^\/+/, '');
+    const prefix = (clean.startsWith('api') || clean.startsWith('api/')) || BASE_HAS_API ? '' : 'api/';
+    fullUrl = joinUrl(`/${prefix}${clean}`);
+  }
 
   const isFormData = options.body instanceof FormData || options.data instanceof FormData;
+
   const headers = {
     ...(token && { Authorization: `Bearer ${token}` }),
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
@@ -53,7 +53,8 @@ async function apiCall(url, options = {}) {
   const req = {
     method: options.method || 'GET',
     headers,
-    credentials: 'include', // required for cookie auth
+    // Use cookie auth only when requested at call-site to reduce CORS friction:
+    ...(options.credentials ? { credentials: options.credentials } : {}),
     body:
       options.body ??
       (options.data instanceof FormData
@@ -93,11 +94,11 @@ export const api = {
   put: (url, data, opts) => apiCall(url, { ...(opts || {}), method: 'PUT', data }),
   patch: (url, data, opts) => apiCall(url, { ...(opts || {}), method: 'PATCH', data }),
   delete: (url, opts) => apiCall(url, { ...(opts || {}), method: 'DELETE' }),
-  request: ({ url, method = 'GET', data, params, headers }) => {
+  request: ({ url, method = 'GET', data, params, headers, credentials }) => {
     const p = params
       ? url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params).toString()
       : url;
-    return apiCall(p, { method, data, headers });
+    return apiCall(p, { method, data, headers, credentials });
   },
 };
 
