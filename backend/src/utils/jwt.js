@@ -1,10 +1,18 @@
-// backend/src/utils/jwt.js
-export function getJwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || !secret.trim()) {
-    throw new Error('JWT_SECRET is not set in environment');
-  }
-  return secret.trim();
+import jwt from 'jsonwebtoken';
+import getJwtSecret from './getJwtSecret.js';
+
+const SECRET = getJwtSecret();
+
+export function signToken(payload, opts = {}) {
+  // default 7 days
+  const options = { expiresIn: '7d', ...opts };
+  return jwt.sign(payload, SECRET, options);
 }
 
-export default getJwtSecret;
+export function verifyToken(token) {
+  return jwt.verify(token, SECRET);
+}
+
+export function decodeToken(token) {
+  return jwt.decode(token);
+}
