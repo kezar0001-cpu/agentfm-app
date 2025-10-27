@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../config/prismaClient.js';
 import jwt from 'jsonwebtoken';
-import { getJwtSecret } from '../utils/jwt.js';
+// ✅ FIX: The import path is corrected to point to the right file
+import getJwtSecret from '../utils/getJwtSecret.js';
 
 const router = Router();
 

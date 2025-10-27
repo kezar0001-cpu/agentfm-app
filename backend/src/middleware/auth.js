@@ -1,24 +1,20 @@
-import jwt from 'jsonwebtoken';
 import prisma from '../config/prismaClient.js';
+import { verifyToken } from '../utils/jwt.js';
 
 export const requireAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'No token provided' });
     }
 
-    const token = authHeader.split(' ')[1];
-    let decoded;
+    const token = authHeader.slice('Bearer '.length).trim();
 
+    let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    } catch (error) {
-      console.error('JWT verification failed:', {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-      });
+      decoded = verifyToken(token); // uses the single SECRET
+    } catch (err) {
+      console.error('JWT verify error:', err?.name, err?.message);
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
@@ -28,9 +24,9 @@ export const requireAuth = async (req, res, next) => {
     }
 
     req.user = user;
-    next();
-  } catch (error) {
-    console.error('Auth middleware error:', error?.message);
+    return next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 };
