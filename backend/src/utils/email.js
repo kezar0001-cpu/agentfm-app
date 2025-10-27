@@ -1,6 +1,20 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend client only when needed
+let resend = null;
+
+function getResendClient() {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not configured - email sending will be disabled');
+    return null;
+  }
+
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+
+  return resend;
+}
 
 /**
  * Send password reset email
@@ -9,10 +23,19 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  * @param {string} firstName - User's first name
  */
 export async function sendPasswordResetEmail(to, resetUrl, firstName) {
+  const client = getResendClient();
+
+  if (!client) {
+    console.error('Cannot send password reset email - Resend API key not configured');
+    // Don't throw error to prevent breaking the forgot password flow
+    // The user will still get a success message (to prevent email enumeration)
+    return null;
+  }
+
   try {
     const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await client.emails.send({
       from: emailFrom,
       to: to,
       subject: 'Reset Your Buildstate Password',
