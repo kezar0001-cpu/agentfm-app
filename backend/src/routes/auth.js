@@ -522,7 +522,7 @@ router.get('/reset-password/validate', async (req, res) => {
 
     // Find the password reset record by selector
     const passwordReset = await prisma.passwordReset.findUnique({
-      where: { selector: selector as string },
+      where: { selector: String(selector) },
       include: { user: true },
     });
 
@@ -551,7 +551,7 @@ router.get('/reset-password/validate', async (req, res) => {
     }
 
     // Verify the token against stored hashed verifier
-    const isValidToken = await bcrypt.compare(token as string, passwordReset.verifier);
+    const isValidToken = await bcrypt.compare(String(token), passwordReset.verifier);
 
     if (!isValidToken) {
       return res.status(400).json({
