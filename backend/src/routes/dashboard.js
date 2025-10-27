@@ -1,6 +1,6 @@
 import express from 'express';
-import { getDashboardSummary, getRecentActivity } from '../controllers/dashboardController.js';
-import { requireAuth } from '../middleware/auth.js'; // ✅ Centralized JWT middleware
+import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js';
+import { requireAuth } from '../../src/middleware/auth.js'; // ✅ Centralized JWT middleware
 
 const router = express.Router();
 
