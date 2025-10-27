@@ -20,6 +20,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,  // Add this
+  InputLabel,   // Add this
+  Select,       // Add this
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -203,20 +206,21 @@ export default function PropertiesPage() {
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                select
-                id="properties-filter-status"
-                name="filterStatus"
-                label="Status"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <MenuItem value="all">All Statuses</MenuItem>
-                <MenuItem value="ACTIVE">Active</MenuItem>
-                <MenuItem value="INACTIVE">Inactive</MenuItem>
-                <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
-              </TextField>
+              <FormControl fullWidth>
+                <InputLabel id="properties-filter-status-label">Status</InputLabel>
+                <Select
+                  labelId="properties-filter-status-label"
+                  id="properties-filter-status"
+                  name="filterStatus"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <MenuItem value="all">All Statuses</MenuItem>
+                  <MenuItem value="ACTIVE">Active</MenuItem>
+                  <MenuItem value="INACTIVE">Inactive</MenuItem>
+                  <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
         </Paper>
@@ -283,66 +287,66 @@ export default function PropertiesPage() {
                   )}
 
                   <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-  <Box
-    sx={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      gap: 1,
-      flexWrap: 'wrap',
-    }}
-  >
-    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-      {property.name}
-    </Typography>
-    <IconButton
-      size="small"
-      onClick={(e) => handleMenuOpen(e, property)}
-    >
-      <MoreVertIcon />
-    </IconButton>
-  </Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {property.name}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleMenuOpen(e, property)}
+                      >
+                        <MoreVertIcon />
+                      </IconButton>
+                    </Box>
 
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-    <LocationIcon fontSize="small" color="action" />
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      sx={{ flexGrow: 1, minWidth: 0 }}
-    >
-      {formatPropertyAddressLine(property)}
-    </Typography>
-  </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <LocationIcon fontSize="small" color="action" />
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ flexGrow: 1, minWidth: 0 }}
+                      >
+                        {formatPropertyAddressLine(property)}
+                      </Typography>
+                    </Box>
 
-  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-    <Chip
-      size="small"
-      label={property.status?.replace('_', ' ') || ''}
-      color={getStatusColor(property.status || '')}
-    />
-    <Chip
-      size="small"
-      icon={<ApartmentIcon />}
-      label={`${property.totalUnits} units`}
-      variant="outlined"
-    />
-  </Box>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        size="small"
+                        label={property.status?.replace('_', ' ') || ''}
+                        color={getStatusColor(property.status || '')}
+                      />
+                      <Chip
+                        size="small"
+                        icon={<ApartmentIcon />}
+                        label={`${property.totalUnits} units`}
+                        variant="outlined"
+                      />
+                    </Box>
 
-  {property.description && (
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      sx={{
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-      }}
-    >
-      {property.description}
-    </Typography>
-  )}
-</CardContent>
+                    {property.description && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {property.description}
+                      </Typography>
+                    )}
+                  </CardContent>
 
                   <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
                     <Stack spacing={0.5} sx={{ width: '100%' }}>
