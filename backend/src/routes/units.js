@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import prisma from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
-import { ROLES } from '../../middleware/roleAuth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 
 const UNIT_STATUSES = new Set(['AVAILABLE', 'OCCUPIED', 'MAINTENANCE', 'VACANT']);
+const ROLE_MANAGER = 'PROPERTY_MANAGER';
 
 router.use(requireAuth);
 
@@ -45,11 +45,11 @@ const ensurePropertyAccess = async (user, propertyId) => {
     return { allowed: false, status: 404, message: 'Property not found' };
   }
 
-  if (user.role === ROLES.ADMIN) {
+  if (user.role === ROLE_MANAGER) {
     return { allowed: true, property };
   }
 
-  if (user.role === ROLES.PROPERTY_MANAGER && property.managerId === user.id) {
+  if (user.role === ROLE_MANAGER && property.managerId === user.id) {
     return { allowed: true, property };
   }
 
@@ -57,7 +57,7 @@ const ensurePropertyAccess = async (user, propertyId) => {
 };
 
 const ensureManagerAccess = async (user, propertyId) => {
-  if (user.role !== ROLES.ADMIN && user.role !== ROLES.PROPERTY_MANAGER) {
+  if (user.role !== ROLE_MANAGER && user.role !== ROLE_MANAGER) {
     return { allowed: false, status: 403, message: 'Only property managers can manage units' };
   }
 
@@ -66,7 +66,7 @@ const ensureManagerAccess = async (user, propertyId) => {
     return access;
   }
 
-  if (user.role === ROLES.PROPERTY_MANAGER && access.property.managerId !== user.id) {
+  if (user.role === ROLE_MANAGER && access.property.managerId !== user.id) {
     return { allowed: false, status: 403, message: 'Access denied' };
   }
 

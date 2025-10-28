@@ -1,54 +1,16 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 // backend/src/routes/properties.js
 import { Router } from 'express';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
-
 import prisma from '../config/prismaClient.js';
-import { requireRole, ROLES } from '../../middleware/roleAuth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import unitsRouter from './units.js';
 
 const router = Router();
 
-// ---------------------------------------------------------------------------
-// Authentication middleware
-// ---------------------------------------------------------------------------
-const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let decoded;
-
-    try {
-      decoded = jwt.verify(token, getJwtSecret());
-    } catch (error) {
-      console.error('JWT verification failed:', {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-      });
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.error('Auth middleware error:', error?.message);
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  }
-};
-
+// All property routes require authentication
 router.use(requireAuth);
-router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
+
+// Nested units routes
 router.use('/:id/units', unitsRouter);
 
 // ---------------------------------------------------------------------------
@@ -195,9 +157,34 @@ const ensurePropertyAccess = (property, user) => {
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
+// GET / - List properties (PROPERTY_MANAGER sees their properties, OWNER sees owned properties)
 router.get('/', async (req, res) => {
   try {
-    const where = req.user.role === ROLES.ADMIN ? {} : { managerId: req.user.id };
+    let where = {};
+    
+    // Property managers see properties they manage
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      where = { managerId: req.user.id };
+    }
+    
+    // Owners see properties they own
+    if (req.user.role === 'OWNER') {
+      where = {
+        owners: {
+          some: {
+            ownerId: req.user.id,
+          },
+        },
+      };
+    }
+    
+    // Technicians and tenants should not access this route
+    if (req.user.role === 'TECHNICIAN' || req.user.role === 'TENANT') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. This endpoint is for property managers and owners only.' 
+      });
+    }
 
     const select = {
       id: true,
@@ -239,7 +226,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+// POST / - Create property (PROPERTY_MANAGER only, requires active subscription)
+router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, async (req, res) => {
   try {
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
@@ -277,6 +265,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+// GET /:id - Get property by ID (with access check)
 router.get('/:id', async (req, res) => {
   try {
     const property = await prisma.property.findUnique({
@@ -311,7 +300,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.patch('/:id', async (req, res) => {
+// PATCH /:id - Update property (PROPERTY_MANAGER only, must be property manager)
+router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const property = await prisma.property.findUnique({ where: { id: req.params.id } });
     const access = ensurePropertyAccess(property, req.user);
@@ -324,7 +314,8 @@ router.patch('/:id', async (req, res) => {
     // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : property.managerId;
+    // Property manager can only update their own properties (already checked by ensurePropertyAccess)
+    const managerId = property.managerId;
 
     // Ensure converted fields are included in the data
     const updateData = {
@@ -356,7 +347,8 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+// DELETE /:id - Delete property (PROPERTY_MANAGER only, must be property manager)
+router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const property = await prisma.property.findUnique({ where: { id: req.params.id } });
     const access = ensurePropertyAccess(property, req.user);

@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import { prisma } from '../config/prismaClient.js';
 
 const router = express.Router();
@@ -42,13 +42,35 @@ const jobUpdateSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+// GET / - List jobs (role-based filtering)
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, assignedToId } = req.query;
     
-    // Build where clause based on filters
+    // Build where clause based on filters and user role
     const where = {};
     
+    // Role-based filtering
+    if (req.user.role === 'TECHNICIAN') {
+      // Technicians only see jobs assigned to them
+      where.assignedToId = req.user.id;
+    } else if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers see jobs for their properties
+      where.property = {
+        managerId: req.user.id,
+      };
+    } else if (req.user.role === 'OWNER') {
+      // Owners see jobs for properties they own
+      where.property = {
+        owners: {
+          some: {
+            ownerId: req.user.id,
+          },
+        },
+      };
+    }
+    
+    // Apply query filters
     if (status) {
       where.status = status;
     }
@@ -57,7 +79,8 @@ router.get('/', requireAuth, async (req, res) => {
       where.propertyId = propertyId;
     }
     
-    if (assignedToId) {
+    if (assignedToId && (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'OWNER')) {
+      // Only managers and owners can filter by assignedToId
       where.assignedToId = assignedToId;
     }
     
@@ -101,7 +124,8 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/', requireAuth, validate(jobCreateSchema), async (req, res) => {
+// POST / - Create job (PROPERTY_MANAGER only, requires active subscription)
+router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubscription, validate(jobCreateSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, priority, scheduledDate, assignedToId, estimatedCost, notes } = req.body;
     
@@ -226,7 +250,8 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.patch('/:id', requireAuth, validate(jobUpdateSchema), async (req, res) => {
+// PATCH /:id - Update job (PROPERTY_MANAGER and TECHNICIAN can update)
+router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'), validate(jobUpdateSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -234,10 +259,45 @@ router.patch('/:id', requireAuth, validate(jobUpdateSchema), async (req, res) =>
     // Check if job exists
     const existingJob = await prisma.job.findUnique({
       where: { id },
+      include: {
+        property: true,
+      },
     });
     
     if (!existingJob) {
       return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Access control: Technicians can only update jobs assigned to them
+    if (req.user.role === 'TECHNICIAN') {
+      if (existingJob.assignedToId !== req.user.id) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only update jobs assigned to you' 
+        });
+      }
+      
+      // Technicians can only update status, notes, and evidence
+      const allowedFields = ['status', 'notes', 'actualCost', 'evidence'];
+      const requestedFields = Object.keys(updates);
+      const unauthorizedFields = requestedFields.filter(f => !allowedFields.includes(f));
+      
+      if (unauthorizedFields.length > 0) {
+        return res.status(403).json({ 
+          success: false, 
+          message: `Technicians can only update: ${allowedFields.join(', ')}` 
+        });
+      }
+    }
+    
+    // Property managers can only update jobs for their properties
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      if (existingJob.property.managerId !== req.user.id) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only update jobs for your properties' 
+        });
+      }
     }
     
     // Prepare update data
@@ -295,7 +355,8 @@ router.patch('/:id', requireAuth, validate(jobUpdateSchema), async (req, res) =>
   }
 });
 
-router.delete('/:id', requireAuth, async (req, res) => {
+// DELETE /:id - Delete job (PROPERTY_MANAGER only)
+router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
     
