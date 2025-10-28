@@ -1,10 +1,13 @@
 /**
  * Role-Based Authorization Middleware
  * Protects routes based on user roles
+ * 
+ * NOTE: This file is deprecated. Use ../src/middleware/auth.js instead.
+ * Kept for backward compatibility with existing routes.
  */
 
+// Roles from Prisma schema (no ADMIN role exists)
 export const ROLES = {
-  ADMIN: 'ADMIN',
   PROPERTY_MANAGER: 'PROPERTY_MANAGER',
   OWNER: 'OWNER',
   TECHNICIAN: 'TECHNICIAN',
@@ -19,24 +22,18 @@ export function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
-        error: 'Authentication required',
-        message: 'You must be logged in to access this resource'
+        success: false,
+        message: 'Authentication required'
       });
     }
 
     const userRole = req.user.role;
-    
-    // Admins have access to everything
-    if (userRole === ROLES.ADMIN) {
-      return next();
-    }
 
     // Check if user's role is in the allowed roles
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ 
-        error: 'Forbidden',
-        message: `This resource requires one of the following roles: ${allowedRoles.join(', ')}`,
-        userRole: userRole
+        success: false,
+        message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
       });
     }
 
@@ -45,9 +42,9 @@ export function requireRole(...allowedRoles) {
 }
 
 /**
- * Middleware to check if user is an admin
+ * Middleware to check if user is a property manager
  */
-export function requireAdmin(req, res, next) {
+export function requirePropertyManager(req, res, next) {
   return requireRole(ROLES.ADMIN)(req, res, next);
 }
 
