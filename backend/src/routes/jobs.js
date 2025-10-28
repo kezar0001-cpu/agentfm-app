@@ -6,30 +6,40 @@ import { listJobs, createJob, updateJob } from '../data/memoryStore.js';
 
 const router = express.Router();
 
-const STATUSES = ['open', 'scheduled', 'in_progress', 'completed'];
+const STATUSES = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 const jobCreateSchema = z.object({
   propertyId: z.string().min(1),
   unitId: z.string().optional(),
   title: z.string().min(1),
   description: z.string().min(1),
-  scheduledFor: z
+  priority: z.enum(PRIORITIES).optional().default('MEDIUM'),
+  scheduledDate: z
     .string()
     .optional()
     .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
-      message: 'scheduledFor must be a valid ISO date string',
+      message: 'scheduledDate must be a valid ISO date string',
     }),
+  assignedToId: z.string().optional(),
+  estimatedCost: z.number().optional(),
+  notes: z.string().optional(),
 });
 
 const jobUpdateSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
   status: z.enum(STATUSES).optional(),
-  scheduledFor: z
+  priority: z.enum(PRIORITIES).optional(),
+  scheduledDate: z
     .string()
     .optional()
     .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
-      message: 'scheduledFor must be a valid ISO date string',
+      message: 'scheduledDate must be a valid ISO date string',
     }),
-  assignedTo: z.string().optional().nullable(),
+  assignedToId: z.string().optional().nullable(),
+  estimatedCost: z.number().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 router.get('/', requireAuth, (req, res) => {
