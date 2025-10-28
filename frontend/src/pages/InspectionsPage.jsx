@@ -29,7 +29,6 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
-import ensureArray from '../utils/ensureArray';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -59,22 +58,30 @@ const InspectionsPage = () => {
     queryKey: ['inspections', filters],
     queryFn: async () => {
       const response = await apiClient.get(`/inspections?${queryParams.toString()}`);
-      return response.data;
+      // Backend now returns a plain array
+      const data = response.data;
+      // Ensure we always return an array
+      return Array.isArray(data) ? data : [];
     },
   });
 
-  const inspections = ensureArray(inspectionsData, ['data.items', 'items', 'data']);
+  // Defensive normalization: always ensure we have an array
+  const inspections = Array.isArray(inspectionsData) ? inspectionsData : [];
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      // Backend now returns a plain array
+      const data = response.data;
+      // Ensure we always return an array
+      return Array.isArray(data) ? data : [];
     },
   });
 
-  const properties = ensureArray(propertiesData, ['properties', 'data', 'items']);
+  // Defensive normalization: always ensure we have an array
+  const properties = Array.isArray(propertiesData) ? propertiesData : [];
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -202,7 +209,7 @@ const InspectionsPage = () => {
                 size="small"
               >
                 <MenuItem value="">All Properties</MenuItem>
-                {properties?.map((property) => (
+                {Array.isArray(properties) && properties.map((property) => (
                   <MenuItem key={property.id} value={property.id}>
                     {property.name}
                   </MenuItem>
@@ -236,7 +243,7 @@ const InspectionsPage = () => {
       </Card>
 
       {/* Inspections List */}
-      {!inspections || inspections.length === 0 ? (
+      {!Array.isArray(inspections) || inspections.length === 0 ? (
         <DataState
           type="empty"
           message="No inspections found"
