@@ -15,7 +15,7 @@ export async function sendPasswordResetEmail(to, resetUrl, firstName) {
     const { data, error } = await resend.emails.send({
       from: emailFrom,
       to: to,
-      subject: 'Reset Your Buildstate Password',
+      subject: 'Reset Your Password',
       html: generatePasswordResetEmailHTML(firstName, resetUrl),
     });
 
@@ -127,7 +127,7 @@ function generatePasswordResetEmailHTML(firstName, resetUrl) {
 
     <p>Hi ${firstName},</p>
 
-    <p>We received a request to reset your password for your Buildstate account. Click the button below to create a new password:</p>
+    <p>We received a request to reset your password for your account. Click the button below to create a new password:</p>
 
     <div class="button-container">
       <a href="${resetUrl}" class="button">Reset Password</a>
