@@ -1,3 +1,4 @@
+import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
@@ -20,7 +21,7 @@ const requireAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
+    const decoded = jwt.verify(token, getJwtSecret());
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },

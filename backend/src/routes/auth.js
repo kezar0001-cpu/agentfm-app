@@ -1,3 +1,4 @@
+import getJwtSecret from '../utils/getJwtSecret.js';
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -67,7 +68,7 @@ const requireAuth = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
+    const decoded = jwt.verify(token, getJwtSecret());
     req.user = {
       id: decoded.id,
       email: decoded.email,
@@ -219,7 +220,7 @@ router.post('/register', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -272,7 +273,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -328,7 +329,7 @@ router.get(
 
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
+        getJwtSecret(),
         { expiresIn: '7d' }
       );
 

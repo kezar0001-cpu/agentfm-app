@@ -1,3 +1,4 @@
+import getJwtSecret from '../utils/getJwtSecret.js';
 // backend/src/routes/properties.js
 import { Router } from 'express';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ const requireAuth = async (req, res, next) => {
     let decoded;
 
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
+      decoded = jwt.verify(token, getJwtSecret());
     } catch (error) {
       console.error('JWT verification failed:', {
         name: error?.name,
