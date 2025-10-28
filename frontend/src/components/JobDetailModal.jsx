@@ -30,7 +30,7 @@ import {
   Comment as CommentIcon,
 } from '@mui/icons-material';
 
-const JobDetailModal = ({ job, onClose }) => {
+const JobDetailModal = ({ job, open, onClose }) => {
   if (!job) {
     return null;
   }
@@ -53,7 +53,7 @@ const JobDetailModal = ({ job, onClose }) => {
   ];
 
   return (
-    <Dialog open={!!job} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open && !!job} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Typography variant="h5" component="span">
           {job.title}
