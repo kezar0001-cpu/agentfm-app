@@ -19,7 +19,7 @@ describe('JWT secret helper', () => {
   it('falls back to default when JWT_SECRET is not set', async () => {
     delete process.env.JWT_SECRET;
     const { getJwtSecret } = await import('../src/utils/jwt.js?test=default');
-    assert.strictEqual(getJwtSecret(), 'your-secret-key');
+    assert.strictEqual(getJwtSecret(), 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
   });
 
   it('returns trimmed environment secret when provided', async () => {
