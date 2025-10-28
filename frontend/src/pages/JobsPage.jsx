@@ -19,6 +19,7 @@ import {
   Badge,
   ToggleButtonGroup,
   ToggleButton,
+  Paper,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -581,6 +582,7 @@ const JobsPage = () => {
       {/* Job Detail Modal */}
       <JobDetailModal
         job={selectedJob}
+        open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
       />
     </Container>
