@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import ensureArray from '../utils/ensureArray';
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
@@ -35,31 +36,31 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   // Fetch properties
-  const { data: properties, isLoading: loadingProperties } = useQuery({
+  const { data: properties = [], isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
     },
   });
 
   // Fetch units for selected property
-  const { data: units } = useQuery({
+  const { data: units = [] } = useQuery({
     queryKey: ['units', formData.propertyId],
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return response.data;
+      return ensureArray(response.data, ['units', 'data', 'items', 'results']);
     },
     enabled: !!formData.propertyId,
   });
 
   // Fetch technicians
-  const { data: technicians } = useQuery({
+  const { data: technicians = [] } = useQuery({
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return response.data;
+      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
     },
   });
 
@@ -260,7 +261,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               required
               disabled={loadingProperties}
             >
-              {properties?.map((property) => (
+              {Array.isArray(properties) && properties.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -280,7 +281,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               disabled={!formData.propertyId || !units?.length}
             >
               <MenuItem value="">No specific unit</MenuItem>
-              {units?.map((unit) => (
+              {Array.isArray(units) && units.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>
@@ -299,7 +300,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               onChange={(e) => handleChange('assignedToId', e.target.value)}
             >
               <MenuItem value="">Unassigned</MenuItem>
-              {technicians?.map((tech) => (
+              {Array.isArray(technicians) && technicians.map((tech) => (
                 <MenuItem key={tech.id} value={tech.id}>
                   {tech.firstName} {tech.lastName} ({tech.email})
                 </MenuItem>
