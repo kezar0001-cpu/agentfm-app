@@ -999,4 +999,11 @@ router.get(
   },
 );
 
+router._test = {
+  buildInspectionWhere,
+  buildAccessWhere,
+  parseSort,
+  augmentUser,
+};
+
 export default router;
