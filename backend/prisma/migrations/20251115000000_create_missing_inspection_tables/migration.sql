@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS "Inspection" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ensure columns exist if table was created earlier without them
+ALTER TABLE "Inspection"
+  ADD COLUMN IF NOT EXISTS "tags" TEXT[] DEFAULT ARRAY[]::TEXT[];
+
 -- Supporting tables required by the inspections API
 CREATE TABLE IF NOT EXISTS "InspectionAttachment" (
   "id" TEXT PRIMARY KEY,
@@ -42,6 +46,12 @@ CREATE TABLE IF NOT EXISTS "InspectionAttachment" (
   "inspectionId" TEXT NOT NULL
 );
 
+-- Ensure columns exist if table was created earlier without them
+ALTER TABLE "InspectionAttachment"
+  ADD COLUMN IF NOT EXISTS "size" INTEGER,
+  ADD COLUMN IF NOT EXISTS "annotations" JSONB,
+  ADD COLUMN IF NOT EXISTS "uploadedById" TEXT;
+
 CREATE TABLE IF NOT EXISTS "InspectionReminder" (
   "id" TEXT PRIMARY KEY,
   "reminderDate" TIMESTAMP(3) NOT NULL,
@@ -53,6 +63,11 @@ CREATE TABLE IF NOT EXISTS "InspectionReminder" (
   "userId" TEXT NOT NULL
 );
 
+-- Ensure columns exist if table was created earlier without them
+ALTER TABLE "InspectionReminder"
+  ADD COLUMN IF NOT EXISTS "recipients" TEXT[] DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN IF NOT EXISTS "metadata" JSONB;
+
 CREATE TABLE IF NOT EXISTS "InspectionAuditLog" (
   "id" TEXT PRIMARY KEY,
   "action" TEXT NOT NULL,
@@ -61,6 +76,15 @@ CREATE TABLE IF NOT EXISTS "InspectionAuditLog" (
   "inspectionId" TEXT NOT NULL,
   "userId" TEXT
 );
+
+-- Ensure userId is nullable if table was created earlier with NOT NULL
+DO $$
+BEGIN
+  ALTER TABLE "InspectionAuditLog" ALTER COLUMN "userId" DROP NOT NULL;
+EXCEPTION
+  WHEN undefined_column THEN NULL;
+  WHEN others THEN NULL;
+END $$;
 
 -- Ensure the foreign keys we rely on exist
 DO $$
