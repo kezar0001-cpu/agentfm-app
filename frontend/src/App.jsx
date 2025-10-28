@@ -2,6 +2,7 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Toaster } from 'react-hot-toast';
 import GlobalGuard from './components/GlobalGuard.jsx';
 import AuthGate from './authGate';
 import Layout from './components/Layout';
@@ -70,6 +71,7 @@ const TechnicianDashboard = lazy(() => import('./pages/TechnicianDashboard.jsx')
 const TechnicianJobDetail = lazy(() => import('./pages/TechnicianJobDetail.jsx'));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
 const TenantDashboard = lazy(() => import('./pages/TenantDashboard.jsx'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -85,6 +87,30 @@ export default function App() {
     <ErrorBoundary>
       <CssBaseline />
       <GlobalGuard />
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#4caf50',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#f44336',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public */}
@@ -111,6 +137,7 @@ export default function App() {
           <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
           <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
           <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+          <Route path="/profile" element={<AuthGate><Layout><ProfilePage /></Layout></AuthGate>} />
 
           {/* Role-specific dashboards */}
           <Route path="/technician/dashboard" element={<AuthGate><Layout><TechnicianDashboard /></Layout></AuthGate>} />

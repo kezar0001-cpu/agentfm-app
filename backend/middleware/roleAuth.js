@@ -45,14 +45,7 @@ export function requireRole(...allowedRoles) {
  * Middleware to check if user is a property manager
  */
 export function requirePropertyManager(req, res, next) {
-  return requireRole(ROLES.ADMIN)(req, res, next);
-}
-
-/**
- * Middleware to check if user is a property manager or admin
- */
-export function requirePropertyManager(req, res, next) {
-  return requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER)(req, res, next);
+  return requireRole(ROLES.PROPERTY_MANAGER)(req, res, next);
 }
 
 /**
@@ -239,7 +232,6 @@ export async function ensureRoleProfile(prisma) {
 export default {
   ROLES,
   requireRole,
-  requireAdmin,
   requirePropertyManager,
   requireTechnician,
   requirePropertyAccess,
