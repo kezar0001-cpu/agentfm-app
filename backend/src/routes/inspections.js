@@ -608,21 +608,8 @@ router.get('/', async (req, res) => {
       {},
     );
 
-    res.json({
-      data: {
-        items,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.max(Math.ceil(total / pageSize), 1),
-        },
-      },
-      summary,
-      meta: {
-        generatedAt: new Date().toISOString(),
-      },
-    });
+    // Always return a plain array for consistent frontend handling
+    res.json(items);
   } catch (error) {
     console.error('Failed to fetch inspections', error);
     res.status(500).json({ success: false, message: 'Failed to load inspections' });
