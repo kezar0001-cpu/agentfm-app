@@ -2,11 +2,19 @@
 
 ## Problem
 
-The deployment was failing with the following error:
+The deployment was failing with the following errors:
 
+**First deployment attempt:**
 ```
 Database error code: 42703
 ERROR: column "uploadedById" referenced in foreign key constraint does not exist
+```
+
+**Second deployment attempt (after fix):**
+```
+Error: P3009
+migrate found failed migrations in the target database, new migrations will not be applied.
+The `20251115000000_create_missing_inspection_tables` migration started at 2025-10-28 03:39:30.034604 UTC failed
 ```
 
 ## Root Cause
@@ -60,14 +68,45 @@ The fix ensures:
 - ✅ Migrations are idempotent (can run multiple times)
 - ✅ No data loss occurs during migration
 
-## Deployment
+## Resolving Failed Migration State
 
-After this fix, the deployment should succeed with:
+Since the migration failed on the first attempt, Prisma marked it as failed in the `_prisma_migrations` table. Before the fixed migration can run, we need to resolve this state.
+
+### Option 1: Using the SQL Script (Recommended for Production)
+
+Run the provided SQL script against your database:
+
+```bash
+psql $DATABASE_URL -f backend/resolve-failed-migration.sql
+```
+
+Or connect to your database and run:
+
+```sql
+UPDATE "_prisma_migrations"
+SET 
+  rolled_back_at = NOW(),
+  logs = COALESCE(logs, '') || E'\n\n--- MANUAL ROLLBACK ---\nMarked as rolled back to allow re-application with column existence fixes.'
+WHERE migration_name = '20251115000000_create_missing_inspection_tables'
+  AND finished_at IS NULL
+  AND rolled_back_at IS NULL;
+```
+
+### Option 2: Using Prisma Migrate Resolve
+
+```bash
+npx prisma migrate resolve --rolled-back 20251115000000_create_missing_inspection_tables
+```
+
+### After Resolution
+
+Once the failed migration is marked as rolled back, deploy again:
+
 ```bash
 npx prisma migrate deploy
 ```
 
-The migration will:
+The migration will now:
 1. Create tables if they don't exist
 2. Add missing columns to existing tables
 3. Add foreign key constraints only after columns exist
