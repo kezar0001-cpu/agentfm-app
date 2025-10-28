@@ -1,39 +1,10 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../config/prismaClient.js';
+import { requireAuth } from '../middleware/auth.js';
 import { listJobs, createJob, updateJob } from '../data/memoryStore.js';
 
 const router = express.Router();
-
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, getJwtSecret());
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true }
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
 
 const STATUSES = ['open', 'scheduled', 'in_progress', 'completed'];
 
@@ -62,27 +33,49 @@ const jobUpdateSchema = z.object({
 });
 
 router.get('/', requireAuth, (req, res) => {
-  const { status, propertyId } = req.query;
-  const jobs = listJobs(req.user.orgId, { status, propertyId });
-  res.json(jobs);
+  try {
+    const { status, propertyId } = req.query;
+    // Use orgId if available, otherwise use user's id as fallback
+    const orgId = req.user.orgId || req.user.id;
+    const jobs = listJobs(orgId, { status, propertyId });
+    // Always return an array
+    res.json(Array.isArray(jobs) ? jobs : []);
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch jobs' });
+  }
 });
 
 router.post('/', requireAuth, validate(jobCreateSchema), (req, res) => {
-  const result = createJob(req.user.orgId, req.body);
-  if (result instanceof Error) {
-    const status = result.code === 'NOT_FOUND' ? 404 : 400;
-    return res.status(status).json({ error: result.message });
+  try {
+    // Use orgId if available, otherwise use user's id as fallback
+    const orgId = req.user.orgId || req.user.id;
+    const result = createJob(orgId, req.body);
+    if (result instanceof Error) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 400;
+      return res.status(status).json({ error: result.message });
+    }
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Error creating job:', error);
+    res.status(500).json({ success: false, message: 'Failed to create job' });
   }
-  res.status(201).json(result);
 });
 
 router.patch('/:id', requireAuth, validate(jobUpdateSchema), (req, res) => {
-  const result = updateJob(req.user.orgId, req.params.id, req.body);
-  if (result instanceof Error) {
-    const status = result.code === 'NOT_FOUND' ? 404 : 400;
-    return res.status(status).json({ error: result.message });
+  try {
+    // Use orgId if available, otherwise use user's id as fallback
+    const orgId = req.user.orgId || req.user.id;
+    const result = updateJob(orgId, req.params.id, req.body);
+    if (result instanceof Error) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 400;
+      return res.status(status).json({ error: result.message });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Error updating job:', error);
+    res.status(500).json({ success: false, message: 'Failed to update job' });
   }
-  res.json(result);
 });
 
 export default router;
