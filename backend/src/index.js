@@ -104,6 +104,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
 import usersRouter from './routes/users.js';
 import invitesRoutes from './routes/invites.js';
+import notificationsRoutes from './routes/notifications.js';
 
 // ===================================================================
 //
@@ -135,6 +136,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/service-requests', serviceRequestsRoutes);
 app.use('/api/users', usersRouter);
 app.use('/api/invites', invitesRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
