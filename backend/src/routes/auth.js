@@ -67,7 +67,7 @@ const requireAuth = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
     req.user = {
       id: decoded.id,
       email: decoded.email,
@@ -219,7 +219,7 @@ router.post('/register', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
       { expiresIn: '7d' }
     );
 
@@ -272,7 +272,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
       { expiresIn: '7d' }
     );
 
@@ -328,7 +328,7 @@ router.get(
 
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b',
         { expiresIn: '7d' }
       );
 
