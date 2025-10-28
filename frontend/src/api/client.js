@@ -53,19 +53,42 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor: Handle 401 errors by clearing auth
+// Response interceptor: Handle 401 errors with rate limiting
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If we get a 401, the token is invalid - clear it and redirect to login
+    // If we get a 401, log it for debugging
     if (error.response?.status === 401) {
-      console.warn('Received 401 Unauthorized - clearing auth token');
-      removeAuthToken();
-      // Only redirect if not already on auth pages
-      if (!window.location.pathname.startsWith('/signin') && 
-          !window.location.pathname.startsWith('/signup')) {
-        window.location.href = '/signin';
+      console.error('[API Client] 401 Unauthorized:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        response: error.response?.data,
+      });
+      
+      // Rate limit the logout to prevent immediate logout on single 401
+      // Only logout if we get multiple 401s in a short time
+      const now = Date.now();
+      const lastError = window._last401Error || 0;
+      const errorCount = window._401ErrorCount || 0;
+      
+      if (now - lastError < 5000) {
+        // Multiple 401s within 5 seconds
+        window._401ErrorCount = errorCount + 1;
+        
+        if (window._401ErrorCount >= 3) {
+          console.warn('[API Client] Multiple 401 errors detected - clearing auth');
+          removeAuthToken();
+          if (!window.location.pathname.startsWith('/signin') && 
+              !window.location.pathname.startsWith('/signup')) {
+            window.location.href = '/signin';
+          }
+        }
+      } else {
+        // Reset counter if errors are spaced out
+        window._401ErrorCount = 1;
       }
+      
+      window._last401Error = now;
     }
     return Promise.reject(error);
   }
