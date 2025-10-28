@@ -27,8 +27,9 @@ model User {
   emailVerified           Boolean                 @default(false)
   assignedInspections     Inspection[]            @relation("AssignedTechnician")
   completedInspections    Inspection[]            @relation("CompletedBy")
-  InspectionAuditLog      InspectionAuditLog[]
-  InspectionReminder      InspectionReminder[]
+  inspectionAuditLogs     InspectionAuditLog[]
+  inspectionReminders     InspectionReminder[]
+  uploadedAttachments     InspectionAttachment[] @relation("InspectionAttachmentUploadedBy")
   sentInvites             Invite[]                @relation("InvitedBy")
   receivedInvite          Invite?                 @relation("InvitedUser")
   assignedJobs            Job[]                   @relation("AssignedTechnician")
@@ -189,30 +190,31 @@ model UnitTenant {
 }
 
 model Inspection {
-  id                   String                 @id @default(cuid())
-  title                String
-  type                 InspectionType
-  scheduledDate        DateTime
-  completedDate        DateTime?
-  propertyId           String
-  unitId               String?
-  assignedToId         String?
-  completedById        String?
-  status               InspectionStatus       @default(SCHEDULED)
-  notes                String?
-  findings             String?
-  photos               String[]               @default([])
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  assignedTo           User?                  @relation("AssignedTechnician", fields: [assignedToId], references: [id])
-  completedBy          User?                  @relation("CompletedBy", fields: [completedById], references: [id])
-  property             Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unit                 Unit?                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  InspectionAttachment InspectionAttachment[]
-  InspectionAuditLog   InspectionAuditLog[]
-  InspectionReminder   InspectionReminder[]
-  Job                  Job[]
-  report               Report?
+  id              String            @id @default(cuid())
+  title           String
+  type            InspectionType
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  propertyId      String
+  unitId          String?
+  assignedToId    String?
+  completedById   String?
+  status          InspectionStatus  @default(SCHEDULED)
+  notes           String?
+  findings        String?
+  tags            String[]          @default([])
+  photos          String[]          @default([])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  assignedTo      User?             @relation("AssignedTechnician", fields: [assignedToId], references: [id])
+  completedBy     User?             @relation("CompletedBy", fields: [completedById], references: [id])
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  attachments     InspectionAttachment[]
+  auditLogs       InspectionAuditLog[]
+  reminders       InspectionReminder[]
+  jobs            Job[]
+  report          Report?
 
   @@index([propertyId])
   @@index([unitId])
@@ -365,45 +367,51 @@ model Notification {
 }
 
 model InspectionAttachment {
-  id           String     @id
-  fileName     String
-  fileType     String
-  fileUrl      String
-  uploadedAt   DateTime   @default(now())
-  inspectionId String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  inspectionId  String
+  name          String      @map("fileName")
+  mimeType      String      @map("fileType")
+  url           String      @map("fileUrl")
+  size          Int?
+  annotations   Json?
+  uploadedById  String?
+  createdAt     DateTime    @default(now()) @map("uploadedAt")
+  inspection    Inspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  uploadedBy    User?       @relation("InspectionAttachmentUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([inspectionId])
 }
 
 model InspectionAuditLog {
-  id           String     @id
+  id           String     @id @default(cuid())
   action       String
   changes      Json?
-  timestamp    DateTime   @default(now())
+  createdAt    DateTime   @default(now()) @map("timestamp")
   inspectionId String
-  userId       String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String?
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
-  @@index([timestamp])
+  @@index([createdAt])
   @@index([userId])
 }
 
 model InspectionReminder {
-  id           String     @id
-  reminderDate DateTime
+  id           String     @id @default(cuid())
+  inspectionId String
+  remindAt     DateTime   @map("reminderDate")
   sentAt       DateTime?
   channel      String
-  inspectionId String
-  userId       String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipients   String[]   @default([])
+  metadata     Json?
+  createdById  String     @map("userId")
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  createdBy    User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
-  @@index([reminderDate])
-  @@index([userId])
+  @@index([remindAt])
+  @@index([createdById])
 }
 
 model Org {

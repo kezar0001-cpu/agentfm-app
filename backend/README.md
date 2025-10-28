@@ -71,6 +71,15 @@ The API follows a RESTful structure.  All requests and responses are JSON.  The 
 
 Authentication is stubbed for now; every request assumes a user with `orgId` of `demo‑org` and role `owner`.  Integrate your own auth provider (e.g. Clerk or Auth0) by populating `req.user` in `src/index.js`.
 
+## Inspection API schema alignment
+
+`GET /api/inspections` returned a 500 response because the Prisma schema in this repository still reflected an earlier data model.
+The handler includes related `attachments`, `reminders`, `jobs`, and `auditLogs` and expects inspection `tags`, but those fields did
+not exist in the generated client.  Prisma rejected the query before it reached the database, so the frontend always saw an internal
+server error.  The schema has now been updated to expose those relations and fields, along with a migration that adds the missing
+columns.  After running the new migration (`npx prisma migrate deploy`) and regenerating the client, the inspections list endpoint
+resolves successfully.
+
 ## Development notes
 
 * This scaffold focuses on the **MVP** features: properties, units, inspections, recommendations, jobs, maintenance plans, subscriptions and a basic dashboard.
