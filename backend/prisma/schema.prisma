@@ -189,31 +189,30 @@ model UnitTenant {
 }
 
 model Inspection {
-  id            String           @id @default(cuid())
-  title         String
-  type          InspectionType
-  scheduledDate DateTime
-  completedDate DateTime?
-  propertyId    String
-  unitId        String?
-  assignedToId  String?
-  completedById String?
-  status        InspectionStatus @default(SCHEDULED)
-  notes         String?
-  findings      String?
-  tags          String[]         @default([])
-  photos        String[]         @default([])
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  assignedTo    User?            @relation("AssignedTechnician", fields: [assignedToId], references: [id])
-  completedBy   User?            @relation("CompletedBy", fields: [completedById], references: [id])
-  property      Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unit          Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  attachments   InspectionAttachment[]
-  auditLogs     InspectionAuditLog[]
-  reminders     InspectionReminder[]
-  jobs          Job[]
-  report        Report?
+  id                   String                 @id @default(cuid())
+  title                String
+  type                 InspectionType
+  scheduledDate        DateTime
+  completedDate        DateTime?
+  propertyId           String
+  unitId               String?
+  assignedToId         String?
+  completedById        String?
+  status               InspectionStatus       @default(SCHEDULED)
+  notes                String?
+  findings             String?
+  photos               String[]               @default([])
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  assignedTo           User?                  @relation("AssignedTechnician", fields: [assignedToId], references: [id])
+  completedBy          User?                  @relation("CompletedBy", fields: [completedById], references: [id])
+  property             Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit                 Unit?                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  InspectionAttachment InspectionAttachment[]
+  InspectionAuditLog   InspectionAuditLog[]
+  InspectionReminder   InspectionReminder[]
+  Job                  Job[]
+  report               Report?
 
   @@index([propertyId])
   @@index([unitId])
