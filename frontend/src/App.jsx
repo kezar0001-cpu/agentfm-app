@@ -66,6 +66,10 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
 const RecommendationsPage = lazy(() => import('./pages/RecommendationsPage.jsx'));
 const ServiceRequestsPage = lazy(() => import('./pages/ServiceRequestsPage.jsx'));
 const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage.jsx'));
+const TechnicianDashboard = lazy(() => import('./pages/TechnicianDashboard.jsx'));
+const TechnicianJobDetail = lazy(() => import('./pages/TechnicianJobDetail.jsx'));
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
+const TenantDashboard = lazy(() => import('./pages/TenantDashboard.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -107,6 +111,12 @@ export default function App() {
           <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
           <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
           <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+
+          {/* Role-specific dashboards */}
+          <Route path="/technician/dashboard" element={<AuthGate><Layout><TechnicianDashboard /></Layout></AuthGate>} />
+          <Route path="/technician/jobs/:id" element={<AuthGate><Layout><TechnicianJobDetail /></Layout></AuthGate>} />
+          <Route path="/owner/dashboard" element={<AuthGate><Layout><OwnerDashboard /></Layout></AuthGate>} />
+          <Route path="/tenant/dashboard" element={<AuthGate><Layout><TenantDashboard /></Layout></AuthGate>} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
