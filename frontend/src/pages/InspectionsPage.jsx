@@ -29,6 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
+import ensureArray from '../utils/ensureArray';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const InspectionsPage = () => {
 
   // Fetch inspections
   const {
-    data: inspections,
+    data: inspectionsData,
     isLoading,
     error,
     refetch,
@@ -62,14 +63,18 @@ const InspectionsPage = () => {
     },
   });
 
+  const inspections = ensureArray(inspectionsData, ['data.items', 'items', 'data']);
+
   // Fetch properties for filter
-  const { data: properties } = useQuery({
+  const { data: propertiesData } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return response.data;
     },
   });
+
+  const properties = ensureArray(propertiesData, ['properties', 'data', 'items']);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
