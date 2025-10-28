@@ -83,7 +83,7 @@ router.post('/checkout', async (req, res) => {
 
     let user;
     try {
-      user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      user = jwt.verify(token, process.env.JWT_SECRET || 'ed4579c94dee0cf3ecffc3dbbfe7ab0b');
     } catch {
       return res.status(401).json({ error: 'Invalid token' });
     }
