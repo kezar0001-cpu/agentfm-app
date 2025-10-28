@@ -16,3 +16,5 @@ export function verifyToken(token) {
 export function decodeToken(token) {
   return jwt.decode(token);
 }
+
+export { getJwtSecret };
