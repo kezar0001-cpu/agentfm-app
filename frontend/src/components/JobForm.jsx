@@ -40,7 +40,11 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
+<<<<<<< HEAD
       return ensureArray(response.data, ['items', 'data.items', 'properties']);
+=======
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
+>>>>>>> 4834f1d (Fix: JobForm .map() error on non-array API responses)
     },
   });
 
@@ -50,7 +54,11 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
+<<<<<<< HEAD
       return ensureArray(response.data, ['items', 'data.items', 'units']);
+=======
+      return ensureArray(response.data, ['units', 'data', 'items', 'results']);
+>>>>>>> 4834f1d (Fix: JobForm .map() error on non-array API responses)
     },
     enabled: !!formData.propertyId,
   });
@@ -60,8 +68,12 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
+<<<<<<< HEAD
       // Backend returns { success: true, users: [...] }
       return response.data?.users || [];
+=======
+      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
+>>>>>>> 4834f1d (Fix: JobForm .map() error on non-array API responses)
     },
   });
 
@@ -262,7 +274,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               required
               disabled={loadingProperties}
             >
-              {properties?.map((property) => (
+              {Array.isArray(properties) && properties.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -282,7 +294,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               disabled={!formData.propertyId || !units?.length}
             >
               <MenuItem value="">No specific unit</MenuItem>
-              {units?.map((unit) => (
+              {Array.isArray(units) && units.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>
@@ -301,7 +313,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               onChange={(e) => handleChange('assignedToId', e.target.value)}
             >
               <MenuItem value="">Unassigned</MenuItem>
-              {technicians?.map((tech) => (
+              {Array.isArray(technicians) && technicians.map((tech) => (
                 <MenuItem key={tech.id} value={tech.id}>
                   {tech.firstName} {tech.lastName} ({tech.email})
                 </MenuItem>
