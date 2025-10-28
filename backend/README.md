@@ -76,7 +76,6 @@ Authentication is stubbed for now; every request assumes a user with `orgId` of 
 * This scaffold focuses on the **MVP** features: properties, units, inspections, recommendations, jobs, maintenance plans, subscriptions and a basic dashboard.
 * Use **Prisma** for all database access.  The schema is defined in `prisma/schema.prisma` and should be extended carefully when adding new features.
 * **Zod** is used for request validation.  If a request body fails validation, the API responds with a 400 status and validation errors.
-* **2024-03-05**: Fixed a production incident where the inspections endpoint responded with HTTP 500 because the Prisma model omitted the `tags` column while the handler selected it.  The schema now defines `tags` with a default empty array and the controller includes unit tests to guard against regressions.
 * Multi‑tenancy is enforced by filtering on `orgId` in every query.
 * The recommendation rule engine is defined in `src/config/rules.json` and used by `applyRules` in `src/utils/pci.js`.  Adjust the rules or severity scores to suit your business logic.
 * The report endpoints (`/reports/owner` and `/reports/:id.pdf`) are currently stubs.  To implement PDF generation use **Puppeteer** to render a server‑side React template or static HTML into PDF and send via email.

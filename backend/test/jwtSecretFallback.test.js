@@ -23,9 +23,9 @@ describe('JWT secret helper', () => {
   });
 
   it('returns trimmed environment secret when provided', async () => {
-    process.env.JWT_SECRET = '  custom-secret-value-that-is-long-enough  ';
+    process.env.JWT_SECRET = '  custom-secret  ';
     const { getJwtSecret } = await import('../src/utils/jwt.js?test=custom');
-    assert.strictEqual(getJwtSecret(), 'custom-secret-value-that-is-long-enough');
+    assert.strictEqual(getJwtSecret(), 'custom-secret');
   });
 });
 
