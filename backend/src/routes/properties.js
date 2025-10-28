@@ -226,7 +226,8 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, properties: properties.map(toPublicProperty) });
+    // Always return a plain array for consistent frontend handling
+    res.json(properties.map(toPublicProperty));
   } catch (error) {
     console.error('Get properties error:', {
       message: error?.message,
