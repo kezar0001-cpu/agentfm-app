@@ -242,15 +242,24 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
+    // Remove legacy alias fields (they've been converted to standard fields)
+    // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
     const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : req.user.id;
 
+    // Ensure converted fields are included in the data
+    const propertyData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
+    };
+
     const property = await prisma.property.create({
-      data: {
-        ...data,
-        managerId,
-      },
+      data: propertyData,
     });
 
     res.status(201).json({ success: true, property: toPublicProperty(property) });
@@ -311,16 +320,25 @@ router.patch('/:id', async (req, res) => {
     }
 
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
+    // Remove legacy alias fields (they've been converted to standard fields)
+    // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
     const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : property.managerId;
 
+    // Ensure converted fields are included in the data
+    const updateData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
+    };
+
     const updated = await prisma.property.update({
       where: { id: property.id },
-      data: {
-        ...data,
-        managerId,
-      },
+      data: updateData,
     });
 
     res.json({ success: true, property: toPublicProperty(updated) });
