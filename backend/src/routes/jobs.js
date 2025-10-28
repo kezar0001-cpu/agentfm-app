@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
-import { listJobs, createJob, updateJob } from '../data/memoryStore.js';
+import { prisma } from '../config/prismaClient.js';
 
 const router = express.Router();
 
@@ -42,49 +42,281 @@ const jobUpdateSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const { status, propertyId } = req.query;
-    // Use orgId if available, otherwise use user's id as fallback
-    const orgId = req.user.orgId || req.user.id;
-    const jobs = listJobs(orgId, { status, propertyId });
-    // Always return an array
-    res.json(Array.isArray(jobs) ? jobs : []);
+    const { status, propertyId, assignedToId } = req.query;
+    
+    // Build where clause based on filters
+    const where = {};
+    
+    if (status) {
+      where.status = status;
+    }
+    
+    if (propertyId) {
+      where.propertyId = propertyId;
+    }
+    
+    if (assignedToId) {
+      where.assignedToId = assignedToId;
+    }
+    
+    // Fetch jobs from database
+    const jobs = await prisma.job.findMany({
+      where,
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    
+    res.json(jobs);
   } catch (error) {
     console.error('Error fetching jobs:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch jobs' });
   }
 });
 
-router.post('/', requireAuth, validate(jobCreateSchema), (req, res) => {
+router.post('/', requireAuth, validate(jobCreateSchema), async (req, res) => {
   try {
-    // Use orgId if available, otherwise use user's id as fallback
-    const orgId = req.user.orgId || req.user.id;
-    const result = createJob(orgId, req.body);
-    if (result instanceof Error) {
-      const status = result.code === 'NOT_FOUND' ? 404 : 400;
-      return res.status(status).json({ error: result.message });
+    const { propertyId, unitId, title, description, priority, scheduledDate, assignedToId, estimatedCost, notes } = req.body;
+    
+    // Verify property exists
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+    });
+    
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
     }
-    res.status(201).json(result);
+    
+    // Verify unit exists if provided
+    if (unitId) {
+      const unit = await prisma.unit.findUnique({
+        where: { id: unitId },
+      });
+      
+      if (!unit) {
+        return res.status(404).json({ success: false, message: 'Unit not found' });
+      }
+    }
+    
+    // Verify assigned user exists if provided
+    if (assignedToId) {
+      const assignedUser = await prisma.user.findUnique({
+        where: { id: assignedToId },
+      });
+      
+      if (!assignedUser) {
+        return res.status(404).json({ success: false, message: 'Assigned user not found' });
+      }
+    }
+    
+    // Create job
+    const job = await prisma.job.create({
+      data: {
+        title,
+        description,
+        priority: priority || 'MEDIUM',
+        status: 'OPEN',
+        propertyId,
+        unitId: unitId || null,
+        assignedToId: assignedToId || null,
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        estimatedCost: estimatedCost || null,
+        notes: notes || null,
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
     res.status(500).json({ success: false, message: 'Failed to create job' });
   }
 });
 
-router.patch('/:id', requireAuth, validate(jobUpdateSchema), (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
-    // Use orgId if available, otherwise use user's id as fallback
-    const orgId = req.user.orgId || req.user.id;
-    const result = updateJob(orgId, req.params.id, req.body);
-    if (result instanceof Error) {
-      const status = result.code === 'NOT_FOUND' ? 404 : 400;
-      return res.status(status).json({ error: result.message });
+    const { id } = req.params;
+    
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
     }
-    res.json(result);
+    
+    res.json(job);
+  } catch (error) {
+    console.error('Error fetching job:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch job' });
+  }
+});
+
+router.patch('/:id', requireAuth, validate(jobUpdateSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Check if job exists
+    const existingJob = await prisma.job.findUnique({
+      where: { id },
+    });
+    
+    if (!existingJob) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Prepare update data
+    const updateData = {};
+    
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.priority !== undefined) updateData.priority = updates.priority;
+    if (updates.scheduledDate !== undefined) {
+      updateData.scheduledDate = updates.scheduledDate ? new Date(updates.scheduledDate) : null;
+    }
+    if (updates.assignedToId !== undefined) updateData.assignedToId = updates.assignedToId;
+    if (updates.estimatedCost !== undefined) updateData.estimatedCost = updates.estimatedCost;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    
+    // If status is being set to COMPLETED, set completedDate
+    if (updates.status === 'COMPLETED' && !existingJob.completedDate) {
+      updateData.completedDate = new Date();
+    }
+    
+    // Update job
+    const job = await prisma.job.update({
+      where: { id },
+      data: updateData,
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    res.json(job);
   } catch (error) {
     console.error('Error updating job:', error);
     res.status(500).json({ success: false, message: 'Failed to update job' });
+  }
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if job exists
+    const existingJob = await prisma.job.findUnique({
+      where: { id },
+    });
+    
+    if (!existingJob) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Delete job
+    await prisma.job.delete({
+      where: { id },
+    });
+    
+    res.json({ success: true, message: 'Job deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete job' });
   }
 });
 

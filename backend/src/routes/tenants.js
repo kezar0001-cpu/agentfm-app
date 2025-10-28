@@ -1,40 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../config/prismaClient.js';
-import jwt from 'jsonwebtoken';
-// ✅ FIX: The import path is corrected to point to the right file
-import getJwtSecret from '../utils/getJwtSecret.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// Middleware to verify JWT token
-const authenticate = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, getJwtSecret());
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true }
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
-
 // GET /api/tenants - Get all tenants for the organization
-router.get('/', authenticate, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const tenants = await prisma.user.findMany({
       where: {
@@ -72,7 +43,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/tenants/:id - Get specific tenant
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const tenant = await prisma.user.findFirst({
       where: {

@@ -1,51 +1,121 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
-import { listRecommendations, convertRecommendation } from '../data/memoryStore.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
+
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, getJwtSecret());
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true }
+    const { reportId, status } = req.query;
+    
+    const where = {};
+    if (reportId) where.reportId = reportId;
+    if (status) where.status = status;
+    
+    const recommendations = await prisma.recommendation.findMany({
+      where,
+      include: {
+        report: {
+          select: {
+            id: true,
+            title: true,
+            inspectionId: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
+    
+    res.json(recommendations);
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch recommendations' });
   }
-};
-
-router.get('/', requireAuth, (req, res) => {
-  res.json(listRecommendations(req.user.orgId));
 });
 
-router.post('/:id/convert', requireAuth, (req, res) => {
-  const result = convertRecommendation(req.user.orgId, req.params.id);
-  if (result instanceof Error) {
-    let status = 400;
-    if (result.code === 'NOT_FOUND') status = 404;
-    if (result.code === 'INVALID') status = 400;
-    return res.status(status).json({ error: result.message });
+router.post('/:id/approve', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const recommendation = await prisma.recommendation.findUnique({
+      where: { id },
+    });
+    
+    if (!recommendation) {
+      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+    
+    const updated = await prisma.recommendation.update({
+      where: { id },
+      data: {
+        status: 'APPROVED',
+        approvedById: req.user.id,
+        approvedAt: new Date(),
+      },
+      include: {
+        report: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error approving recommendation:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve recommendation' });
   }
-  res.json(result);
+});
+
+router.post('/:id/reject', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+    
+    const recommendation = await prisma.recommendation.findUnique({
+      where: { id },
+    });
+    
+    if (!recommendation) {
+      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+    
+    const updated = await prisma.recommendation.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: rejectionReason || null,
+      },
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error rejecting recommendation:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject recommendation' });
+  }
 });
 
 export default router;

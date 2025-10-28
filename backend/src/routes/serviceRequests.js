@@ -1,107 +1,181 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
-import {
-  listServiceRequests,
-  createServiceRequest,
-  updateServiceRequest,
-} from '../data/memoryStore.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, getJwtSecret());
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { org: true }
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
-
-const STATUSES = ['NEW', 'TRIAGED', 'SCHEDULED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+// Service request statuses from Prisma schema
+const STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'CONVERTED_TO_JOB', 'REJECTED', 'COMPLETED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+const CATEGORIES = ['PLUMBING', 'ELECTRICAL', 'HVAC', 'APPLIANCE', 'STRUCTURAL', 'PEST_CONTROL', 'LANDSCAPING', 'GENERAL', 'OTHER'];
 
 const requestSchema = z.object({
   propertyId: z.string().min(1),
   unitId: z.string().optional(),
   title: z.string().min(1),
   description: z.string().min(1),
-  priority: z.enum(PRIORITIES).optional(),
-  dueAt: z
-    .string()
-    .optional()
-    .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
-      message: 'dueAt must be a valid ISO date string',
-    }),
+  category: z.enum(CATEGORIES),
+  priority: z.enum(PRIORITIES).optional().default('MEDIUM'),
+  photos: z.array(z.string()).optional(),
 });
 
 const requestUpdateSchema = z.object({
   status: z.enum(STATUSES).optional(),
   priority: z.enum(PRIORITIES).optional(),
-  dueAt: z
-    .string()
-    .optional()
-    .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
-      message: 'dueAt must be a valid ISO date string',
-    }),
   title: z.string().optional(),
   description: z.string().optional(),
+  reviewNotes: z.string().optional(),
 });
 
-router.use(requireAuth);
-
-router.get('/', (req, res) => {
-  const { status, propertyId } = req.query;
-  let requests = listServiceRequests(req.user.orgId);
-  if (propertyId) {
-    requests = requests.filter((request) => request.propertyId === propertyId);
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const { status, propertyId, category } = req.query;
+    
+    const where = {};
+    if (status) where.status = status;
+    if (propertyId) where.propertyId = propertyId;
+    if (category) where.category = category;
+    
+    const requests = await prisma.serviceRequest.findMany({
+      where,
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    
+    res.json(requests);
+  } catch (error) {
+    console.error('Error fetching service requests:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch service requests' });
   }
-  if (status) {
-    const normalised = String(status).toUpperCase();
-    if (STATUSES.includes(normalised)) {
-      requests = requests.filter((request) => request.status === normalised);
+});
+
+router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
+  try {
+    const { propertyId, unitId, title, description, category, priority, photos } = req.body;
+    
+    // Verify property exists
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+    });
+    
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
     }
+    
+    // Create service request
+    const request = await prisma.serviceRequest.create({
+      data: {
+        title,
+        description,
+        category,
+        priority: priority || 'MEDIUM',
+        status: 'SUBMITTED',
+        propertyId,
+        unitId: unitId || null,
+        requestedById: req.user.id,
+        photos: photos || [],
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+      },
+    });
+    
+    res.status(201).json(request);
+  } catch (error) {
+    console.error('Error creating service request:', error);
+    res.status(500).json({ success: false, message: 'Failed to create service request' });
   }
-  res.json(requests);
 });
 
-router.post('/', validate(requestSchema), (req, res) => {
-  const result = createServiceRequest(req.user.orgId, req.body);
-  if (result instanceof Error) {
-    const status = result.code === 'NOT_FOUND' ? 404 : 400;
-    return res.status(status).json({ error: result.message });
+router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Check if request exists
+    const existing = await prisma.serviceRequest.findUnique({
+      where: { id },
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+    
+    // Prepare update data
+    const updateData = {};
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.priority !== undefined) updateData.priority = updates.priority;
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.reviewNotes !== undefined) {
+      updateData.reviewNotes = updates.reviewNotes;
+      updateData.reviewedAt = new Date();
+    }
+    
+    // Update service request
+    const request = await prisma.serviceRequest.update({
+      where: { id },
+      data: updateData,
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+      },
+    });
+    
+    res.json(request);
+  } catch (error) {
+    console.error('Error updating service request:', error);
+    res.status(500).json({ success: false, message: 'Failed to update service request' });
   }
-  res.status(201).json(result);
-});
-
-router.patch('/:id', validate(requestUpdateSchema), (req, res) => {
-  const result = updateServiceRequest(req.user.orgId, req.params.id, req.body);
-  if (result instanceof Error) {
-    const status = result.code === 'NOT_FOUND' ? 404 : 400;
-    return res.status(status).json({ error: result.message });
-  }
-  res.json(result);
 });
 
 export default router;
