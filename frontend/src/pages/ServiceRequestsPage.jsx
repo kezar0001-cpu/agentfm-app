@@ -472,6 +472,13 @@ const ServiceRequestsPage = () => {
           }}
         />
       )}
+
+      {/* Service Request Detail Modal */}
+      <ServiceRequestDetailModal
+        requestId={selectedRequest}
+        open={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+      />
     </Container>
   );
 };
@@ -634,13 +641,6 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
         </DialogActions>
       </form>
     </Dialog>
-
-    {/* Service Request Detail Modal */}
-    <ServiceRequestDetailModal
-      requestId={selectedRequest}
-      open={!!selectedRequest}
-      onClose={() => setSelectedRequest(null)}
-    />
   );
 };
 
