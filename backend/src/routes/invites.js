@@ -2,8 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
-import { requireRole, ROLES } from '../../middleware/roleAuth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -31,7 +30,7 @@ const createInviteSchema = z.object({
  * POST /api/invites
  * Property Manager creates an invite for Owner, Technician, or Tenant
  */
-router.post('/', requireAuth, requireRole(ROLES.PROPERTY_MANAGER), async (req, res) => {
+router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const { email, role, propertyId, unitId } = createInviteSchema.parse(req.body);
 
@@ -227,7 +226,7 @@ router.get('/:token', async (req, res) => {
  * GET /api/invites
  * Get all invites created by the authenticated Property Manager
  */
-router.get('/', requireAuth, requireRole(ROLES.PROPERTY_MANAGER), async (req, res) => {
+router.get('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const invites = await prisma.invite.findMany({
       where: {
@@ -267,7 +266,7 @@ router.get('/', requireAuth, requireRole(ROLES.PROPERTY_MANAGER), async (req, re
  * DELETE /api/invites/:id
  * Cancel/delete a pending invite
  */
-router.delete('/:id', requireAuth, requireRole(ROLES.PROPERTY_MANAGER), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
 
