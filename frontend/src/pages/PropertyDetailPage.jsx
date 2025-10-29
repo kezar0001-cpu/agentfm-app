@@ -77,6 +77,13 @@ export default function PropertyDetailPage() {
     url: `/api/units?propertyId=${id}`,
   });
 
+  // Fetch activity for this property
+  const activityQuery = useApiQuery({
+    queryKey: ['property-activity', id],
+    url: `/api/properties/${id}/activity?limit=20`,
+    enabled: currentTab === 3, // Only fetch when Activity tab is active
+  });
+
   // Delete unit mutation
   const deleteUnitMutation = useApiMutation({
     method: 'delete',
@@ -114,7 +121,10 @@ export default function PropertyDetailPage() {
     setUnitMenuAnchor(null);
   };
 
-  const handleEditUnit = () => {
+  const handleEditUnit = (unit = null) => {
+    if (unit) {
+      setSelectedUnit(unit);
+    }
     setUnitDialogOpen(true);
     handleUnitMenuClose();
   };
@@ -147,8 +157,28 @@ export default function PropertyDetailPage() {
       OCCUPIED: 'info',
       MAINTENANCE: 'warning',
       VACANT: 'default',
+      OPEN: 'warning',
+      ASSIGNED: 'info',
+      IN_PROGRESS: 'warning',
+      COMPLETED: 'success',
+      CANCELLED: 'error',
+      SCHEDULED: 'info',
+      SUBMITTED: 'warning',
+      UNDER_REVIEW: 'info',
+      APPROVED: 'success',
+      REJECTED: 'error',
     };
     return colors[status] || 'default';
+  };
+
+  const getPriorityColor = (priority) => {
+    const colors = {
+      LOW: 'default',
+      MEDIUM: 'info',
+      HIGH: 'warning',
+      URGENT: 'error',
+    };
+    return colors[priority] || 'default';
   };
 
   return (
@@ -424,7 +454,20 @@ export default function PropertyDetailPage() {
                   <Grid container spacing={2.5}>
                     {units.map((unit) => (
                       <Grid item xs={12} sm={6} md={4} key={unit.id}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Card 
+                          sx={{ 
+                            height: '100%', 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            '&:hover': {
+                              transform: 'translateY(-4px)',
+                              boxShadow: 4,
+                            },
+                          }}
+                          onClick={() => handleEditUnit(unit)}
+                        >
                           <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                             <Box
                               sx={{
@@ -439,7 +482,10 @@ export default function PropertyDetailPage() {
                               </Typography>
                               <IconButton
                                 size="small"
-                                onClick={(e) => handleUnitMenuOpen(e, unit)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnitMenuOpen(e, unit);
+                                }}
                               >
                                 <MoreVertIcon />
                               </IconButton>
@@ -545,9 +591,60 @@ export default function PropertyDetailPage() {
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Recent Activity
                 </Typography>
-                <Typography color="text.secondary">
-                  Activity log coming soon...
-                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <DataState
+                  isLoading={activityQuery.isLoading}
+                  isError={activityQuery.isError}
+                  error={activityQuery.error}
+                  isEmpty={!activityQuery.data?.activities || activityQuery.data.activities.length === 0}
+                  emptyMessage="No recent activity for this property"
+                  onRetry={activityQuery.refetch}
+                >
+                  <List>
+                    {activityQuery.data?.activities?.map((activity, index) => (
+                      <ListItem
+                        key={`${activity.type}-${activity.id}-${index}`}
+                        divider={index < activityQuery.data.activities.length - 1}
+                        sx={{ px: 0 }}
+                      >
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                {activity.title}
+                              </Typography>
+                              {activity.status && (
+                                <Chip
+                                  label={activity.status.replace('_', ' ')}
+                                  size="small"
+                                  color={getStatusColor(activity.status)}
+                                />
+                              )}
+                              {activity.priority && (
+                                <Chip
+                                  label={activity.priority}
+                                  size="small"
+                                  color={getPriorityColor(activity.priority)}
+                                />
+                              )}
+                            </Box>
+                          }
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                {activity.description}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(activity.date).toLocaleString()} • {activity.type.replace('_', ' ')}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </DataState>
               </Paper>
             )}
           </Stack>

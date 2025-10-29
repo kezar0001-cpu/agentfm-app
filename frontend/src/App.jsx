@@ -61,6 +61,7 @@ const PropertiesPage = lazy(() => import('./pages/PropertiesPage.jsx')); // wiza
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage.jsx'));
 const EditPropertyPage = lazy(() => import('./pages/EditPropertyPage.jsx'));
 const InspectionsPage = lazy(() => import('./pages/InspectionsPage.jsx'));
+const InspectionDetailPage = lazy(() => import('./pages/InspectionDetailPage.jsx'));
 const JobsPage = lazy(() => import('./pages/JobsPage.jsx'));
 const PlansPage = lazy(() => import('./pages/PlansPage.jsx'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
@@ -132,6 +133,7 @@ export default function App() {
 
           {/* Other feature pages */}
           <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
+          <Route path="/inspections/:id" element={<AuthGate><Layout><InspectionDetailPage /></Layout></AuthGate>} />
           <Route path="/jobs" element={<AuthGate><Layout><JobsPage /></Layout></AuthGate>} />
           <Route path="/plans" element={<AuthGate><Layout><PlansPage /></Layout></AuthGate>} />
           <Route path="/service-requests" element={<AuthGate><Layout><ServiceRequestsPage /></Layout></AuthGate>} />
