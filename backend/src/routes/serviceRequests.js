@@ -33,10 +33,42 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, category } = req.query;
     
+    // Build base where clause with filters
     const where = {};
     if (status) where.status = status;
     if (propertyId) where.propertyId = propertyId;
     if (category) where.category = category;
+    
+    // Add role-based access control
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers see requests for properties they manage
+      where.property = { managerId: req.user.id };
+    } else if (req.user.role === 'OWNER') {
+      // Owners see requests for properties they own
+      where.property = {
+        owners: {
+          some: { ownerId: req.user.id }
+        }
+      };
+    } else if (req.user.role === 'TENANT') {
+      // Tenants see only their own requests
+      where.requestedById = req.user.id;
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians see requests for properties they work on
+      const assignedJobs = await prisma.job.findMany({
+        where: { assignedToId: req.user.id },
+        select: { propertyId: true },
+        distinct: ['propertyId'],
+      });
+      const propertyIds = assignedJobs.map(j => j.propertyId).filter(Boolean);
+      
+      if (propertyIds.length === 0) {
+        // Technician has no assigned jobs, return empty array
+        return res.json([]);
+      }
+      
+      where.propertyId = { in: propertyIds };
+    }
     
     const requests = await prisma.serviceRequest.findMany({
       where,
@@ -161,13 +193,57 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, category, priority, photos } = req.body;
     
-    // Verify property exists
+    // Verify property exists and user has access
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
     });
     
     if (!property) {
       return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+    
+    // Verify user has access to create requests for this property
+    let hasAccess = false;
+    
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = property.owners.some(o => o.ownerId === req.user.id);
+    } else if (req.user.role === 'TENANT') {
+      // Verify tenant has active lease for the unit
+      if (!unitId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Tenants must specify a unit for service requests' 
+        });
+      }
+      
+      const tenantUnit = await prisma.unitTenant.findFirst({
+        where: {
+          unitId: unitId,
+          tenantId: req.user.id,
+          isActive: true,
+        },
+      });
+      
+      hasAccess = !!tenantUnit;
+    } else if (req.user.role === 'TECHNICIAN') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Technicians cannot create service requests' 
+      });
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You do not have access to create service requests for this property' 
+      });
     }
     
     // Create service request
@@ -212,13 +288,69 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
     const { id } = req.params;
     const updates = req.body;
     
-    // Check if request exists
+    // Check if request exists and get full details for access control
     const existing = await prisma.serviceRequest.findUnique({
       where: { id },
+      include: {
+        property: {
+          include: {
+            owners: {
+              select: { ownerId: true },
+            },
+          },
+        },
+      },
     });
     
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+    
+    // Verify user has access to update this request
+    let hasAccess = false;
+    let allowedFields = [];
+    
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = existing.property.managerId === req.user.id;
+      allowedFields = ['status', 'priority', 'title', 'description', 'reviewNotes'];
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = existing.property.owners.some(o => o.ownerId === req.user.id);
+      allowedFields = ['status', 'priority', 'reviewNotes'];
+    } else if (req.user.role === 'TENANT') {
+      hasAccess = existing.requestedById === req.user.id;
+      // Tenants can only update their own requests and only certain fields
+      allowedFields = ['title', 'description'];
+      
+      // Tenants can only update if request is still in SUBMITTED status
+      if (existing.status !== 'SUBMITTED') {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only update service requests that are still in submitted status' 
+        });
+      }
+    } else if (req.user.role === 'TECHNICIAN') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Technicians cannot update service requests directly' 
+      });
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You do not have access to update this service request' 
+      });
+    }
+    
+    // Verify requested fields are allowed for this role
+    const requestedFields = Object.keys(updates);
+    const unauthorizedFields = requestedFields.filter(f => !allowedFields.includes(f));
+    
+    if (unauthorizedFields.length > 0) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `You can only update the following fields: ${allowedFields.join(', ')}` 
+      });
     }
     
     // Prepare update data
