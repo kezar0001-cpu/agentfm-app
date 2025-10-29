@@ -340,6 +340,7 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
             id: true,
             name: true,
             address: true,
+            managerId: true,
           },
         },
         unit: {

@@ -457,17 +457,32 @@ router.post('/:unitId/tenants', requireRole(ROLE_MANAGER), async (req, res) => {
     }
     
     // Check if tenant already has active assignment
-    const existingActive = await prisma.unitTenant.findFirst({
+    const existingActiveTenant = await prisma.unitTenant.findFirst({
       where: {
         tenantId,
         isActive: true
       }
     });
     
-    if (existingActive) {
+    if (existingActiveTenant) {
       return res.status(400).json({
         success: false,
         message: 'Tenant already has an active unit assignment'
+      });
+    }
+    
+    // Check if unit already has an active tenant
+    const existingActiveUnit = await prisma.unitTenant.findFirst({
+      where: {
+        unitId,
+        isActive: true
+      }
+    });
+    
+    if (existingActiveUnit) {
+      return res.status(400).json({
+        success: false,
+        message: 'Unit already has an active tenant assigned'
       });
     }
     
@@ -590,9 +605,13 @@ router.patch('/:unitId/tenants/:tenantId', requireRole(ROLE_MANAGER), async (req
     const { unitId, tenantId } = req.params;
     const updates = req.body;
     
-    // Find the assignment
+    // Find the active assignment (to avoid updating old inactive records)
     const assignment = await prisma.unitTenant.findFirst({
-      where: { unitId, tenantId },
+      where: { 
+        unitId, 
+        tenantId,
+        isActive: true
+      },
       include: {
         unit: {
           include: {
