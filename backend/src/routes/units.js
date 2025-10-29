@@ -407,7 +407,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:unitId/tenants', requireRole(ROLE_MANAGER), async (req, res) => {
   try {
     const { unitId } = req.params;
-    const { tenantId, leaseStart, leaseEnd, rentAmount, depositAmount, notes } = req.body;
+    const { tenantId, leaseStart, leaseEnd, rentAmount, depositAmount } = req.body;
     
     // Validate required fields
     if (!tenantId || !leaseStart || !leaseEnd || !rentAmount) {
@@ -499,7 +499,6 @@ router.post('/:unitId/tenants', requireRole(ROLE_MANAGER), async (req, res) => {
         leaseEnd: end,
         rentAmount,
         depositAmount: depositAmount || null,
-        notes: notes || null,
         isActive: true
       },
       include: {

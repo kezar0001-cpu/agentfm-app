@@ -466,7 +466,7 @@ export default function PropertyDetailPage() {
                               boxShadow: 4,
                             },
                           }}
-                          onClick={() => handleEditUnit(unit)}
+                          onClick={() => navigate(`/units/${unit.id}`)}
                         >
                           <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                             <Box
