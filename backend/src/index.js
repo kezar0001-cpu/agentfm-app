@@ -141,7 +141,7 @@ import authRoutes from './routes/auth.js';
 import billingRoutes, { webhook as stripeWebhook } from './routes/billing.js';
 import propertiesRoutes from './routes/properties.js';
 import tenantsRoutes from './routes/tenants.js';
-import maintenanceRoutes from './routes/maintenance.js';
+// import maintenanceRoutes from './routes/maintenance.js'; // DISABLED: Uses non-existent models, use serviceRequests instead
 import unitsRoutes from './routes/units.js';
 import jobsRoutes from './routes/jobs.js';
 import inspectionsRoutes from './routes/inspections.js';
@@ -173,7 +173,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/billing', billingRoutes); // This will now correctly ignore the webhook path
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/tenants', tenantsRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+// app.use('/api/maintenance', maintenanceRoutes); // DISABLED: Uses non-existent models, use /api/service-requests instead
 app.use('/api/units', unitsRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/inspections', inspectionsRoutes);
