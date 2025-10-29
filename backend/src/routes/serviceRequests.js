@@ -178,4 +178,77 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
   }
 });
 
+// Convert service request to job
+router.post('/:id/convert-to-job', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { scheduledDate, assignedTo, notes } = req.body;
+    
+    // Get service request
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        property: true,
+        unit: true,
+      },
+    });
+    
+    if (!serviceRequest) {
+      return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+    
+    // Create job from service request
+    const job = await prisma.job.create({
+      data: {
+        title: serviceRequest.title,
+        description: serviceRequest.description,
+        status: 'SCHEDULED',
+        priority: serviceRequest.priority,
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+        propertyId: serviceRequest.propertyId,
+        unitId: serviceRequest.unitId,
+        assignedTo: assignedTo || null,
+        notes: notes || `Converted from service request #${serviceRequest.id}`,
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        technician: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    // Update service request status to converted
+    await prisma.serviceRequest.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        reviewNotes: `Converted to job #${job.id}`,
+        reviewedAt: new Date(),
+      },
+    });
+    
+    res.json({ success: true, job });
+  } catch (error) {
+    console.error('Error converting service request to job:', error);
+    res.status(500).json({ success: false, message: 'Failed to convert service request to job' });
+  }
+});
+
 export default router;

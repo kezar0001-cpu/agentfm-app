@@ -35,31 +35,34 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   // Fetch properties
-  const { data: properties, isLoading: loadingProperties } = useQuery({
+  const { data: properties = [], isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      // Backend returns array directly
+      return Array.isArray(response.data) ? response.data : [];
     },
   });
 
   // Fetch units for selected property
-  const { data: units } = useQuery({
+  const { data: units = [] } = useQuery({
     queryKey: ['units', formData.propertyId],
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return response.data;
+      // Backend returns array directly
+      return Array.isArray(response.data) ? response.data : [];
     },
     enabled: !!formData.propertyId,
   });
 
   // Fetch technicians
-  const { data: technicians } = useQuery({
+  const { data: technicians = [] } = useQuery({
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return response.data;
+      // Backend returns { success: true, users: [...] }
+      return response.data?.users || [];
     },
   });
 
