@@ -116,14 +116,6 @@ router.get('/:id', requireAuth, async (req, res) => {
       where: { id },
       include: {
         property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
-            state: true,
-            managerId: true,
-          },
           include: {
             owners: {
               select: {
@@ -132,12 +124,7 @@ router.get('/:id', requireAuth, async (req, res) => {
             },
           },
         },
-        unit: {
-          select: {
-            id: true,
-            unitNumber: true,
-          },
-        },
+        unit: true,
         requestedBy: {
           select: {
             id: true,
@@ -231,9 +218,17 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
           tenantId: req.user.id,
           isActive: true,
         },
+        include: {
+          unit: {
+            select: {
+              propertyId: true,
+            },
+          },
+        },
       });
       
-      hasAccess = !!tenantUnit;
+      // Verify tenant has lease AND unit belongs to the specified property
+      hasAccess = !!tenantUnit && tenantUnit.unit.propertyId === propertyId;
     } else if (req.user.role === 'TECHNICIAN') {
       return res.status(403).json({ 
         success: false, 
