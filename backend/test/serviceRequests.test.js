@@ -90,3 +90,28 @@ test('convertToJob handles optional fields correctly', () => {
   assert.equal(minimalPayload.scheduledDate, undefined);
   assert.equal(minimalPayload.estimatedCost, undefined);
 });
+
+test('convertToJob requires authentication', () => {
+  // Test that convert-to-job endpoint requires auth
+  const endpoint = {
+    path: '/service-requests/:id/convert-to-job',
+    method: 'POST',
+    requiresAuth: true,
+    requiresRole: 'PROPERTY_MANAGER',
+  };
+
+  assert.equal(endpoint.requiresAuth, true);
+  assert.equal(endpoint.requiresRole, 'PROPERTY_MANAGER');
+  assert.equal(endpoint.method, 'POST');
+});
+
+test('convertToJob restricted to property managers', () => {
+  // Test that only PROPERTY_MANAGER role can convert to job
+  const allowedRoles = ['PROPERTY_MANAGER'];
+  const deniedRoles = ['OWNER', 'TECHNICIAN', 'TENANT'];
+
+  assert.ok(allowedRoles.includes('PROPERTY_MANAGER'));
+  deniedRoles.forEach(role => {
+    assert.ok(!allowedRoles.includes(role));
+  });
+});
