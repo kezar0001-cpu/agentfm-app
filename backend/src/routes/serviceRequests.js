@@ -182,7 +182,7 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
 router.post('/:id/convert-to-job', async (req, res) => {
   try {
     const { id } = req.params;
-    const { scheduledDate, assignedTo, notes } = req.body;
+    const { scheduledDate, assignedToId, estimatedCost, notes } = req.body;
     
     // Get service request
     const serviceRequest = await prisma.serviceRequest.findUnique({
@@ -197,17 +197,32 @@ router.post('/:id/convert-to-job', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Service request not found' });
     }
     
+    // Verify assigned user exists if provided
+    if (assignedToId) {
+      const assignedUser = await prisma.user.findUnique({
+        where: { id: assignedToId },
+      });
+      
+      if (!assignedUser) {
+        return res.status(404).json({ success: false, message: 'Assigned user not found' });
+      }
+    }
+    
+    // Determine job status based on assignment
+    const jobStatus = assignedToId ? 'ASSIGNED' : 'OPEN';
+    
     // Create job from service request
     const job = await prisma.job.create({
       data: {
         title: serviceRequest.title,
         description: serviceRequest.description,
-        status: 'SCHEDULED',
+        status: jobStatus,
         priority: serviceRequest.priority,
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
         propertyId: serviceRequest.propertyId,
         unitId: serviceRequest.unitId,
-        assignedTo: assignedTo || null,
+        assignedToId: assignedToId || null,
+        estimatedCost: estimatedCost || null,
         notes: notes || `Converted from service request #${serviceRequest.id}`,
       },
       include: {
@@ -224,10 +239,11 @@ router.post('/:id/convert-to-job', async (req, res) => {
             unitNumber: true,
           },
         },
-        technician: {
+        assignedTo: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
