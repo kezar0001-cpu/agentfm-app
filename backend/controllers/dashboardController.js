@@ -30,9 +30,13 @@ export const getDashboardSummary = async (req, res) => {
 
     if (role === 'PROPERTY_MANAGER') {
       propertyFilter = { managerId: userId };
+      jobFilter = { property: { managerId: userId } };
+      inspectionFilter = { property: { managerId: userId } };
       serviceRequestWhere = { property: { managerId: userId } };
     } else if (role === 'OWNER') {
       propertyFilter = { owners: { some: { ownerId: userId } } };
+      jobFilter = { property: { owners: { some: { ownerId: userId } } } };
+      inspectionFilter = { property: { owners: { some: { ownerId: userId } } } };
       serviceRequestWhere = { property: { owners: { some: { ownerId: userId } } } };
     } else if (role === 'TENANT') {
       // Tenant: get properties via active unit tenancies
