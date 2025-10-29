@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -178,8 +178,8 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
   }
 });
 
-// Convert service request to job
-router.post('/:id/convert-to-job', async (req, res) => {
+// Convert service request to job (PROPERTY_MANAGER only)
+router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { scheduledDate, assignedToId, estimatedCost, notes } = req.body;
