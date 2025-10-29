@@ -399,4 +399,333 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ========================================
+// TENANT ASSIGNMENT ENDPOINTS
+// ========================================
+
+// POST /:unitId/tenants - Assign tenant to unit
+router.post('/:unitId/tenants', requireRole(ROLE_MANAGER), async (req, res) => {
+  try {
+    const { unitId } = req.params;
+    const { tenantId, leaseStart, leaseEnd, rentAmount, depositAmount, notes } = req.body;
+    
+    // Validate required fields
+    if (!tenantId || !leaseStart || !leaseEnd || !rentAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'tenantId, leaseStart, leaseEnd, and rentAmount are required'
+      });
+    }
+    
+    // Verify unit exists and user has access
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        property: {
+          include: {
+            owners: {
+              select: { ownerId: true }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!unit) {
+      return res.status(404).json({ success: false, message: 'Unit not found' });
+    }
+    
+    // Check access
+    const hasAccess = req.user.role === 'PROPERTY_MANAGER' && unit.property.managerId === req.user.id ||
+                      req.user.role === 'OWNER' && unit.property.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Verify tenant exists and has TENANT role
+    const tenant = await prisma.user.findUnique({
+      where: { id: tenantId }
+    });
+    
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+    
+    if (tenant.role !== 'TENANT') {
+      return res.status(400).json({ success: false, message: 'User must have TENANT role' });
+    }
+    
+    // Check if tenant already has active assignment
+    const existingActive = await prisma.unitTenant.findFirst({
+      where: {
+        tenantId,
+        isActive: true
+      }
+    });
+    
+    if (existingActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tenant already has an active unit assignment'
+      });
+    }
+    
+    // Validate dates
+    const start = new Date(leaseStart);
+    const end = new Date(leaseEnd);
+    
+    if (end <= start) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lease end date must be after start date'
+      });
+    }
+    
+    // Validate rent amount
+    if (rentAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rent amount must be positive'
+      });
+    }
+    
+    // Create tenant assignment
+    const unitTenant = await prisma.unitTenant.create({
+      data: {
+        unitId,
+        tenantId,
+        leaseStart: start,
+        leaseEnd: end,
+        rentAmount,
+        depositAmount: depositAmount || null,
+        notes: notes || null,
+        isActive: true
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    res.status(201).json({ success: true, unitTenant });
+  } catch (error) {
+    console.error('Error assigning tenant:', error);
+    res.status(500).json({ success: false, message: 'Failed to assign tenant' });
+  }
+});
+
+// GET /:unitId/tenants - Get all tenants for unit
+router.get('/:unitId/tenants', async (req, res) => {
+  try {
+    const { unitId } = req.params;
+    
+    // Verify unit exists and user has access
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        property: {
+          include: {
+            owners: {
+              select: { ownerId: true }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!unit) {
+      return res.status(404).json({ success: false, message: 'Unit not found' });
+    }
+    
+    // Check access
+    const hasAccess = req.user.role === 'PROPERTY_MANAGER' && unit.property.managerId === req.user.id ||
+                      req.user.role === 'OWNER' && unit.property.owners.some(o => o.ownerId === req.user.id) ||
+                      req.user.role === 'TENANT'; // Tenants can view (filtered below)
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Build where clause
+    const where = { unitId };
+    
+    // Tenants only see their own assignments
+    if (req.user.role === 'TENANT') {
+      where.tenantId = req.user.id;
+    }
+    
+    const tenants = await prisma.unitTenant.findMany({
+      where,
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    res.json({ success: true, tenants });
+  } catch (error) {
+    console.error('Error fetching unit tenants:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch tenants' });
+  }
+});
+
+// PATCH /:unitId/tenants/:tenantId - Update tenant assignment
+router.patch('/:unitId/tenants/:tenantId', requireRole(ROLE_MANAGER), async (req, res) => {
+  try {
+    const { unitId, tenantId } = req.params;
+    const updates = req.body;
+    
+    // Find the assignment
+    const assignment = await prisma.unitTenant.findFirst({
+      where: { unitId, tenantId },
+      include: {
+        unit: {
+          include: {
+            property: {
+              include: {
+                owners: {
+                  select: { ownerId: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Tenant assignment not found' });
+    }
+    
+    // Check access
+    const hasAccess = req.user.role === 'PROPERTY_MANAGER' && assignment.unit.property.managerId === req.user.id ||
+                      req.user.role === 'OWNER' && assignment.unit.property.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Prepare update data
+    const updateData = {};
+    
+    if (updates.leaseStart !== undefined) {
+      updateData.leaseStart = new Date(updates.leaseStart);
+    }
+    
+    if (updates.leaseEnd !== undefined) {
+      updateData.leaseEnd = new Date(updates.leaseEnd);
+    }
+    
+    if (updates.rentAmount !== undefined) {
+      if (updates.rentAmount <= 0) {
+        return res.status(400).json({ success: false, message: 'Rent amount must be positive' });
+      }
+      updateData.rentAmount = updates.rentAmount;
+    }
+    
+    if (updates.depositAmount !== undefined) {
+      updateData.depositAmount = updates.depositAmount;
+    }
+    
+    if (updates.isActive !== undefined) {
+      updateData.isActive = updates.isActive;
+    }
+    
+    if (updates.notes !== undefined) {
+      updateData.notes = updates.notes;
+    }
+    
+    // Validate dates if both are being updated
+    if (updateData.leaseStart && updateData.leaseEnd) {
+      if (updateData.leaseEnd <= updateData.leaseStart) {
+        return res.status(400).json({ success: false, message: 'Lease end must be after start' });
+      }
+    }
+    
+    const updated = await prisma.unitTenant.update({
+      where: { id: assignment.id },
+      data: updateData,
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    res.json({ success: true, unitTenant: updated });
+  } catch (error) {
+    console.error('Error updating tenant assignment:', error);
+    res.status(500).json({ success: false, message: 'Failed to update assignment' });
+  }
+});
+
+// DELETE /:unitId/tenants/:tenantId - Remove tenant from unit
+router.delete('/:unitId/tenants/:tenantId', requireRole(ROLE_MANAGER), async (req, res) => {
+  try {
+    const { unitId, tenantId } = req.params;
+    
+    // Find the assignment
+    const assignment = await prisma.unitTenant.findFirst({
+      where: { unitId, tenantId, isActive: true },
+      include: {
+        unit: {
+          include: {
+            property: {
+              include: {
+                owners: {
+                  select: { ownerId: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Active tenant assignment not found' });
+    }
+    
+    // Check access
+    const hasAccess = req.user.role === 'PROPERTY_MANAGER' && assignment.unit.property.managerId === req.user.id ||
+                      req.user.role === 'OWNER' && assignment.unit.property.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Mark as inactive (soft delete)
+    await prisma.unitTenant.update({
+      where: { id: assignment.id },
+      data: { isActive: false }
+    });
+    
+    res.json({ success: true, message: 'Tenant removed from unit' });
+  } catch (error) {
+    console.error('Error removing tenant:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove tenant' });
+  }
+});
+
 export default router;
