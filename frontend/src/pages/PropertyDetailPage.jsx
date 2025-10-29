@@ -184,15 +184,26 @@ export default function PropertyDetailPage() {
                   </Box>
                 </Box>
               </Stack>
-              <Button
-                variant="outlined"
-                startIcon={<EditIcon />}
-                onClick={handleEditProperty}
-                fullWidth
-                sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
-              >
-                Edit Property
-              </Button>
+              <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<PersonAddIcon />}
+                  onClick={() => navigate('/team')}
+                  fullWidth
+                  sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                >
+                  Manage Team
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={handleEditProperty}
+                  fullWidth
+                  sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                >
+                  Edit Property
+                </Button>
+              </Stack>
             </Stack>
 
             {/* Property Image */}
