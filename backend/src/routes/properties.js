@@ -149,7 +149,7 @@ const toPublicProperty = (property) => {
 
 const ensurePropertyAccess = (property, user) => {
   if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
-  if (user.role === ROLES.ADMIN) return { allowed: true };
+  // Only property managers who own the property can access it
   if (property.managerId === user.id) return { allowed: true };
   return { allowed: false, reason: 'Forbidden', status: 403 };
 };
@@ -234,7 +234,8 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : req.user.id;
+    // Property managers can only create properties for themselves
+    const managerId = req.user.id;
 
     // Ensure converted fields are included in the data
     const propertyData = {

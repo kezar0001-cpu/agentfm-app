@@ -88,7 +88,7 @@ const requireAuth = (req, res, next) => {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['ADMIN', 'PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional()
+  role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional()
 });
 
 const registerSchema = z.object({
@@ -300,7 +300,7 @@ router.get('/google', (req, res, next) => {
     return res.status(503).json({ success: false, message: 'Google OAuth is not configured. Please use email/password signup.' });
   }
   const { role = 'PROPERTY_MANAGER' } = req.query;
-  if (!['PROPERTY_MANAGER', 'ADMIN'].includes(role)) {
+  if (!['PROPERTY_MANAGER'].includes(role)) {
     return res.status(400).json({ success: false, message: 'Google signup is only available for Property Managers' });
   }
   passport.authenticate('google', { scope: ['profile', 'email'], state: role })(req, res, next);
@@ -334,10 +334,9 @@ router.get(
       );
 
       const dashboardRoutes = {
-        ADMIN: '/admin/dashboard',
         PROPERTY_MANAGER: '/dashboard',
         OWNER: '/owner/dashboard',
-        TECHNICIAN: '/tech/dashboard',
+        TECHNICIAN: '/technician/dashboard',
         TENANT: '/tenant/dashboard',
       };
 
