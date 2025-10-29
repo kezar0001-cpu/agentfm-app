@@ -60,6 +60,7 @@ const Dashboard = lazy(() => import('./pages/DashboardPage.jsx'));
 const PropertiesPage = lazy(() => import('./pages/PropertiesPage.jsx')); // wizard inside
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage.jsx'));
 const EditPropertyPage = lazy(() => import('./pages/EditPropertyPage.jsx'));
+const UnitDetailPage = lazy(() => import('./pages/UnitDetailPage.jsx'));
 const InspectionsPage = lazy(() => import('./pages/InspectionsPage.jsx'));
 const InspectionDetailPage = lazy(() => import('./pages/InspectionDetailPage.jsx'));
 const JobsPage = lazy(() => import('./pages/JobsPage.jsx'));
@@ -130,6 +131,9 @@ export default function App() {
           <Route path="/properties" element={<AuthGate><Layout><PropertiesPage /></Layout></AuthGate>} />
           <Route path="/properties/:id" element={<AuthGate><Layout><PropertyDetailPage /></Layout></AuthGate>} />
           <Route path="/properties/:id/edit" element={<AuthGate><Layout><EditPropertyPage /></Layout></AuthGate>} />
+          
+          {/* Units */}
+          <Route path="/units/:id" element={<AuthGate><Layout><UnitDetailPage /></Layout></AuthGate>} />
 
           {/* Other feature pages */}
           <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
