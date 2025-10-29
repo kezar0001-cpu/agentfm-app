@@ -107,6 +107,90 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /:id - Get single service request with full details
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const request = await prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+            managerId: true,
+          },
+          include: {
+            owners: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        jobs: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    });
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service request not found',
+      });
+    }
+    
+    // Access control: Check user has access to property
+    const hasAccess =
+      req.user.role === 'PROPERTY_MANAGER' && request.property.managerId === req.user.id ||
+      req.user.role === 'OWNER' && request.property.owners.some(o => o.ownerId === req.user.id) ||
+      req.user.role === 'TENANT' && request.requestedById === req.user.id;
+    
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+    }
+    
+    res.json({ success: true, request });
+  } catch (error) {
+    console.error('Error fetching service request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch service request',
+    });
+  }
+});
+
 router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, category, priority, photos } = req.body;
