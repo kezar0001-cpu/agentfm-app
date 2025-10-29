@@ -33,6 +33,7 @@ model User {
   sentInvites             Invite[]                @relation("InvitedBy")
   receivedInvite          Invite?                 @relation("InvitedUser")
   assignedJobs            Job[]                   @relation("AssignedTechnician")
+  jobComments             JobComment[]
   notifications           Notification[]
   OwnerProfile            OwnerProfile?
   managedProperties       Property[]              @relation("PropertyManager")
@@ -249,6 +250,7 @@ model Job {
   property          Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   serviceRequest    ServiceRequest?  @relation(fields: [serviceRequestId], references: [id])
   unit              Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  comments          JobComment[]
 
   @@index([propertyId])
   @@index([unitId])
@@ -559,4 +561,20 @@ enum SubscriptionPlan {
   STARTER
   PROFESSIONAL
   ENTERPRISE
+}
+
+model JobComment {
+  id        String   @id @default(cuid())
+  jobId     String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@index([jobId])
+  @@index([userId])
+  @@index([createdAt])
 }
