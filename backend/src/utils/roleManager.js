@@ -157,11 +157,6 @@ export async function grantTechnicianAccess(prisma, userId, propertyIds, canAcce
  * Check if user has permission to perform an action
  */
 export function hasPermission(user, permission) {
-  // Admins have all permissions
-  if (user.role === ROLES.ADMIN) {
-    return true;
-  }
-
   // Check property manager permissions
   if (user.role === ROLES.PROPERTY_MANAGER) {
     const permissions = user.propertyManagerProfile?.permissions || {};
@@ -199,13 +194,6 @@ export async function getAccessibleProperties(prisma, userId) {
   
   if (!user) {
     return [];
-  }
-
-  // Admins can access all properties in their org
-  if (user.role === ROLES.ADMIN) {
-    return await prisma.property.findMany({
-      where: { orgId: user.orgId }
-    });
   }
 
   // Property managers can access their managed properties
