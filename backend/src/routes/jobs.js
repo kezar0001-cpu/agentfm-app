@@ -3,6 +3,7 @@ import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import { prisma } from '../config/prismaClient.js';
+import { notifyJobAssigned, notifyJobCompleted, notifyJobStarted, notifyJobReassigned } from '../utils/notificationService.js';
 
 const router = express.Router();
 
@@ -199,6 +200,16 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
       },
     });
     
+    // Send notification if job is assigned
+    if (job.assignedToId && job.assignedTo) {
+      try {
+        await notifyJobAssigned(job, job.assignedTo, job.property);
+      } catch (notifError) {
+        console.error('Failed to send job assignment notification:', notifError);
+        // Don't fail the job creation if notification fails
+      }
+    }
+    
     res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
@@ -347,6 +358,63 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
         },
       },
     });
+    
+    // Send notifications for various events
+    try {
+      // Job assignment notification
+      if (updates.assignedToId !== undefined && updates.assignedToId !== existingJob.assignedToId) {
+        if (updates.assignedToId && job.assignedTo) {
+          // New assignment or reassignment
+          if (existingJob.assignedToId) {
+            // Reassignment - notify both old and new technician
+            const previousTechnician = await prisma.user.findUnique({
+              where: { id: existingJob.assignedToId },
+              select: { id: true, firstName: true, lastName: true, email: true },
+            });
+            if (previousTechnician) {
+              await notifyJobReassigned(job, previousTechnician, job.assignedTo, job.property);
+            }
+          } else {
+            // New assignment
+            await notifyJobAssigned(job, job.assignedTo, job.property);
+          }
+        }
+      }
+      
+      // Job completion notification
+      if (updates.status === 'COMPLETED' && existingJob.status !== 'COMPLETED') {
+        // Notify property manager
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+          
+          const technician = job.assignedTo || { firstName: 'Unknown', lastName: 'Technician' };
+          
+          if (manager) {
+            await notifyJobCompleted(job, technician, job.property, manager);
+          }
+        }
+      }
+      
+      // Job started notification
+      if (updates.status === 'IN_PROGRESS' && existingJob.status !== 'IN_PROGRESS') {
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+          
+          if (manager) {
+            await notifyJobStarted(job, job.property, manager);
+          }
+        }
+      }
+    } catch (notifError) {
+      console.error('Failed to send job notification:', notifError);
+      // Don't fail the job update if notification fails
+    }
     
     res.json(job);
   } catch (error) {

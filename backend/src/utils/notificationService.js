@@ -122,6 +122,60 @@ export async function notifyJobCompleted(job, technician, property, manager) {
 }
 
 /**
+ * Send notification when a job is started
+ */
+export async function notifyJobStarted(job, property, manager) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+  return sendNotification(
+    manager.id,
+    'JOB_ASSIGNED', // Reuse JOB_ASSIGNED type for status updates
+    'Job Started',
+    `Work has started on: ${job.title}`,
+    {
+      entityType: 'job',
+      entityId: job.id,
+      emailData: {
+        managerName: `${manager.firstName} ${manager.lastName}`,
+        jobTitle: job.title,
+        propertyName: property.name,
+        jobUrl: `${frontendUrl}/jobs/${job.id}`,
+      },
+    }
+  );
+}
+
+/**
+ * Send notification when a job is reassigned
+ */
+export async function notifyJobReassigned(job, previousTechnician, newTechnician, property) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+  // Notify previous technician
+  const prevNotification = sendNotification(
+    previousTechnician.id,
+    'JOB_ASSIGNED',
+    'Job Reassigned',
+    `You have been unassigned from: ${job.title}`,
+    {
+      entityType: 'job',
+      entityId: job.id,
+      emailData: {
+        technicianName: `${previousTechnician.firstName} ${previousTechnician.lastName}`,
+        jobTitle: job.title,
+        propertyName: property.name,
+        jobUrl: `${frontendUrl}/jobs/${job.id}`,
+      },
+    }
+  );
+  
+  // Notify new technician
+  const newNotification = notifyJobAssigned(job, newTechnician, property);
+  
+  return Promise.all([prevNotification, newNotification]);
+}
+
+/**
  * Send inspection reminder
  */
 export async function notifyInspectionReminder(inspection, technician, property) {
