@@ -46,10 +46,26 @@ model User {
   TechnicianProfile       TechnicianProfile?
   TenantProfile           TenantProfile?
   tenantUnits             UnitTenant[]
+  reportRequests          ReportRequest[]         @relation("ReportRequestsCreated")
+  passwordResets          PasswordReset[]
   Org                     Org?                    @relation(fields: [orgId], references: [id])
 
   @@index([email])
   @@index([role])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  selector  String   @unique
+  verifier  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([selector])
 }
 
 model Invite {
@@ -120,6 +136,7 @@ model Property {
   plans           MaintenancePlan[]
   manager         User              @relation("PropertyManager", fields: [managerId], references: [id], onDelete: Cascade)
   owners          PropertyOwner[]
+  reportRequests  ReportRequest[]
   serviceRequests ServiceRequest[]
   units           Unit[]
 
@@ -162,6 +179,7 @@ model Unit {
   inspections     Inspection[]
   invites         Invite[]
   jobs            Job[]
+  reportRequests  ReportRequest[]
   serviceRequests ServiceRequest[]
   property        Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenants         UnitTenant[]
@@ -324,6 +342,28 @@ model Report {
 
   @@index([inspectionId])
   @@index([generatedDate])
+}
+
+model ReportRequest {
+  id              String   @id @default(cuid())
+  reportType      String
+  parameters      Json?
+  propertyId      String
+  unitId          String?
+  requestedById   String
+  status          String   @default("PENDING")
+  fileUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?    @relation(fields: [unitId], references: [id])
+  requestedBy     User     @relation("ReportRequestsCreated", fields: [requestedById], references: [id])
+  
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([requestedById])
+  @@index([status])
 }
 
 model Recommendation {
