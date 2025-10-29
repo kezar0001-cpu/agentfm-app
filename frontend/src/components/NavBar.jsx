@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LogoutButton from './LogoutButton';
+import NotificationBell from './NotificationBell';
 import {
   AppBar,
   Toolbar,
@@ -11,13 +12,20 @@ import {
   Menu,
   MenuItem,
   Divider,
+  Avatar,
+  Tooltip,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import PersonIcon from '@mui/icons-material/Person';
+import GroupIcon from '@mui/icons-material/Group';
+import { useCurrentUser } from '../context/UserContext';
 
 function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useCurrentUser();
   const [mobileMenuAnchor, setMobileMenuAnchor] = useState(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -30,6 +38,11 @@ function NavBar() {
     { name: 'Recommendations', href: '/recommendations' },
     { name: 'Subscriptions', href: '/subscriptions' },
   ];
+  
+  // Add Team link for Property Managers
+  if (user?.role === 'PROPERTY_MANAGER') {
+    navigation.push({ name: 'Team', href: '/team' });
+  }
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -44,9 +57,30 @@ function NavBar() {
     setMobileMenuAnchor(null);
   };
 
+  const handleOpenUserMenu = (event) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseUserMenu = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleUserMenuNavigation = (path) => {
+    navigate(path);
+    handleCloseUserMenu();
+  };
+
   // Helper to mark active links (works with nested paths)
   const isActive = (href) =>
     location.pathname === href || location.pathname.startsWith(`${href}/`);
+  
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user) return '?';
+    const firstInitial = user.firstName?.[0] || '';
+    const lastInitial = user.lastName?.[0] || '';
+    return `${firstInitial}${lastInitial}`.toUpperCase();
+  };
 
   return (
     <AppBar
@@ -138,12 +172,80 @@ function NavBar() {
         </Box>
 
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
-          <LogoutButton
-            variant="outlined"
-            color="error"
-            size="small"
-            sx={{ textTransform: 'none' }}
-          />
+          <NotificationBell />
+          
+          <Tooltip title="Account">
+            <IconButton
+              onClick={handleOpenUserMenu}
+              size="small"
+              sx={{ ml: 1 }}
+              aria-label="account menu"
+            >
+              <Avatar 
+                sx={{ 
+                  width: 32, 
+                  height: 32, 
+                  bgcolor: 'primary.main',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+            </IconButton>
+          </Tooltip>
+          
+          <Menu
+            anchorEl={userMenuAnchor}
+            open={Boolean(userMenuAnchor)}
+            onClose={handleCloseUserMenu}
+            onClick={handleCloseUserMenu}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            PaperProps={{
+              elevation: 3,
+              sx: {
+                minWidth: 200,
+                mt: 1.5,
+                '& .MuiMenuItem-root': {
+                  px: 2,
+                  py: 1,
+                },
+              },
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                {user?.firstName} {user?.lastName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user?.email}
+              </Typography>
+            </Box>
+            
+            <MenuItem onClick={() => handleUserMenuNavigation('/profile')}>
+              <PersonIcon fontSize="small" sx={{ mr: 1.5 }} />
+              Profile
+            </MenuItem>
+            
+            {user?.role === 'PROPERTY_MANAGER' && (
+              <MenuItem onClick={() => handleUserMenuNavigation('/team')}>
+                <GroupIcon fontSize="small" sx={{ mr: 1.5 }} />
+                Team Management
+              </MenuItem>
+            )}
+            
+            <Divider sx={{ my: 1 }} />
+            
+            <Box sx={{ px: 2, pb: 1 }}>
+              <LogoutButton
+                fullWidth
+                variant="outlined"
+                color="error"
+                size="small"
+                sx={{ textTransform: 'none' }}
+              />
+            </Box>
+          </Menu>
         </Box>
 
         <Menu
@@ -161,6 +263,15 @@ function NavBar() {
             },
           }}
         >
+          <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+            <Typography variant="subtitle2" fontWeight={600}>
+              {user?.firstName} {user?.lastName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {user?.email}
+            </Typography>
+          </Box>
+          
           {navigation.map((item) => (
             <MenuItem
               key={item.name}
@@ -171,7 +282,23 @@ function NavBar() {
               {item.name}
             </MenuItem>
           ))}
+          
           <Divider sx={{ my: 1 }} />
+          
+          <MenuItem onClick={() => handleNavigation('/profile')}>
+            <PersonIcon fontSize="small" sx={{ mr: 1.5 }} />
+            Profile
+          </MenuItem>
+          
+          {user?.role === 'PROPERTY_MANAGER' && (
+            <MenuItem onClick={() => handleNavigation('/team')}>
+              <GroupIcon fontSize="small" sx={{ mr: 1.5 }} />
+              Team Management
+            </MenuItem>
+          )}
+          
+          <Divider sx={{ my: 1 }} />
+          
           <Box sx={{ px: 2, pb: 1 }}>
             <LogoutButton
               fullWidth

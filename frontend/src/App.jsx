@@ -72,6 +72,7 @@ const TechnicianJobDetail = lazy(() => import('./pages/TechnicianJobDetail.jsx')
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
 const TenantDashboard = lazy(() => import('./pages/TenantDashboard.jsx'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
+const TeamManagementPage = lazy(() => import('./pages/TeamManagementPage.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -144,6 +145,9 @@ export default function App() {
           <Route path="/technician/jobs/:id" element={<AuthGate><Layout><TechnicianJobDetail /></Layout></AuthGate>} />
           <Route path="/owner/dashboard" element={<AuthGate><Layout><OwnerDashboard /></Layout></AuthGate>} />
           <Route path="/tenant/dashboard" element={<AuthGate><Layout><TenantDashboard /></Layout></AuthGate>} />
+          
+          {/* Team Management (Property Manager only) */}
+          <Route path="/team" element={<AuthGate><Layout><TeamManagementPage /></Layout></AuthGate>} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
