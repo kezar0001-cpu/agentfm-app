@@ -29,6 +29,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import ServiceRequestForm from '../components/ServiceRequestForm';
+import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ const ServiceRequestsPage = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [reviewDialog, setReviewDialog] = useState(null);
   const [convertDialog, setConvertDialog] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Get user role (you'd get this from auth context)
   const userRole = 'PROPERTY_MANAGER'; // This should come from your auth context
@@ -296,11 +298,13 @@ const ServiceRequestsPage = () => {
                     flexDirection: 'column',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     borderRadius: 3,
+                    cursor: 'pointer',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 4,
                     },
                   }}
+                  onClick={() => setSelectedRequest(request.id)}
                 >
                   <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     <Box>
@@ -468,6 +472,13 @@ const ServiceRequestsPage = () => {
           }}
         />
       )}
+
+      {/* Service Request Detail Modal */}
+      <ServiceRequestDetailModal
+        requestId={selectedRequest}
+        open={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+      />
     </Container>
   );
 };
