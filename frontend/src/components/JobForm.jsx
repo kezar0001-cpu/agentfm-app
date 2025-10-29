@@ -37,10 +37,11 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch properties
   const { data: properties = [], isLoading: loadingProperties } = useQuery({
+  const { data: properties = [], isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
+      return response.data;
     },
   });
 
@@ -50,7 +51,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return ensureArray(response.data, ['units', 'data', 'items', 'results']);
+      return response.data;
     },
     enabled: !!formData.propertyId,
   });
@@ -60,7 +61,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
+      return response.data;
     },
   });
 

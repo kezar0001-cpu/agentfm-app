@@ -566,18 +566,20 @@ const JobsPage = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
-        <JobForm
-          job={selectedJob}
-          onSuccess={handleSuccess}
-          onCancel={handleCloseDialog}
-        />
-      </Dialog>
+      {openDialog && (
+        <Dialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          maxWidth="md"
+          fullWidth
+        >
+          <JobForm
+            job={selectedJob}
+            onSuccess={handleSuccess}
+            onCancel={handleCloseDialog}
+          />
+        </Dialog>
+      )}
 
       {/* Job Detail Modal */}
       <JobDetailModal

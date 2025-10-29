@@ -282,6 +282,19 @@ router.get('/:id', async (req, res) => {
             phone: true,
           },
         },
+        owners: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -366,6 +379,136 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       meta: error?.meta,
     });
     res.status(500).json({ success: false, message: 'Failed to delete property' });
+  }
+});
+
+// GET /:id/activity - Get recent activity for a property
+router.get('/:id/activity', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+
+    // Fetch recent activity for this property
+    const [jobs, inspections, serviceRequests, units] = await Promise.all([
+      prisma.job.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          assignedTo: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.inspection.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          scheduledDate: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.serviceRequest.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          requestedBy: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.unit.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          unitNumber: true,
+          status: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const activities = [];
+
+    jobs.forEach((job) => {
+      activities.push({
+        type: 'job',
+        id: job.id,
+        title: job.title,
+        description: job.assignedTo
+          ? `Assigned to ${job.assignedTo.firstName} ${job.assignedTo.lastName}`
+          : 'Job update',
+        status: job.status,
+        priority: job.priority,
+        date: job.updatedAt,
+      });
+    });
+
+    inspections.forEach((inspection) => {
+      activities.push({
+        type: 'inspection',
+        id: inspection.id,
+        title: inspection.title,
+        description: `Inspection ${inspection.status.toLowerCase()}`,
+        status: inspection.status,
+        date: inspection.updatedAt,
+      });
+    });
+
+    serviceRequests.forEach((sr) => {
+      activities.push({
+        type: 'service_request',
+        id: sr.id,
+        title: sr.title,
+        description: sr.requestedBy
+          ? `Requested by ${sr.requestedBy.firstName} ${sr.requestedBy.lastName}`
+          : 'Service request update',
+        status: sr.status,
+        priority: sr.priority,
+        date: sr.updatedAt,
+      });
+    });
+
+    units.forEach((unit) => {
+      activities.push({
+        type: 'unit',
+        id: unit.id,
+        title: `Unit ${unit.unitNumber}`,
+        description: `Status: ${unit.status}`,
+        status: unit.status,
+        date: unit.updatedAt,
+      });
+    });
+
+    // Sort by date descending
+    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({ success: true, activities: activities.slice(0, limit) });
+  } catch (error) {
+    console.error('Get property activity error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch property activity' });
   }
 });
 
