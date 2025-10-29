@@ -11,3 +11,6 @@ backend/.env
 
 # Ignore environment secrets
 backend/.env
+
+# Ignore environment secrets
+backend/.env
