@@ -381,4 +381,136 @@ router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, 
   }
 });
 
+// ========================================
+// JOB COMMENTS
+// ========================================
+
+const commentSchema = z.object({
+  content: z.string().min(1, 'Comment cannot be empty').max(2000, 'Comment too long'),
+});
+
+// GET /:id/comments - Get all comments for a job
+router.get('/:id/comments', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if job exists and user has access
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            managerId: true,
+            owners: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Check access based on role
+    const hasAccess = 
+      req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
+      req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
+      req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Fetch comments
+    const comments = await prisma.jobComment.findMany({
+      where: { jobId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    
+    res.json({ success: true, comments });
+  } catch (error) {
+    console.error('Error fetching job comments:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch comments' });
+  }
+});
+
+// POST /:id/comments - Add a comment to a job
+router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    
+    // Check if job exists and user has access
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            managerId: true,
+            owners: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Check access based on role
+    const hasAccess = 
+      req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
+      req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
+      req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Create comment
+    const comment = await prisma.jobComment.create({
+      data: {
+        jobId: id,
+        userId: req.user.id,
+        content,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+    
+    res.status(201).json({ success: true, comment });
+  } catch (error) {
+    console.error('Error creating job comment:', error);
+    res.status(500).json({ success: false, message: 'Failed to create comment' });
+  }
+});
+
 export default router;
