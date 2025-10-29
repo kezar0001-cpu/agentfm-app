@@ -3,7 +3,13 @@
  * Helper functions for managing user roles and permissions
  */
 
-import { ROLES } from '../middleware/roleAuth.js';
+// Define roles (matching Prisma schema)
+const ROLES = {
+  PROPERTY_MANAGER: 'PROPERTY_MANAGER',
+  OWNER: 'OWNER',
+  TECHNICIAN: 'TECHNICIAN',
+  TENANT: 'TENANT'
+};
 
 /**
  * Get user with their role-specific profile
