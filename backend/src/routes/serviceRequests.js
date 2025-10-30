@@ -141,7 +141,13 @@ router.get('/:id', requireAuth, async (req, res) => {
       where: { id },
       include: {
         property: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+            managerId: true,
             owners: {
               select: {
                 ownerId: true,
