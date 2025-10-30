@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -178,7 +178,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
+router.post('/', requireAuth, requireActiveSubscription, validate(requestSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, category, priority, photos } = req.body;
     
