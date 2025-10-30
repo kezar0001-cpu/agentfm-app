@@ -9,6 +9,50 @@ import { prisma } from '../config/prismaClient.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
 
 const TRIAL_PERIOD_DAYS = 14;
+const ACCESS_TOKEN_EXPIRATION = '15m';
+const REFRESH_TOKEN_EXPIRATION = '7d';
+const REFRESH_COOKIE_NAME = 'refreshToken';
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+function signAccessToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role, tokenType: 'access' },
+    getJwtSecret(),
+    { expiresIn: ACCESS_TOKEN_EXPIRATION }
+  );
+}
+
+function signRefreshToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role, tokenType: 'refresh' },
+    getJwtSecret(),
+    { expiresIn: REFRESH_TOKEN_EXPIRATION }
+  );
+}
+
+function refreshCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/api/auth',
+  };
+}
+
+function setRefreshTokenCookie(res, refreshToken) {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
+}
+
+function issueAuthTokens(user, res) {
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+  if (res) {
+    setRefreshTokenCookie(res, refreshToken);
+  }
+  return { accessToken, refreshToken };
+}
 
 function calculateTrialEndDate(baseDate = new Date()) {
   const endDate = new Date(baseDate);
@@ -69,6 +113,9 @@ const requireAuth = (req, res, next) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, getJwtSecret());
+    if (decoded.tokenType !== 'access') {
+      throw new Error('Invalid token type');
+    }
     req.user = {
       id: decoded.id,
       email: decoded.email,
@@ -218,11 +265,7 @@ router.post('/register', async (req, res) => {
       }
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      getJwtSecret(),
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = issueAuthTokens(user, res);
 
     // Strip passwordHash
     const userWithTrial = await ensureTrialState(user);
@@ -230,7 +273,9 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      token,
+      token: accessToken,
+      accessToken,
+      refreshToken,
       user: userWithoutPassword,
       message: 'Account created successfully!',
     });
@@ -271,24 +316,65 @@ router.post('/login', async (req, res) => {
 
     // ❌ Removed: subscription checks (not on User in this schema)
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      getJwtSecret(),
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = issueAuthTokens(user, res);
 
     await prisma.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
 
     const userWithTrial = await ensureTrialState(user);
 
     const { passwordHash: _ph, ...userWithoutPassword } = userWithTrial;
-    res.json({ success: true, token, user: userWithoutPassword });
+    res.json({ success: true, token: accessToken, accessToken, refreshToken, user: userWithoutPassword });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
     }
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Login failed' });
+  }
+});
+
+// ========================================
+// POST /api/auth/refresh
+// ========================================
+router.post('/refresh', async (req, res) => {
+  try {
+    const cookieToken = req.cookies?.[REFRESH_COOKIE_NAME];
+    const bodyToken = req.body?.refreshToken || req.body?.token;
+    const refreshToken = bodyToken || cookieToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({ success: false, message: 'Refresh token is required' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, getJwtSecret());
+    } catch (error) {
+      const message = error?.name === 'TokenExpiredError'
+        ? 'Refresh token expired'
+        : 'Invalid refresh token';
+      return res.status(401).json({ success: false, message });
+    }
+
+    if (decoded.tokenType !== 'refresh') {
+      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = issueAuthTokens(user, res);
+
+    res.json({ success: true, token: accessToken, accessToken, refreshToken: newRefreshToken });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ success: false, message: 'Failed to refresh token' });
   }
 });
 
@@ -327,11 +413,7 @@ router.get(
 
       // ❌ Removed: subscription checks (not present)
 
-      const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        getJwtSecret(),
-        { expiresIn: '7d' }
-      );
+      const { accessToken } = issueAuthTokens(user, res);
 
       const dashboardRoutes = {
         PROPERTY_MANAGER: '/dashboard',
@@ -344,7 +426,7 @@ router.get(
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
       // Redirect to auth/callback page which will handle token storage
-      res.redirect(`${frontendUrl}/auth/callback?token=${token}&next=${encodeURIComponent(nextPath)}`);
+      res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&next=${encodeURIComponent(nextPath)}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -392,6 +474,7 @@ router.get('/me', requireAuth, async (req, res) => {
 router.post('/logout', (req, res) => {
   req.logout((err) => {
     if (err) return res.status(500).json({ success: false, message: 'Logout failed' });
+    res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
     res.json({ success: true, message: 'Logged out successfully' });
   });
 });
