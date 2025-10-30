@@ -1,6 +1,6 @@
 // frontend/src/api/client.js
 import axios from 'axios';
-import { getAuthToken, removeAuthToken } from '../lib/auth.js';
+import { getAuthToken, removeAuthToken, saveAuthToken } from '../lib/auth.js';
 
 // Determine the base URL. Use the environment variable if it exists, otherwise use the current page's origin.
 const envBase = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE;
@@ -14,6 +14,82 @@ const apiClient = axios.create({
   withCredentials: false,
   headers: { 'Content-Type': 'application/json' },
 });
+
+let refreshRequest = null;
+
+function redirectToSignin() {
+  if (typeof window === 'undefined') return;
+  const { pathname } = window.location;
+  if (!pathname.startsWith('/signin') && !pathname.startsWith('/signup')) {
+    window.location.href = '/signin';
+  }
+}
+
+function handleUnauthorized({ error, forceLogout = false }) {
+  if (import.meta.env.DEV && error?.config) {
+    console.error('[API Client] 401 Unauthorized:', {
+      url: error.config.url,
+      method: error.config.method,
+      response: error.response?.data,
+    });
+  }
+
+  if (forceLogout) {
+    removeAuthToken();
+    if (typeof window !== 'undefined') {
+      window._401ErrorCount = 0;
+      window._last401Error = Date.now();
+    }
+    redirectToSignin();
+    return;
+  }
+
+  if (typeof window === 'undefined') return;
+
+  const now = Date.now();
+  const lastError = window._last401Error || 0;
+  const errorCount = window._401ErrorCount || 0;
+
+  if (now - lastError < 5000) {
+    window._401ErrorCount = errorCount + 1;
+
+    if (window._401ErrorCount >= 3) {
+      removeAuthToken();
+      redirectToSignin();
+    }
+  } else {
+    window._401ErrorCount = 1;
+  }
+
+  window._last401Error = now;
+}
+
+async function requestNewAccessToken() {
+  if (!refreshRequest) {
+    refreshRequest = apiClient
+      .post('/auth/refresh', {}, {
+        withCredentials: true,
+        __isRefreshRequest: true,
+      })
+      .then((response) => {
+        const newToken = response.data?.token || response.data?.accessToken;
+        if (!newToken) {
+          throw new Error('Refresh response did not include an access token');
+        }
+        saveAuthToken(newToken);
+        return newToken;
+      })
+      .catch((error) => {
+        removeAuthToken();
+        throw error;
+      })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+
+  return refreshRequest;
+}
 
 // Request interceptor: Attach auth token to every request
 apiClient.interceptors.request.use(
@@ -53,43 +129,43 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor: Handle 401 errors with rate limiting
+// Response interceptor: Handle 401 errors with refresh flow
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // If we get a 401, log it for debugging
-    if (error.response?.status === 401) {
-      console.error('[API Client] 401 Unauthorized:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        response: error.response?.data,
-      });
-      
-      // Rate limit the logout to prevent immediate logout on single 401
-      // Only logout if we get multiple 401s in a short time
-      const now = Date.now();
-      const lastError = window._last401Error || 0;
-      const errorCount = window._401ErrorCount || 0;
-      
-      if (now - lastError < 5000) {
-        // Multiple 401s within 5 seconds
-        window._401ErrorCount = errorCount + 1;
-        
-        if (window._401ErrorCount >= 3) {
-          console.warn('[API Client] Multiple 401 errors detected - clearing auth');
-          removeAuthToken();
-          if (!window.location.pathname.startsWith('/signin') && 
-              !window.location.pathname.startsWith('/signup')) {
-            window.location.href = '/signin';
-          }
-        }
-      } else {
-        // Reset counter if errors are spaced out
-        window._401ErrorCount = 1;
+  async (error) => {
+    const status = error.response?.status;
+
+    if (status === 401) {
+      const originalRequest = error.config || {};
+
+      if (originalRequest.__isRefreshRequest) {
+        handleUnauthorized({ error, forceLogout: true });
+        return Promise.reject(error);
       }
-      
-      window._last401Error = now;
+
+      const url = originalRequest.url || '';
+      const skipRefresh =
+        originalRequest._retry === true ||
+        ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].some((path) => url.includes(path));
+
+      if (!skipRefresh) {
+        originalRequest._retry = true;
+        try {
+          const newToken = await requestNewAccessToken();
+          if (newToken) {
+            originalRequest.headers = originalRequest.headers || {};
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
+          }
+        } catch (refreshError) {
+          handleUnauthorized({ error: refreshError, forceLogout: true });
+          return Promise.reject(refreshError);
+        }
+      }
+
+      handleUnauthorized({ error });
     }
+
     return Promise.reject(error);
   }
 );

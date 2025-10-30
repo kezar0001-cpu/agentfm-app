@@ -45,11 +45,15 @@ export default function SignIn() {
     setError('');
     try {
       // MINIMAL CHANGE: Add the 'role' to the submitted data
-      const res = await api.post('/api/auth/login', {
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        role: formData.role,
-      });
+      const res = await api.post(
+        '/api/auth/login',
+        {
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          role: formData.role,
+        },
+        { credentials: 'include' }
+      );
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 

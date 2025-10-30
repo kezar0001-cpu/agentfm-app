@@ -106,7 +106,7 @@ export default function SignUp() {
         payload.inviteToken = inviteToken;
       }
 
-      const res = await api.post('/api/auth/register', payload);
+      const res = await api.post('/api/auth/register', payload, { credentials: 'include' });
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
