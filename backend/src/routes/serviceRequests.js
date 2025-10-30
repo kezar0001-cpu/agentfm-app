@@ -91,8 +91,6 @@ router.get('/:id', requireAuth, async (req, res) => {
             city: true,
             state: true,
             managerId: true,
-          },
-          include: {
             owners: {
               select: {
                 ownerId: true,
