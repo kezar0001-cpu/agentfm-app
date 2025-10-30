@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -64,6 +64,16 @@ export default function PropertyDetailPage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [unitMenuAnchor, setUnitMenuAnchor] = useState(null);
   const [deleteUnitDialogOpen, setDeleteUnitDialogOpen] = useState(false);
+  const unitDialogOpenRef = useRef(unitDialogOpen);
+  const deleteUnitDialogOpenRef = useRef(deleteUnitDialogOpen);
+
+  useEffect(() => {
+    unitDialogOpenRef.current = unitDialogOpen;
+  }, [unitDialogOpen]);
+
+  useEffect(() => {
+    deleteUnitDialogOpenRef.current = deleteUnitDialogOpen;
+  }, [deleteUnitDialogOpen]);
 
   // Fetch property details
   const propertyQuery = useApiQuery({
@@ -129,9 +139,9 @@ export default function PropertyDetailPage() {
 
   const handleUnitMenuClose = () => {
     setUnitMenuAnchor(null);
-    // Clear selected unit after a short delay to prevent memory leaks
+    // Clear selected unit after a short delay only if no dialogs are open
     setTimeout(() => {
-      if (!unitDialogOpen && !deleteUnitDialogOpen) {
+      if (!unitDialogOpenRef.current && !deleteUnitDialogOpenRef.current) {
         setSelectedUnit(null);
       }
     }, 100);
@@ -763,7 +773,13 @@ export default function PropertyDetailPage() {
       />
 
       {/* Delete Unit Dialog */}
-      <Dialog open={deleteUnitDialogOpen} onClose={() => setDeleteUnitDialogOpen(false)}>
+      <Dialog
+        open={deleteUnitDialogOpen}
+        onClose={() => {
+          setDeleteUnitDialogOpen(false);
+          setTimeout(() => setSelectedUnit(null), 200);
+        }}
+      >
         <DialogTitle>Delete Unit</DialogTitle>
         <DialogContent>
           <Typography>
@@ -777,7 +793,14 @@ export default function PropertyDetailPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteUnitDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setDeleteUnitDialogOpen(false);
+              setTimeout(() => setSelectedUnit(null), 200);
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={confirmDeleteUnit}
             color="error"
