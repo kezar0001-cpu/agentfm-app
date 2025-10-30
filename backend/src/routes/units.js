@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/prismaClient.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 
@@ -190,7 +190,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireActiveSubscription, async (req, res) => {
   try {
     const propertyId = resolvePropertyId(req);
     if (!propertyId) {
