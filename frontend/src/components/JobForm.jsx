@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import ensureArray from '../utils/ensureArray';
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
@@ -39,8 +40,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      // Backend returns array directly
-      return Array.isArray(response.data) ? response.data : [];
+      return ensureArray(response.data, ['items', 'data.items', 'properties']);
     },
   });
 
@@ -50,8 +50,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      // Backend returns array directly
-      return Array.isArray(response.data) ? response.data : [];
+      return ensureArray(response.data, ['items', 'data.items', 'units']);
     },
     enabled: !!formData.propertyId,
   });
