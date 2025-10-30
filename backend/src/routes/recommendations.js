@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -98,7 +98,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/:id/approve', requireAuth, async (req, res) => {
+router.post('/:id/approve', requireAuth, requireActiveSubscription, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -173,7 +173,7 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/:id/reject', requireAuth, async (req, res) => {
+router.post('/:id/reject', requireAuth, requireActiveSubscription, async (req, res) => {
   try {
     const { id } = req.params;
     const { rejectionReason } = req.body;

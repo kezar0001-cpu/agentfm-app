@@ -159,17 +159,17 @@ export const requireActiveSubscription = (req, res, next) => {
     if (trialEndDate && new Date(trialEndDate) > new Date()) {
       return next();
     }
-    return res.status(402).json({ 
-      success: false, 
-      message: 'Trial period has expired. Please upgrade your subscription.',
+    return res.status(403).json({
+      success: false,
+      message: 'Your trial period has expired. Please upgrade your plan to continue.',
       code: 'TRIAL_EXPIRED',
     });
   }
 
   // All other statuses are blocked
-  return res.status(402).json({ 
-    success: false, 
-    message: 'Active subscription required',
+  return res.status(403).json({
+    success: false,
+    message: 'Active subscription required. Please upgrade your plan to access this feature.',
     code: 'SUBSCRIPTION_REQUIRED',
   });
 };
