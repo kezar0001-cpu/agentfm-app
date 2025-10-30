@@ -578,37 +578,35 @@ router.get('/calendar', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const where = buildInspectionWhere(req.query, req.user);
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 20, 1), 100);
-    const skip = (page - 1) * pageSize;
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
     const orderBy = parseSort(req.query.sortBy, req.query.sortOrder);
 
-    const [items, total, statusBreakdown] = await Promise.all([
+    const [items, total] = await Promise.all([
       prisma.inspection.findMany({
         where,
         include: baseInspectionInclude,
         orderBy,
-        skip,
-        take: pageSize,
+        skip: offset,
+        take: limit,
       }),
       prisma.inspection.count({ where }),
-      prisma.inspection.groupBy({
-        where,
-        by: ['status'],
-        _count: { _all: true },
-      }),
     ]);
 
-    const summary = statusBreakdown.reduce(
-      (acc, item) => {
-        acc[item.status] = item._count._all;
-        return acc;
-      },
-      {},
-    );
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
 
-    // Always return a plain array for consistent frontend handling
-    res.json(items);
+    // Return paginated response
+    res.json({
+      items,
+      total,
+      page,
+      hasMore,
+    });
   } catch (error) {
     console.error('Failed to fetch inspections', error);
     res.status(500).json({ success: false, message: 'Failed to load inspections' });
