@@ -1,6 +1,30 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient;
+
+function getResendClient() {
+  if (resendClient) {
+    return resendClient;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    return null;
+  }
+
+  resendClient = new Resend(apiKey);
+  return resendClient;
+}
+
+function ensureResendClient() {
+  const client = getResendClient();
+
+  if (!client) {
+    throw new Error('Resend API key is not configured');
+  }
+
+  return client;
+}
 
 /**
  * Send a generic email
@@ -11,6 +35,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function sendEmail(to, subject, html) {
   try {
     const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+
+    const resend = ensureResendClient();
 
     const { data, error } = await resend.emails.send({
       from: emailFrom,
@@ -40,6 +66,8 @@ export async function sendEmail(to, subject, html) {
 export async function sendPasswordResetEmail(to, resetUrl, firstName) {
   try {
     const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+
+    const resend = ensureResendClient();
 
     const { data, error } = await resend.emails.send({
       from: emailFrom,
