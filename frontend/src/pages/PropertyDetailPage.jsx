@@ -98,6 +98,16 @@ export default function PropertyDetailPage() {
     : null;
   const units = normaliseArray(unitsQuery.data);
 
+  // Fix: Reset all state when property ID changes to prevent race conditions
+  useEffect(() => {
+    setCurrentTab(0);
+    setEditDialogOpen(false);
+    setUnitDialogOpen(false);
+    setSelectedUnit(null);
+    setUnitMenuAnchor(null);
+    setDeleteUnitDialogOpen(false);
+  }, [id]);
+
   const handleBack = () => {
     navigate('/properties');
   };
@@ -313,7 +323,7 @@ export default function PropertyDetailPage() {
                       Status
                     </Typography>
                     <Chip
-                      label={propertyStatus.replace('_', ' ')}
+                      label={propertyStatus.replace(/_/g, ' ')}
                       color={getStatusColor(propertyStatus)}
                       size="small"
                     />
@@ -546,30 +556,30 @@ export default function PropertyDetailPage() {
 
                             <Stack spacing={1}>
                               <Chip
-                                label={unit.status?.replace('_', ' ')}
+                                label={unit.status?.replace(/_/g, ' ')}
                                 color={getStatusColor(unit.status)}
                                 size="small"
                               />
 
-                              {unit.bedrooms && (
+                              {unit.bedrooms != null && unit.bathrooms != null && (
                                 <Typography variant="body2" color="text.secondary">
                                   {unit.bedrooms} bed • {unit.bathrooms} bath
                                 </Typography>
                               )}
 
-                              {unit.area && (
+                              {unit.area != null && (
                                 <Typography variant="body2" color="text.secondary">
                                   {unit.area} sq ft
                                 </Typography>
                               )}
 
-                              {unit.rentAmount && (
+                              {unit.rentAmount != null && (
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                   ${unit.rentAmount.toLocaleString()}/mo
                                 </Typography>
                               )}
 
-                              {unit.tenants && unit.tenants.length > 0 && (
+                              {unit.tenants?.[0]?.tenant && (
                                 <Box>
                                   <Typography variant="caption" color="text.secondary">
                                     Tenant
@@ -669,7 +679,7 @@ export default function PropertyDetailPage() {
                               </Typography>
                               {activity.status && (
                                 <Chip
-                                  label={activity.status.replace('_', ' ')}
+                                  label={activity.status.replace(/_/g, ' ')}
                                   size="small"
                                   color={getStatusColor(activity.status)}
                                 />
@@ -772,7 +782,10 @@ export default function PropertyDetailPage() {
             onClick={confirmDeleteUnit}
             color="error"
             variant="contained"
-            disabled={deleteUnitMutation.isPending}
+            disabled={
+              deleteUnitMutation.isPending || 
+              (selectedUnit?.tenants && selectedUnit.tenants.length > 0)
+            }
           >
             {deleteUnitMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
