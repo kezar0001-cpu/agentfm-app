@@ -13,6 +13,45 @@ router.get('/', requireAuth, async (req, res) => {
     if (reportId) where.reportId = reportId;
     if (status) where.status = status;
     
+    // Add role-based access control
+    // Recommendations are tied to inspection reports, which are tied to properties
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers see recommendations for their properties
+      where.report = {
+        inspection: {
+          property: {
+            managerId: req.user.id,
+          },
+        },
+      };
+    } else if (req.user.role === 'OWNER') {
+      // Owners see recommendations for properties they own
+      where.report = {
+        inspection: {
+          property: {
+            owners: {
+              some: {
+                ownerId: req.user.id,
+              },
+            },
+          },
+        },
+      };
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians see recommendations for inspections assigned to them
+      where.report = {
+        inspection: {
+          assignedToId: req.user.id,
+        },
+      };
+    } else {
+      // Tenants and other roles have no access to recommendations
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to view recommendations.' 
+      });
+    }
+    
     const recommendations = await prisma.recommendation.findMany({
       where,
       include: {
@@ -21,6 +60,13 @@ router.get('/', requireAuth, async (req, res) => {
             id: true,
             title: true,
             inspectionId: true,
+            inspection: {
+              select: {
+                id: true,
+                title: true,
+                propertyId: true,
+              },
+            },
           },
         },
         createdBy: {
@@ -58,10 +104,47 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
     
     const recommendation = await prisma.recommendation.findUnique({
       where: { id },
+      include: {
+        report: {
+          include: {
+            inspection: {
+              include: {
+                property: {
+                  include: {
+                    owners: {
+                      select: { ownerId: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     
     if (!recommendation) {
       return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+    
+    // Access control: Only property managers and owners can approve recommendations
+    const property = recommendation.report?.inspection?.property;
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Associated property not found' });
+    }
+    
+    let hasAccess = false;
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to approve this recommendation.' 
+      });
     }
     
     const updated = await prisma.recommendation.update({
@@ -97,10 +180,47 @@ router.post('/:id/reject', requireAuth, async (req, res) => {
     
     const recommendation = await prisma.recommendation.findUnique({
       where: { id },
+      include: {
+        report: {
+          include: {
+            inspection: {
+              include: {
+                property: {
+                  include: {
+                    owners: {
+                      select: { ownerId: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     
     if (!recommendation) {
       return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+    
+    // Access control: Only property managers and owners can reject recommendations
+    const property = recommendation.report?.inspection?.property;
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Associated property not found' });
+    }
+    
+    let hasAccess = false;
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to reject this recommendation.' 
+      });
     }
     
     const updated = await prisma.recommendation.update({
