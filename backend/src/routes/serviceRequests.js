@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, isSubscriptionActive } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -32,13 +32,13 @@ const requestUpdateSchema = z.object({
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, category } = req.query;
-    
+
     // Build base where clause with filters
     const where = {};
     if (status) where.status = status;
     if (propertyId) where.propertyId = propertyId;
     if (category) where.category = category;
-    
+
     // Add role-based access control
     if (req.user.role === 'PROPERTY_MANAGER') {
       // Property managers see requests for properties they manage
@@ -61,46 +61,71 @@ router.get('/', requireAuth, async (req, res) => {
         distinct: ['propertyId'],
       });
       const propertyIds = assignedJobs.map(j => j.propertyId).filter(Boolean);
-      
+
       if (propertyIds.length === 0) {
-        // Technician has no assigned jobs, return empty array
-        return res.json([]);
+        // Technician has no assigned jobs, return empty result
+        return res.json({
+          items: [],
+          total: 0,
+          page: 1,
+          hasMore: false,
+        });
       }
-      
+
       where.propertyId = { in: propertyIds };
     }
-    
-    const requests = await prisma.serviceRequest.findMany({
-      where,
-      include: {
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    // Fetch service requests and total count in parallel
+    const [requests, total] = await Promise.all([
+      prisma.serviceRequest.findMany({
+        where,
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          requestedBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
           },
         },
-        unit: {
-          select: {
-            id: true,
-            unitNumber: true,
-          },
+        orderBy: {
+          createdAt: 'desc',
         },
-        requestedBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.serviceRequest.count({ where }),
+    ]);
+
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    res.json({
+      items: requests,
+      total,
+      page,
+      hasMore,
     });
-    
-    res.json(requests);
   } catch (error) {
     console.error('Error fetching service requests:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch service requests' });
@@ -181,13 +206,20 @@ router.get('/:id', requireAuth, async (req, res) => {
 router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, category, priority, photos } = req.body;
-    
+
     // Verify property exists and user has access
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
       include: {
         owners: {
           select: { ownerId: true },
+        },
+        manager: {
+          select: {
+            id: true,
+            subscriptionStatus: true,
+            trialEndDate: true,
+          },
         },
       },
     });
@@ -237,12 +269,33 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
     }
     
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You do not have access to create service requests for this property' 
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to create service requests for this property'
       });
     }
-    
+
+    // Verify the relevant subscription is active
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      if (!isSubscriptionActive(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your trial period has expired. Please upgrade your plan to continue.',
+          code: 'TRIAL_EXPIRED',
+        });
+      }
+    } else {
+      const manager = property.manager;
+
+      if (!manager || !isSubscriptionActive(manager)) {
+        return res.status(403).json({
+          success: false,
+          message: 'This property\'s subscription has expired. Please contact your property manager.',
+          code: 'MANAGER_SUBSCRIPTION_REQUIRED',
+        });
+      }
+    }
+
     // Create service request
     const request = await prisma.serviceRequest.create({
       data: {

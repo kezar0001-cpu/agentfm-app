@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/prismaClient.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 
@@ -94,34 +94,56 @@ router.get('/', async (req, res) => {
       return res.status(access.status).json({ error: access.message });
     }
 
-    const units = await prisma.unit.findMany({
-      where: { propertyId },
-      include: {
-        tenants: {
-          where: { isActive: true },
-          include: {
-            tenant: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const where = { propertyId };
+
+    // Fetch units and total count in parallel
+    const [units, total] = await Promise.all([
+      prisma.unit.findMany({
+        where,
+        include: {
+          tenants: {
+            where: { isActive: true },
+            include: {
+              tenant: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            jobs: true,
-            inspections: true,
+          _count: {
+            select: {
+              jobs: true,
+              inspections: true,
+            },
           },
         },
-      },
-      orderBy: { unitNumber: 'asc' },
-    });
+        orderBy: { unitNumber: 'asc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.unit.count({ where }),
+    ]);
 
-    return res.json(units);
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    return res.json({
+      items: units,
+      total,
+      page,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching units:', error);
     return res.status(500).json({ error: 'Failed to fetch units' });
@@ -190,7 +212,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireActiveSubscription, async (req, res) => {
   try {
     const propertyId = resolvePropertyId(req);
     if (!propertyId) {

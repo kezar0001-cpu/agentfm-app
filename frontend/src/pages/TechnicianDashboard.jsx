@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
+import ensureArray from '../utils/ensureArray';
 
 const STATUS_COLORS = {
   OPEN: 'default',
@@ -54,7 +55,7 @@ export default function TechnicianDashboard() {
     queryKey: ['technician-jobs'],
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'jobs']);
     },
   });
 

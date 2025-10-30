@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -43,6 +43,8 @@ import {
   Delete as DeleteIcon,
   PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../api/client';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
@@ -53,10 +55,12 @@ import {
   formatPropertyAddressLine,
   formatPropertyLocality,
 } from '../utils/formatPropertyLocation';
+import { CircularProgress } from '@mui/material';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [currentTab, setCurrentTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -81,10 +85,17 @@ export default function PropertyDetailPage() {
     url: `/api/properties/${id}`,
   });
 
-  // Fetch units for this property
-  const unitsQuery = useApiQuery({
+  // Fetch units for this property with infinite query
+  const unitsQuery = useInfiniteQuery({
     queryKey: ['units', id],
-    url: `/api/units?propertyId=${id}`,
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await apiClient.get(`/units?propertyId=${id}&limit=50&offset=${pageParam}`);
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    },
+    initialPageParam: 0,
   });
 
   // Fetch activity for this property
@@ -106,7 +117,9 @@ export default function PropertyDetailPage() {
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
     : null;
-  const units = normaliseArray(unitsQuery.data);
+
+  // Flatten all pages into a single array
+  const units = unitsQuery.data?.pages?.flatMap(page => page.items) || [];
 
   // Fix: Reset all state when property ID changes to prevent race conditions
   useEffect(() => {
@@ -508,103 +521,120 @@ export default function PropertyDetailPage() {
                   error={unitsQuery.error}
                   isEmpty={units.length === 0}
                   emptyMessage="No units yet. Add your first unit to get started!"
-                  onRetry={unitsQuery.refetch}
+                  onRetry={() => unitsQuery.refetch()}
                 >
-                  <Grid container spacing={2.5}>
-                    {units.map((unit) => (
-                      <Grid item xs={12} sm={6} md={4} key={unit.id}>
-                        <Card 
-                          sx={{ 
-                            height: '100%', 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: 4,
-                            },
-                            '&:focus': {
-                              outline: '2px solid',
-                              outlineColor: 'primary.main',
-                              outlineOffset: '2px',
-                            },
-                          }}
-                          onClick={() => navigate(`/units/${unit.id}`)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              navigate(`/units/${unit.id}`);
-                            }
-                          }}
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`View details for unit ${unit.unitNumber}`}
-                        >
-                          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: 1,
-                              }}
-                            >
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                Unit {unit.unitNumber}
-                              </Typography>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUnitMenuOpen(e, unit);
+                  <Stack spacing={3}>
+                    <Grid container spacing={2.5}>
+                      {units.map((unit) => (
+                        <Grid item xs={12} sm={6} md={4} key={unit.id}>
+                          <Card
+                            sx={{
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s, box-shadow 0.2s',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: 4,
+                              },
+                              '&:focus': {
+                                outline: '2px solid',
+                                outlineColor: 'primary.main',
+                                outlineOffset: '2px',
+                              },
+                            }}
+                            onClick={() => navigate(`/units/${unit.id}`)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigate(`/units/${unit.id}`);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View details for unit ${unit.unitNumber}`}
+                          >
+                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: 1,
                                 }}
                               >
-                                <MoreVertIcon />
-                              </IconButton>
-                            </Box>
-
-                            <Stack spacing={1}>
-                              <Chip
-                                label={unit.status?.replace(/_/g, ' ')}
-                                color={getStatusColor(unit.status)}
-                                size="small"
-                              />
-
-                              {unit.bedrooms != null && unit.bathrooms != null && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {unit.bedrooms} bed • {unit.bathrooms} bath
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                  Unit {unit.unitNumber}
                                 </Typography>
-                              )}
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnitMenuOpen(e, unit);
+                                  }}
+                                >
+                                  <MoreVertIcon />
+                                </IconButton>
+                              </Box>
 
-                              {unit.area != null && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {unit.area} sq ft
-                                </Typography>
-                              )}
+                              <Stack spacing={1}>
+                                <Chip
+                                  label={unit.status?.replace(/_/g, ' ')}
+                                  color={getStatusColor(unit.status)}
+                                  size="small"
+                                />
 
-                              {unit.rentAmount != null && (
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  ${unit.rentAmount.toLocaleString()}/mo
-                                </Typography>
-                              )}
-
-                              {unit.tenants?.[0]?.tenant && (
-                                <Box>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Tenant
+                                {unit.bedrooms != null && unit.bathrooms != null && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {unit.bedrooms} bed • {unit.bathrooms} bath
                                   </Typography>
-                                  <Typography variant="body2">
-                                    {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
+                                )}
+
+                                {unit.area != null && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {unit.area} sq ft
                                   </Typography>
-                                </Box>
-                              )}
-                            </Stack>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
+                                )}
+
+                                {unit.rentAmount != null && (
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    ${unit.rentAmount.toLocaleString()}/mo
+                                  </Typography>
+                                )}
+
+                                {unit.tenants?.[0]?.tenant && (
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Tenant
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Stack>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    {/* Load More Button */}
+                    {unitsQuery.hasNextPage && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                        <Button
+                          variant="outlined"
+                          size="large"
+                          onClick={() => unitsQuery.fetchNextPage()}
+                          disabled={unitsQuery.isFetchingNextPage}
+                          startIcon={unitsQuery.isFetchingNextPage ? <CircularProgress size={20} /> : null}
+                        >
+                          {unitsQuery.isFetchingNextPage ? 'Loading...' : 'Load More'}
+                        </Button>
+                      </Box>
+                    )}
+                  </Stack>
                 </DataState>
               </Paper>
             )}

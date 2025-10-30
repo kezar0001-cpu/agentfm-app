@@ -48,6 +48,7 @@ import UnitForm from '../components/UnitForm';
 import TenantAssignmentDialog from '../components/TenantAssignmentDialog';
 import { formatDateTime } from '../utils/date';
 import toast from 'react-hot-toast';
+import ensureArray from '../utils/ensureArray';
 
 const getStatusColor = (status) => {
   const colors = {
@@ -93,7 +94,7 @@ export default function UnitDetailPage() {
     queryKey: ['unit-jobs', id],
     queryFn: async () => {
       const response = await apiClient.get(`/jobs?unitId=${id}`);
-      return response.data?.jobs || response.data || [];
+      return ensureArray(response.data, ['items', 'data.items', 'jobs']);
     },
     enabled: currentTab === 1,
   });
@@ -103,7 +104,7 @@ export default function UnitDetailPage() {
     queryKey: ['unit-inspections', id],
     queryFn: async () => {
       const response = await apiClient.get(`/inspections?unitId=${id}`);
-      return response.data?.inspections || response.data || [];
+      return ensureArray(response.data, ['items', 'data.items', 'inspections']);
     },
     enabled: currentTab === 2,
   });

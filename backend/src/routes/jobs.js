@@ -47,10 +47,10 @@ const jobUpdateSchema = z.object({
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, assignedToId } = req.query;
-    
+
     // Build where clause based on filters and user role
     const where = {};
-    
+
     // Role-based filtering
     if (req.user.role === 'TECHNICIAN') {
       // Technicians only see jobs assigned to them
@@ -70,55 +70,74 @@ router.get('/', requireAuth, async (req, res) => {
         },
       };
     }
-    
+
     // Apply query filters
     if (status) {
       where.status = status;
     }
-    
+
     if (propertyId) {
       where.propertyId = propertyId;
     }
-    
+
     if (assignedToId && (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'OWNER')) {
       // Only managers and owners can filter by assignedToId
       where.assignedToId = assignedToId;
     }
-    
-    // Fetch jobs from database
-    const jobs = await prisma.job.findMany({
-      where,
-      include: {
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
-            state: true,
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    // Fetch jobs and total count in parallel
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              state: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
           },
         },
-        unit: {
-          select: {
-            id: true,
-            unitNumber: true,
-          },
+        orderBy: {
+          createdAt: 'desc',
         },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.job.count({ where }),
+    ]);
+
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    res.json({
+      items: jobs,
+      total,
+      page,
+      hasMore,
     });
-    
-    res.json(jobs);
   } catch (error) {
     console.error('Error fetching jobs:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch jobs' });

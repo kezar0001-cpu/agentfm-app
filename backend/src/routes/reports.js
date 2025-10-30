@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requirePropertyManagerSubscription } from '../middleware/auth.js';
 import { generateReport } from '../utils/reportGenerator.js';
 
 const router = express.Router();
@@ -16,7 +16,7 @@ const reportSchema = z.object({
 });
 
 // POST /api/reports - Create and generate a new report
-router.post('/', async (req, res) => {
+router.post('/', requirePropertyManagerSubscription, async (req, res) => {
   try {
     const payload = reportSchema.parse(req.body);
 
