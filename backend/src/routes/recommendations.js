@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -98,10 +98,10 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/:id/approve', requireAuth, requireActiveSubscription, async (req, res) => {
+router.post('/:id/approve', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const recommendation = await prisma.recommendation.findUnique({
       where: { id },
       include: {
@@ -114,6 +114,13 @@ router.post('/:id/approve', requireAuth, requireActiveSubscription, async (req, 
                     owners: {
                       select: { ownerId: true },
                     },
+                    manager: {
+                      select: {
+                        id: true,
+                        subscriptionStatus: true,
+                        trialEndDate: true,
+                      },
+                    },
                   },
                 },
               },
@@ -122,28 +129,44 @@ router.post('/:id/approve', requireAuth, requireActiveSubscription, async (req, 
         },
       },
     });
-    
+
     if (!recommendation) {
       return res.status(404).json({ success: false, message: 'Recommendation not found' });
     }
-    
+
     // Access control: Only property managers and owners can approve recommendations
     const property = recommendation.report?.inspection?.property;
     if (!property) {
       return res.status(404).json({ success: false, message: 'Associated property not found' });
     }
-    
+
     let hasAccess = false;
     if (req.user.role === 'PROPERTY_MANAGER') {
       hasAccess = property.managerId === req.user.id;
     } else if (req.user.role === 'OWNER') {
       hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
     }
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied. You do not have permission to approve this recommendation.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You do not have permission to approve this recommendation.'
+      });
+    }
+
+    // Check property manager's subscription
+    const manager = property.manager;
+    const isManagerSubscriptionActive =
+      manager.subscriptionStatus === 'ACTIVE' ||
+      (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
+
+    if (!isManagerSubscriptionActive) {
+      return res.status(403).json({
+        success: false,
+        message: req.user.role === 'PROPERTY_MANAGER'
+          ? 'Your trial period has expired. Please upgrade your plan to continue.'
+          : 'This property\'s subscription has expired. Please contact your property manager.',
+        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
       });
     }
     
@@ -173,11 +196,11 @@ router.post('/:id/approve', requireAuth, requireActiveSubscription, async (req, 
   }
 });
 
-router.post('/:id/reject', requireAuth, requireActiveSubscription, async (req, res) => {
+router.post('/:id/reject', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { rejectionReason } = req.body;
-    
+
     const recommendation = await prisma.recommendation.findUnique({
       where: { id },
       include: {
@@ -190,6 +213,13 @@ router.post('/:id/reject', requireAuth, requireActiveSubscription, async (req, r
                     owners: {
                       select: { ownerId: true },
                     },
+                    manager: {
+                      select: {
+                        id: true,
+                        subscriptionStatus: true,
+                        trialEndDate: true,
+                      },
+                    },
                   },
                 },
               },
@@ -198,28 +228,44 @@ router.post('/:id/reject', requireAuth, requireActiveSubscription, async (req, r
         },
       },
     });
-    
+
     if (!recommendation) {
       return res.status(404).json({ success: false, message: 'Recommendation not found' });
     }
-    
+
     // Access control: Only property managers and owners can reject recommendations
     const property = recommendation.report?.inspection?.property;
     if (!property) {
       return res.status(404).json({ success: false, message: 'Associated property not found' });
     }
-    
+
     let hasAccess = false;
     if (req.user.role === 'PROPERTY_MANAGER') {
       hasAccess = property.managerId === req.user.id;
     } else if (req.user.role === 'OWNER') {
       hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
     }
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied. You do not have permission to reject this recommendation.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You do not have permission to reject this recommendation.'
+      });
+    }
+
+    // Check property manager's subscription
+    const manager = property.manager;
+    const isManagerSubscriptionActive =
+      manager.subscriptionStatus === 'ACTIVE' ||
+      (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
+
+    if (!isManagerSubscriptionActive) {
+      return res.status(403).json({
+        success: false,
+        message: req.user.role === 'PROPERTY_MANAGER'
+          ? 'Your trial period has expired. Please upgrade your plan to continue.'
+          : 'This property\'s subscription has expired. Please contact your property manager.',
+        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
       });
     }
     
