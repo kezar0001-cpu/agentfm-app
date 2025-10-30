@@ -47,10 +47,10 @@ const jobUpdateSchema = z.object({
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, assignedToId } = req.query;
-    
+
     // Build where clause based on filters and user role
     const where = {};
-    
+
     // Role-based filtering
     if (req.user.role === 'TECHNICIAN') {
       // Technicians only see jobs assigned to them
@@ -70,55 +70,74 @@ router.get('/', requireAuth, async (req, res) => {
         },
       };
     }
-    
+
     // Apply query filters
     if (status) {
       where.status = status;
     }
-    
+
     if (propertyId) {
       where.propertyId = propertyId;
     }
-    
+
     if (assignedToId && (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'OWNER')) {
       // Only managers and owners can filter by assignedToId
       where.assignedToId = assignedToId;
     }
-    
-    // Fetch jobs from database
-    const jobs = await prisma.job.findMany({
-      where,
-      include: {
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
-            state: true,
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    // Fetch jobs and total count in parallel
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              state: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
           },
         },
-        unit: {
-          select: {
-            id: true,
-            unitNumber: true,
-          },
+        orderBy: {
+          createdAt: 'desc',
         },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.job.count({ where }),
+    ]);
+
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    res.json({
+      items: jobs,
+      total,
+      page,
+      hasMore,
     });
-    
-    res.json(jobs);
   } catch (error) {
     console.error('Error fetching jobs:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch jobs' });
@@ -231,6 +250,10 @@ router.get('/:id', requireAuth, async (req, res) => {
             address: true,
             city: true,
             state: true,
+            managerId: true,
+            owners: {
+              select: { ownerId: true },
+            },
           },
         },
         unit: {
@@ -254,7 +277,38 @@ router.get('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
     
-    res.json(job);
+    // Access control: Check user has permission to view this job
+    let hasAccess = false;
+    
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers can view jobs for properties they manage
+      hasAccess = job.property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      // Owners can view jobs for properties they own
+      hasAccess = job.property.owners?.some(o => o.ownerId === req.user.id);
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians can view jobs assigned to them
+      hasAccess = job.assignedToId === req.user.id;
+    } else if (req.user.role === 'TENANT') {
+      // Tenants cannot view jobs directly (they use service requests)
+      hasAccess = false;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to view this job.' 
+      });
+    }
+    
+    // Remove sensitive fields before sending response
+    const { property, ...jobData } = job;
+    const { managerId, owners, ...propertyData } = property;
+    
+    res.json({
+      ...jobData,
+      property: propertyData,
+    });
   } catch (error) {
     console.error('Error fetching job:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch job' });
@@ -340,6 +394,7 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
             id: true,
             name: true,
             address: true,
+            managerId: true,
           },
         },
         unit: {

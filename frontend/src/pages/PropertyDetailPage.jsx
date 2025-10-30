@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -43,6 +43,8 @@ import {
   Delete as DeleteIcon,
   PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../api/client';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
@@ -53,10 +55,12 @@ import {
   formatPropertyAddressLine,
   formatPropertyLocality,
 } from '../utils/formatPropertyLocation';
+import { CircularProgress } from '@mui/material';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [currentTab, setCurrentTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -64,6 +68,16 @@ export default function PropertyDetailPage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [unitMenuAnchor, setUnitMenuAnchor] = useState(null);
   const [deleteUnitDialogOpen, setDeleteUnitDialogOpen] = useState(false);
+  const unitDialogOpenRef = useRef(unitDialogOpen);
+  const deleteUnitDialogOpenRef = useRef(deleteUnitDialogOpen);
+
+  useEffect(() => {
+    unitDialogOpenRef.current = unitDialogOpen;
+  }, [unitDialogOpen]);
+
+  useEffect(() => {
+    deleteUnitDialogOpenRef.current = deleteUnitDialogOpen;
+  }, [deleteUnitDialogOpen]);
 
   // Fetch property details
   const propertyQuery = useApiQuery({
@@ -71,17 +85,24 @@ export default function PropertyDetailPage() {
     url: `/api/properties/${id}`,
   });
 
-  // Fetch units for this property
-  const unitsQuery = useApiQuery({
+  // Fetch units for this property with infinite query
+  const unitsQuery = useInfiniteQuery({
     queryKey: ['units', id],
-    url: `/api/units?propertyId=${id}`,
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await apiClient.get(`/units?propertyId=${id}&limit=50&offset=${pageParam}`);
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    },
+    initialPageParam: 0,
   });
 
   // Fetch activity for this property
+  // Fix: Removed enabled condition to ensure activity loads on bookmarks and refreshes properly
   const activityQuery = useApiQuery({
     queryKey: ['property-activity', id],
     url: `/api/properties/${id}/activity?limit=20`,
-    enabled: currentTab === 3, // Only fetch when Activity tab is active
   });
 
   // Delete unit mutation
@@ -96,7 +117,19 @@ export default function PropertyDetailPage() {
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
     : null;
-  const units = normaliseArray(unitsQuery.data);
+
+  // Flatten all pages into a single array
+  const units = unitsQuery.data?.pages?.flatMap(page => page.items) || [];
+
+  // Fix: Reset all state when property ID changes to prevent race conditions
+  useEffect(() => {
+    setCurrentTab(0);
+    setEditDialogOpen(false);
+    setUnitDialogOpen(false);
+    setSelectedUnit(null);
+    setUnitMenuAnchor(null);
+    setDeleteUnitDialogOpen(false);
+  }, [id]);
 
   const handleBack = () => {
     navigate('/properties');
@@ -119,6 +152,12 @@ export default function PropertyDetailPage() {
 
   const handleUnitMenuClose = () => {
     setUnitMenuAnchor(null);
+    // Clear selected unit after a short delay only if no dialogs are open
+    setTimeout(() => {
+      if (!unitDialogOpenRef.current && !deleteUnitDialogOpenRef.current) {
+        setSelectedUnit(null);
+      }
+    }, 100);
   };
 
   const handleEditUnit = (unit = null) => {
@@ -141,37 +180,51 @@ export default function PropertyDetailPage() {
       await deleteUnitMutation.mutateAsync({
         url: `/api/units/${selectedUnit.id}`,
       });
+      // Only close dialog and clear state on success
       setDeleteUnitDialogOpen(false);
       setSelectedUnit(null);
+      // Manually refetch to ensure data consistency
+      unitsQuery.refetch();
+      propertyQuery.refetch();
     } catch (error) {
-      // Error shown via mutation
+      // Keep dialog open on error so user can retry
+      // Error message shown via mutation state
+      console.error('Failed to delete unit:', error);
     }
   };
 
-  const getStatusColor = (status) => {
+  // Memoize expensive functions to prevent unnecessary re-renders
+  const getStatusColor = useCallback((status) => {
     const colors = {
+      // Property statuses
       ACTIVE: 'success',
       INACTIVE: 'default',
       UNDER_MAINTENANCE: 'warning',
+      UNDER_MAJOR_MAINTENANCE: 'error',
+      // Unit statuses
       AVAILABLE: 'success',
       OCCUPIED: 'info',
       MAINTENANCE: 'warning',
       VACANT: 'default',
+      // Job statuses
       OPEN: 'warning',
       ASSIGNED: 'info',
       IN_PROGRESS: 'warning',
       COMPLETED: 'success',
       CANCELLED: 'error',
+      // Inspection statuses
       SCHEDULED: 'info',
+      // Service request statuses
       SUBMITTED: 'warning',
       UNDER_REVIEW: 'info',
       APPROVED: 'success',
       REJECTED: 'error',
+      CONVERTED_TO_JOB: 'success',
     };
     return colors[status] || 'default';
-  };
+  }, []);
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = useCallback((priority) => {
     const colors = {
       LOW: 'default',
       MEDIUM: 'info',
@@ -179,7 +232,20 @@ export default function PropertyDetailPage() {
       URGENT: 'error',
     };
     return colors[priority] || 'default';
-  };
+  }, []);
+
+  const formatDate = useCallback((date) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return 'Invalid date';
+      }
+      return d.toLocaleString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  }, []);
 
   return (
     <Box sx={{ py: { xs: 2, md: 4 } }}>
@@ -199,7 +265,12 @@ export default function PropertyDetailPage() {
               justifyContent="space-between"
             >
               <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
-                <IconButton onClick={handleBack} size="large" sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <IconButton 
+                  onClick={handleBack} 
+                  size="large" 
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                  aria-label="Go back to properties list"
+                >
                   <ArrowBackIcon />
                 </IconButton>
                 <Box>
@@ -221,6 +292,7 @@ export default function PropertyDetailPage() {
                   onClick={() => navigate('/team')}
                   fullWidth
                   sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                  aria-label="Manage team members for this property"
                 >
                   Manage Team
                 </Button>
@@ -274,7 +346,7 @@ export default function PropertyDetailPage() {
                       Status
                     </Typography>
                     <Chip
-                      label={propertyStatus.replace('_', ' ')}
+                      label={propertyStatus.replace(/_/g, ' ')}
                       color={getStatusColor(propertyStatus)}
                       size="small"
                     />
@@ -449,89 +521,120 @@ export default function PropertyDetailPage() {
                   error={unitsQuery.error}
                   isEmpty={units.length === 0}
                   emptyMessage="No units yet. Add your first unit to get started!"
-                  onRetry={unitsQuery.refetch}
+                  onRetry={() => unitsQuery.refetch()}
                 >
-                  <Grid container spacing={2.5}>
-                    {units.map((unit) => (
-                      <Grid item xs={12} sm={6} md={4} key={unit.id}>
-                        <Card 
-                          sx={{ 
-                            height: '100%', 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: 4,
-                            },
-                          }}
-                          onClick={() => navigate(`/units/${unit.id}`)}
-                        >
-                          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: 1,
-                              }}
-                            >
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                Unit {unit.unitNumber}
-                              </Typography>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUnitMenuOpen(e, unit);
+                  <Stack spacing={3}>
+                    <Grid container spacing={2.5}>
+                      {units.map((unit) => (
+                        <Grid item xs={12} sm={6} md={4} key={unit.id}>
+                          <Card
+                            sx={{
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s, box-shadow 0.2s',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: 4,
+                              },
+                              '&:focus': {
+                                outline: '2px solid',
+                                outlineColor: 'primary.main',
+                                outlineOffset: '2px',
+                              },
+                            }}
+                            onClick={() => navigate(`/units/${unit.id}`)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigate(`/units/${unit.id}`);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View details for unit ${unit.unitNumber}`}
+                          >
+                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: 1,
                                 }}
                               >
-                                <MoreVertIcon />
-                              </IconButton>
-                            </Box>
-
-                            <Stack spacing={1}>
-                              <Chip
-                                label={unit.status?.replace('_', ' ')}
-                                color={getStatusColor(unit.status)}
-                                size="small"
-                              />
-
-                              {unit.bedrooms && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {unit.bedrooms} bed • {unit.bathrooms} bath
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                  Unit {unit.unitNumber}
                                 </Typography>
-                              )}
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnitMenuOpen(e, unit);
+                                  }}
+                                >
+                                  <MoreVertIcon />
+                                </IconButton>
+                              </Box>
 
-                              {unit.area && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {unit.area} sq ft
-                                </Typography>
-                              )}
+                              <Stack spacing={1}>
+                                <Chip
+                                  label={unit.status?.replace(/_/g, ' ')}
+                                  color={getStatusColor(unit.status)}
+                                  size="small"
+                                />
 
-                              {unit.rentAmount && (
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  ${unit.rentAmount.toLocaleString()}/mo
-                                </Typography>
-                              )}
-
-                              {unit.tenants && unit.tenants.length > 0 && (
-                                <Box>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Tenant
+                                {unit.bedrooms != null && unit.bathrooms != null && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {unit.bedrooms} bed • {unit.bathrooms} bath
                                   </Typography>
-                                  <Typography variant="body2">
-                                    {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
+                                )}
+
+                                {unit.area != null && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {unit.area} sq ft
                                   </Typography>
-                                </Box>
-                              )}
-                            </Stack>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
+                                )}
+
+                                {unit.rentAmount != null && (
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    ${unit.rentAmount.toLocaleString()}/mo
+                                  </Typography>
+                                )}
+
+                                {unit.tenants?.[0]?.tenant && (
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Tenant
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {unit.tenants[0].tenant.firstName} {unit.tenants[0].tenant.lastName}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Stack>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    {/* Load More Button */}
+                    {unitsQuery.hasNextPage && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                        <Button
+                          variant="outlined"
+                          size="large"
+                          onClick={() => unitsQuery.fetchNextPage()}
+                          disabled={unitsQuery.isFetchingNextPage}
+                          startIcon={unitsQuery.isFetchingNextPage ? <CircularProgress size={20} /> : null}
+                        >
+                          {unitsQuery.isFetchingNextPage ? 'Loading...' : 'Load More'}
+                        </Button>
+                      </Box>
+                    )}
+                  </Stack>
                 </DataState>
               </Paper>
             )}
@@ -604,7 +707,7 @@ export default function PropertyDetailPage() {
                   <List>
                     {activityQuery.data?.activities?.map((activity, index) => (
                       <ListItem
-                        key={`${activity.type}-${activity.id}-${index}`}
+                        key={`${activity.type}-${activity.id}-${activity.date}-${index}`}
                         divider={index < activityQuery.data.activities.length - 1}
                         sx={{ px: 0 }}
                       >
@@ -616,7 +719,7 @@ export default function PropertyDetailPage() {
                               </Typography>
                               {activity.status && (
                                 <Chip
-                                  label={activity.status.replace('_', ' ')}
+                                  label={activity.status.replace(/_/g, ' ')}
                                   size="small"
                                   color={getStatusColor(activity.status)}
                                 />
@@ -636,7 +739,7 @@ export default function PropertyDetailPage() {
                                 {activity.description}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {new Date(activity.date).toLocaleString()} • {activity.type.replace('_', ' ')}
+                                {new Date(activity.date).toLocaleString()} • {activity.type.replace(/_/g, ' ')}
                               </Typography>
                             </Box>
                           }
@@ -675,6 +778,8 @@ export default function PropertyDetailPage() {
         onSuccess={() => {
           setEditDialogOpen(false);
           propertyQuery.refetch();
+          // Also refetch units in case totalUnits or other related data changed
+          unitsQuery.refetch();
         }}
       />
 
@@ -683,19 +788,28 @@ export default function PropertyDetailPage() {
         open={unitDialogOpen}
         onClose={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          // Delay clearing selectedUnit to prevent flash of wrong data during close animation
+          setTimeout(() => setSelectedUnit(null), 200);
         }}
         propertyId={id}
         unit={selectedUnit}
         onSuccess={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          setTimeout(() => setSelectedUnit(null), 200);
           unitsQuery.refetch();
+          // Also refetch property to update unit count
+          propertyQuery.refetch();
         }}
       />
 
       {/* Delete Unit Dialog */}
-      <Dialog open={deleteUnitDialogOpen} onClose={() => setDeleteUnitDialogOpen(false)}>
+      <Dialog
+        open={deleteUnitDialogOpen}
+        onClose={() => {
+          setDeleteUnitDialogOpen(false);
+          setTimeout(() => setSelectedUnit(null), 200);
+        }}
+      >
         <DialogTitle>Delete Unit</DialogTitle>
         <DialogContent>
           <Typography>
@@ -709,12 +823,22 @@ export default function PropertyDetailPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteUnitDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setDeleteUnitDialogOpen(false);
+              setTimeout(() => setSelectedUnit(null), 200);
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={confirmDeleteUnit}
             color="error"
             variant="contained"
-            disabled={deleteUnitMutation.isPending}
+            disabled={
+              deleteUnitMutation.isPending || 
+              (selectedUnit?.tenants && selectedUnit.tenants.length > 0)
+            }
           >
             {deleteUnitMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>

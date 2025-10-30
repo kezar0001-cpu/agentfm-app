@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/prismaClient.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 
@@ -38,26 +38,34 @@ const parseOptionalString = (value) => {
 const ensurePropertyAccess = async (user, propertyId) => {
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
-    select: { id: true, managerId: true },
+    select: { 
+      id: true, 
+      managerId: true,
+      owners: {
+        select: { ownerId: true },
+      },
+    },
   });
 
   if (!property) {
     return { allowed: false, status: 404, message: 'Property not found' };
   }
 
-  if (user.role === ROLE_MANAGER) {
+  // Property managers can only access properties they manage
+  if (user.role === ROLE_MANAGER && property.managerId === user.id) {
     return { allowed: true, property };
   }
 
-  if (user.role === ROLE_MANAGER && property.managerId === user.id) {
-    return { allowed: true, property };
+  // Owners can access properties they own (read-only for units)
+  if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
+    return { allowed: true, property, readOnly: true };
   }
 
   return { allowed: false, status: 403, message: 'Access denied' };
 };
 
 const ensureManagerAccess = async (user, propertyId) => {
-  if (user.role !== ROLE_MANAGER && user.role !== ROLE_MANAGER) {
+  if (user.role !== ROLE_MANAGER) {
     return { allowed: false, status: 403, message: 'Only property managers can manage units' };
   }
 
@@ -66,7 +74,8 @@ const ensureManagerAccess = async (user, propertyId) => {
     return access;
   }
 
-  if (user.role === ROLE_MANAGER && access.property.managerId !== user.id) {
+  // Ensure the property manager owns this property
+  if (access.property.managerId !== user.id) {
     return { allowed: false, status: 403, message: 'Access denied' };
   }
 
@@ -85,34 +94,56 @@ router.get('/', async (req, res) => {
       return res.status(access.status).json({ error: access.message });
     }
 
-    const units = await prisma.unit.findMany({
-      where: { propertyId },
-      include: {
-        tenants: {
-          where: { isActive: true },
-          include: {
-            tenant: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const where = { propertyId };
+
+    // Fetch units and total count in parallel
+    const [units, total] = await Promise.all([
+      prisma.unit.findMany({
+        where,
+        include: {
+          tenants: {
+            where: { isActive: true },
+            include: {
+              tenant: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            jobs: true,
-            inspections: true,
+          _count: {
+            select: {
+              jobs: true,
+              inspections: true,
+            },
           },
         },
-      },
-      orderBy: { unitNumber: 'asc' },
-    });
+        orderBy: { unitNumber: 'asc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.unit.count({ where }),
+    ]);
 
-    return res.json(units);
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    return res.json({
+      items: units,
+      total,
+      page,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching units:', error);
     return res.status(500).json({ error: 'Failed to fetch units' });
@@ -181,7 +212,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireActiveSubscription, async (req, res) => {
   try {
     const propertyId = resolvePropertyId(req);
     if (!propertyId) {
@@ -457,17 +488,32 @@ router.post('/:unitId/tenants', requireRole(ROLE_MANAGER), async (req, res) => {
     }
     
     // Check if tenant already has active assignment
-    const existingActive = await prisma.unitTenant.findFirst({
+    const existingActiveTenant = await prisma.unitTenant.findFirst({
       where: {
         tenantId,
         isActive: true
       }
     });
     
-    if (existingActive) {
+    if (existingActiveTenant) {
       return res.status(400).json({
         success: false,
         message: 'Tenant already has an active unit assignment'
+      });
+    }
+    
+    // Check if unit already has an active tenant
+    const existingActiveUnit = await prisma.unitTenant.findFirst({
+      where: {
+        unitId,
+        isActive: true
+      }
+    });
+    
+    if (existingActiveUnit) {
+      return res.status(400).json({
+        success: false,
+        message: 'Unit already has an active tenant assigned'
       });
     }
     
@@ -590,9 +636,13 @@ router.patch('/:unitId/tenants/:tenantId', requireRole(ROLE_MANAGER), async (req
     const { unitId, tenantId } = req.params;
     const updates = req.body;
     
-    // Find the assignment
+    // Find the active assignment (to avoid updating old inactive records)
     const assignment = await prisma.unitTenant.findFirst({
-      where: { unitId, tenantId },
+      where: { 
+        unitId, 
+        tenantId,
+        isActive: true
+      },
       include: {
         unit: {
           include: {

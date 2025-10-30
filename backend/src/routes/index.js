@@ -11,7 +11,7 @@ import inspectionsRouter from './inspections.js';
 // Missing imports based on the image
 import billingRouter from './billing.js';
 import invitesRouter from './invites.js';
-import maintenanceRouter from './maintenance.js';
+// import maintenanceRouter from './maintenance.js'; // DISABLED: Uses non-existent models, ServiceRequest should be used instead
 import plansRouter from './plans.js';
 import recommendationsRouter from './recommendations.js';
 import reportsRouter from './reports.js';
@@ -37,7 +37,7 @@ router.use('/inspections', inspectionsRouter);
 // Add missing routes
 router.use('/billing', billingRouter);
 router.use('/invites', invitesRouter);
-router.use('/maintenance', maintenanceRouter);
+// router.use('/maintenance', maintenanceRouter); // DISABLED: Uses non-existent models, use /serviceRequests instead
 router.use('/plans', plansRouter);
 router.use('/recommendations', recommendationsRouter);
 router.use('/reports', reportsRouter);
