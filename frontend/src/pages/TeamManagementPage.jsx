@@ -34,6 +34,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import ensureArray from '../utils/ensureArray';
 
 export default function TeamManagementPage() {
   const queryClient = useQueryClient();
@@ -73,7 +74,7 @@ export default function TeamManagementPage() {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data || [];
+      return ensureArray(response.data, ['items', 'data.items', 'properties']);
     },
   });
 

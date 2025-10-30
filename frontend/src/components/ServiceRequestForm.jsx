@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import ensureArray from '../utils/ensureArray';
 
 const ServiceRequestForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -33,7 +34,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'properties']);
     },
   });
 
@@ -43,7 +44,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'units']);
     },
     enabled: !!formData.propertyId,
   });
