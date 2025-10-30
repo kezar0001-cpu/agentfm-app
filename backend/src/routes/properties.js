@@ -147,10 +147,24 @@ const toPublicProperty = (property) => {
   };
 };
 
-const ensurePropertyAccess = (property, user) => {
+const ensurePropertyAccess = (property, user, options = {}) => {
+  const { requireWrite = false } = options;
+  
   if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
-  // Only property managers who own the property can access it
-  if (property.managerId === user.id) return { allowed: true };
+  
+  // Property managers who manage the property have full access
+  if (user.role === 'PROPERTY_MANAGER' && property.managerId === user.id) {
+    return { allowed: true, canWrite: true };
+  }
+  
+  // Owners who own the property have read-only access
+  if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
+    if (requireWrite) {
+      return { allowed: false, reason: 'Owners have read-only access', status: 403 };
+    }
+    return { allowed: true, canWrite: false };
+  }
+  
   return { allowed: false, reason: 'Forbidden', status: 403 };
 };
 
@@ -317,8 +331,15 @@ router.get('/:id', async (req, res) => {
 // PATCH /:id - Update property (PROPERTY_MANAGER only, must be property manager)
 router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
-    const access = ensurePropertyAccess(property, req.user);
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
+    });
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.reason });
     }
@@ -364,8 +385,15 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 // DELETE /:id - Delete property (PROPERTY_MANAGER only, must be property manager)
 router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
-    const access = ensurePropertyAccess(property, req.user);
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
+    });
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.reason });
     }
@@ -385,7 +413,14 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 // GET /:id/activity - Get recent activity for a property
 router.get('/:id/activity', async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
+    });
     const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.reason });
