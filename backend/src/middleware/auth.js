@@ -178,7 +178,7 @@ export const requireActiveSubscription = (req, res, next) => {
 /**
  * Helper function to check if a user's subscription is active
  */
-const isSubscriptionActive = (user) => {
+export const isSubscriptionActive = (user) => {
   if (!user) return false;
 
   const { subscriptionStatus, trialEndDate } = user;

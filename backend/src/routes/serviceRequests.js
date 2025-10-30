@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth, requireRole, requirePropertyManagerSubscription } from '../middleware/auth.js';
+import { requireAuth, requireRole, isSubscriptionActive } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -178,16 +178,23 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/', requireAuth, requirePropertyManagerSubscription, validate(requestSchema), async (req, res) => {
+router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
   try {
     const { propertyId, unitId, title, description, category, priority, photos } = req.body;
-    
+
     // Verify property exists and user has access
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
       include: {
         owners: {
           select: { ownerId: true },
+        },
+        manager: {
+          select: {
+            id: true,
+            subscriptionStatus: true,
+            trialEndDate: true,
+          },
         },
       },
     });
@@ -237,12 +244,33 @@ router.post('/', requireAuth, requirePropertyManagerSubscription, validate(reque
     }
     
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You do not have access to create service requests for this property' 
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to create service requests for this property'
       });
     }
-    
+
+    // Verify the relevant subscription is active
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      if (!isSubscriptionActive(req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your trial period has expired. Please upgrade your plan to continue.',
+          code: 'TRIAL_EXPIRED',
+        });
+      }
+    } else {
+      const manager = property.manager;
+
+      if (!manager || !isSubscriptionActive(manager)) {
+        return res.status(403).json({
+          success: false,
+          message: 'This property\'s subscription has expired. Please contact your property manager.',
+          code: 'MANAGER_SUBSCRIPTION_REQUIRED',
+        });
+      }
+    }
+
     // Create service request
     const request = await prisma.serviceRequest.create({
       data: {
