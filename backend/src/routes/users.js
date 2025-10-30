@@ -24,7 +24,7 @@ const passwordChangeSchema = z.object({
   newPassword: z.string().min(8).max(100),
 });
 
-// GET /api/users - List users by role (existing functionality)
+// GET /api/users - List users by role (restricted to PROPERTY_MANAGER)
 router.get('/', asyncHandler(async (req, res) => {
   const { role } = req.query;
 
@@ -32,9 +32,24 @@ router.get('/', asyncHandler(async (req, res) => {
     return sendError(res, 400, 'Role query parameter is required');
   }
 
+  // Access control: Only property managers can list users
+  // This prevents unauthorized enumeration of users in the system
+  if (req.user.role !== 'PROPERTY_MANAGER') {
+    return sendError(res, 403, 'Access denied. Only property managers can list users.');
+  }
+
+  // Property managers can only query for TECHNICIAN role
+  // This prevents them from enumerating owners, other managers, or tenants
+  const allowedRoles = ['TECHNICIAN'];
+  const requestedRole = role.toUpperCase();
+  
+  if (!allowedRoles.includes(requestedRole)) {
+    return sendError(res, 403, `Access denied. You can only list users with roles: ${allowedRoles.join(', ')}`);
+  }
+
   const users = await prisma.user.findMany({
     where: {
-      role: role.toUpperCase(),
+      role: requestedRole,
     },
     select: {
       id: true,
