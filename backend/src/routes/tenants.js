@@ -4,33 +4,70 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-const TENANT_INCLUDE = {
-  tenantProfile: true,
-  tenantUnits: {
-    include: {
+const PROPERTY_SELECT = {
+  id: true,
+  name: true,
+  address: true,
+  city: true,
+  state: true,
+  zipCode: true,
+  managerId: true,
+  owners: {
+    select: {
+      ownerId: true,
+    },
+  },
+};
+
+function buildTenantUnitAccessFilter(user) {
+  if (!user) return null;
+
+  if (user.role === 'PROPERTY_MANAGER') {
+    return {
       unit: {
-        include: {
-          property: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-              city: true,
-              state: true,
-              zipCode: true,
-              managerId: true,
-              owners: {
-                select: {
-                  ownerId: true,
-                },
-              },
+        property: {
+          managerId: user.id,
+        },
+      },
+    };
+  }
+
+  if (user.role === 'OWNER') {
+    return {
+      unit: {
+        property: {
+          owners: {
+            some: {
+              ownerId: user.id,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  return null;
+}
+
+function buildTenantInclude(user) {
+  const unitAccessFilter = buildTenantUnitAccessFilter(user);
+
+  return {
+    tenantProfile: true,
+    tenantUnits: {
+      ...(unitAccessFilter ? { where: unitAccessFilter } : {}),
+      include: {
+        unit: {
+          include: {
+            property: {
+              select: PROPERTY_SELECT,
             },
           },
         },
       },
     },
-  },
-};
+  };
+}
 
 export function buildTenantAccessWhere(user) {
   if (!user) return null;
@@ -89,7 +126,7 @@ router.get('/', async (req, res) => {
 
     const tenants = await prisma.user.findMany({
       where,
-      include: TENANT_INCLUDE,
+      include: buildTenantInclude(req.user),
       orderBy: {
         createdAt: 'desc',
       },
@@ -125,7 +162,7 @@ router.get('/:id', async (req, res) => {
         ...where,
         id: req.params.id,
       },
-      include: TENANT_INCLUDE,
+      include: buildTenantInclude(req.user),
     });
 
     if (!tenant) {
