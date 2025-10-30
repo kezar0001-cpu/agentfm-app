@@ -14,7 +14,7 @@ router.get('/', requireAuth, async (req, res) => {
       },
       include: {
         tenantProfile: true,
-        tenantUnitLinks: {
+        tenantUnits: {
           include: {
             unit: {
               include: {
@@ -53,7 +53,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       },
       include: {
         tenantProfile: true,
-        tenantUnitLinks: {
+        tenantUnits: {
           include: {
             unit: {
               include: {
