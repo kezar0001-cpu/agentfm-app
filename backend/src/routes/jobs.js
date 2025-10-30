@@ -231,6 +231,10 @@ router.get('/:id', requireAuth, async (req, res) => {
             address: true,
             city: true,
             state: true,
+            managerId: true,
+            owners: {
+              select: { ownerId: true },
+            },
           },
         },
         unit: {
@@ -254,7 +258,38 @@ router.get('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
     
-    res.json(job);
+    // Access control: Check user has permission to view this job
+    let hasAccess = false;
+    
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers can view jobs for properties they manage
+      hasAccess = job.property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      // Owners can view jobs for properties they own
+      hasAccess = job.property.owners?.some(o => o.ownerId === req.user.id);
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians can view jobs assigned to them
+      hasAccess = job.assignedToId === req.user.id;
+    } else if (req.user.role === 'TENANT') {
+      // Tenants cannot view jobs directly (they use service requests)
+      hasAccess = false;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to view this job.' 
+      });
+    }
+    
+    // Remove sensitive fields before sending response
+    const { property, ...jobData } = job;
+    const { managerId, owners, ...propertyData } = property;
+    
+    res.json({
+      ...jobData,
+      property: propertyData,
+    });
   } catch (error) {
     console.error('Error fetching job:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch job' });
