@@ -21,23 +21,46 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   // Build search filters based on user role
   let propertyFilter = {};
+  let accessiblePropertyIds = null;
 
   if (req.user.role === 'PROPERTY_MANAGER') {
-    propertyFilter = { managerId: req.user.id };
+    const managedProperties = await prisma.property.findMany({
+      where: { managerId: req.user.id },
+      select: { id: true }
+    });
+    accessiblePropertyIds = managedProperties.map(property => property.id);
+
+    if (accessiblePropertyIds.length === 0) {
+      return res.json({ success: true, results: [], total: 0 });
+    }
+
+    propertyFilter = { id: { in: accessiblePropertyIds } };
   } else if (req.user.role === 'OWNER') {
     // Get properties owned by this user
     const ownerships = await prisma.propertyOwner.findMany({
       where: { ownerId: req.user.id },
       select: { propertyId: true }
     });
-    propertyFilter = { id: { in: ownerships.map(o => o.propertyId) } };
+    accessiblePropertyIds = ownerships.map(o => o.propertyId);
+
+    if (accessiblePropertyIds.length === 0) {
+      return res.json({ success: true, results: [], total: 0 });
+    }
+
+    propertyFilter = { id: { in: accessiblePropertyIds } };
   } else if (req.user.role === 'TENANT') {
     // Get properties where user is a tenant
     const units = await prisma.unit.findMany({
       where: { tenantId: req.user.id },
       select: { propertyId: true }
     });
-    propertyFilter = { id: { in: units.map(u => u.propertyId) } };
+    accessiblePropertyIds = units.map(u => u.propertyId);
+
+    if (accessiblePropertyIds.length === 0) {
+      return res.json({ success: true, results: [], total: 0 });
+    }
+
+    propertyFilter = { id: { in: accessiblePropertyIds } };
   } else if (req.user.role === 'TECHNICIAN') {
     // Technicians can only search jobs assigned to them
     const jobs = await prisma.job.findMany({
@@ -105,16 +128,20 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   // Get property IDs for filtering jobs and inspections
   const propertyIds = properties.map(p => p.id);
 
-  // Early return if no properties found - prevents security issue where undefined
-  // in Prisma's 'in' operator would match ALL records instead of none
-  if (propertyIds.length === 0) {
-    return res.json({ success: true, results: [], total: 0 });
+  let relatedPropertyIds = propertyIds;
+
+  if (Array.isArray(accessiblePropertyIds)) {
+    relatedPropertyIds = accessiblePropertyIds;
+  } else if (relatedPropertyIds.length === 0) {
+    // User can access all properties but none matched the property search.
+    // Leave relatedPropertyIds as null so downstream queries are not constrained.
+    relatedPropertyIds = null;
   }
 
   // Search jobs
   const jobs = await prisma.job.findMany({
     where: {
-      propertyId: { in: propertyIds },
+      ...(Array.isArray(relatedPropertyIds) ? { propertyId: { in: relatedPropertyIds } } : {}),
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
         { description: { contains: searchTerm, mode: 'insensitive' } }
@@ -140,7 +167,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   // Search inspections
   const inspections = await prisma.inspection.findMany({
     where: {
-      propertyId: { in: propertyIds },
+      ...(Array.isArray(relatedPropertyIds) ? { propertyId: { in: relatedPropertyIds } } : {}),
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
         { notes: { contains: searchTerm, mode: 'insensitive' } }
@@ -168,7 +195,9 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   if (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'TENANT') {
     const serviceRequestFilter = req.user.role === 'TENANT'
       ? { requesterId: req.user.id }
-      : { propertyId: { in: propertyIds } };
+      : Array.isArray(relatedPropertyIds)
+        ? { propertyId: { in: relatedPropertyIds } }
+        : {};
 
     serviceRequests = await prisma.serviceRequest.findMany({
       where: {
