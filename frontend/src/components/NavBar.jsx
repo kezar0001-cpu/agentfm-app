@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LogoutButton from './LogoutButton';
 import NotificationBell from './NotificationBell';
+import GlobalSearch from './GlobalSearch';
 import {
   AppBar,
   Toolbar,
@@ -18,6 +19,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
+import SearchIcon from '@mui/icons-material/Search';
 import { useCurrentUser } from '../context/UserContext';
 
 function NavBar() {
@@ -26,6 +28,20 @@ function NavBar() {
   const { user } = useCurrentUser();
   const [mobileMenuAnchor, setMobileMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Keyboard shortcut for search (Cmd+K or Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -172,8 +188,18 @@ function NavBar() {
         </Box>
 
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
+          <Tooltip title="Search (Ctrl+K)">
+            <IconButton
+              color="inherit"
+              onClick={() => setSearchOpen(true)}
+              size="medium"
+            >
+              <SearchIcon />
+            </IconButton>
+          </Tooltip>
+
           <NotificationBell />
-          
+
           <Tooltip title="Account">
             <IconButton
               onClick={handleOpenUserMenu}
@@ -310,6 +336,8 @@ function NavBar() {
           </Box>
         </Menu>
       </Toolbar>
+
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </AppBar>
   );
 }

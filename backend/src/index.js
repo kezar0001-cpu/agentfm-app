@@ -155,6 +155,7 @@ import serviceRequestsRoutes from './routes/serviceRequests.js';
 import usersRouter from './routes/users.js';
 import invitesRoutes from './routes/invites.js';
 import notificationsRoutes from './routes/notifications.js';
+import searchRoutes from './routes/search.js';
 
 // ===================================================================
 //
@@ -187,6 +188,7 @@ app.use('/api/service-requests', serviceRequestsRoutes);
 app.use('/api/users', usersRouter);
 app.use('/api/invites', invitesRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/search', searchRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
