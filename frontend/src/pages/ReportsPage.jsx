@@ -25,6 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { format } from 'date-fns';
+import ensureArray from '../utils/ensureArray';
 
 const reportSchema = z.object({
   reportType: z.string().min(1, 'forms.required'),
@@ -49,8 +50,7 @@ export default function ReportsPage() {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const res = await apiClient.get('/properties');
-      // Backend returns array directly
-      return Array.isArray(res.data) ? res.data : res.data?.properties || [];
+      return ensureArray(res.data, ['items', 'data.items', 'properties']);
     },
   });
 
@@ -58,8 +58,7 @@ export default function ReportsPage() {
     queryKey: ['units-list', selectedPropertyId],
     queryFn: async () => {
       const res = await apiClient.get(`/units?propertyId=${selectedPropertyId}`);
-      // Backend returns array directly
-      return Array.isArray(res.data) ? res.data : res.data?.units || [];
+      return ensureArray(res.data, ['items', 'data.items', 'units']);
     },
     enabled: !!selectedPropertyId,
   });
