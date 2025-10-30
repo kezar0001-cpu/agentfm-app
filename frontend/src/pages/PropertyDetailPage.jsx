@@ -119,6 +119,12 @@ export default function PropertyDetailPage() {
 
   const handleUnitMenuClose = () => {
     setUnitMenuAnchor(null);
+    // Clear selected unit after a short delay to prevent memory leaks
+    setTimeout(() => {
+      if (!unitDialogOpen && !deleteUnitDialogOpen) {
+        setSelectedUnit(null);
+      }
+    }, 100);
   };
 
   const handleEditUnit = (unit = null) => {
@@ -156,23 +162,30 @@ export default function PropertyDetailPage() {
 
   const getStatusColor = (status) => {
     const colors = {
+      // Property statuses
       ACTIVE: 'success',
       INACTIVE: 'default',
       UNDER_MAINTENANCE: 'warning',
+      UNDER_MAJOR_MAINTENANCE: 'error',
+      // Unit statuses
       AVAILABLE: 'success',
       OCCUPIED: 'info',
       MAINTENANCE: 'warning',
       VACANT: 'default',
+      // Job statuses
       OPEN: 'warning',
       ASSIGNED: 'info',
       IN_PROGRESS: 'warning',
       COMPLETED: 'success',
       CANCELLED: 'error',
+      // Inspection statuses
       SCHEDULED: 'info',
+      // Service request statuses
       SUBMITTED: 'warning',
       UNDER_REVIEW: 'info',
       APPROVED: 'success',
       REJECTED: 'error',
+      CONVERTED_TO_JOB: 'success',
     };
     return colors[status] || 'default';
   };
@@ -185,6 +198,19 @@ export default function PropertyDetailPage() {
       URGENT: 'error',
     };
     return colors[priority] || 'default';
+  };
+
+  const formatDate = (date) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return 'Invalid date';
+      }
+      return d.toLocaleString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
   };
 
   return (
@@ -610,7 +636,7 @@ export default function PropertyDetailPage() {
                   <List>
                     {activityQuery.data?.activities?.map((activity, index) => (
                       <ListItem
-                        key={`${activity.type}-${activity.id}-${index}`}
+                        key={`${activity.type}-${activity.id}-${activity.date}-${index}`}
                         divider={index < activityQuery.data.activities.length - 1}
                         sx={{ px: 0 }}
                       >
@@ -642,7 +668,7 @@ export default function PropertyDetailPage() {
                                 {activity.description}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {new Date(activity.date).toLocaleString()} • {activity.type.replace('_', ' ')}
+                                {formatDate(activity.date)} • {activity.type.replace(/_/g, ' ')}
                               </Typography>
                             </Box>
                           }
