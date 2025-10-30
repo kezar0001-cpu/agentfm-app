@@ -105,10 +105,16 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   // Get property IDs for filtering jobs and inspections
   const propertyIds = properties.map(p => p.id);
 
+  // Early return if no properties found - prevents security issue where undefined
+  // in Prisma's 'in' operator would match ALL records instead of none
+  if (propertyIds.length === 0) {
+    return res.json({ success: true, results: [], total: 0 });
+  }
+
   // Search jobs
   const jobs = await prisma.job.findMany({
     where: {
-      propertyId: { in: propertyIds.length > 0 ? propertyIds : undefined },
+      propertyId: { in: propertyIds },
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
         { description: { contains: searchTerm, mode: 'insensitive' } }
@@ -134,7 +140,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   // Search inspections
   const inspections = await prisma.inspection.findMany({
     where: {
-      propertyId: { in: propertyIds.length > 0 ? propertyIds : undefined },
+      propertyId: { in: propertyIds },
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
         { notes: { contains: searchTerm, mode: 'insensitive' } }
@@ -162,7 +168,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   if (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'TENANT') {
     const serviceRequestFilter = req.user.role === 'TENANT'
       ? { requesterId: req.user.id }
-      : { propertyId: { in: propertyIds.length > 0 ? propertyIds : undefined } };
+      : { propertyId: { in: propertyIds } };
 
     serviceRequests = await prisma.serviceRequest.findMany({
       where: {
