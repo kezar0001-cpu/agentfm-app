@@ -78,10 +78,10 @@ export default function PropertyDetailPage() {
   });
 
   // Fetch activity for this property
+  // Fix: Removed enabled condition to ensure activity loads on bookmarks and refreshes properly
   const activityQuery = useApiQuery({
     queryKey: ['property-activity', id],
     url: `/api/properties/${id}/activity?limit=20`,
-    enabled: currentTab === 3, // Only fetch when Activity tab is active
   });
 
   // Delete unit mutation
@@ -129,6 +129,12 @@ export default function PropertyDetailPage() {
 
   const handleUnitMenuClose = () => {
     setUnitMenuAnchor(null);
+    // Clear selected unit after a short delay to prevent memory leaks
+    setTimeout(() => {
+      if (!unitDialogOpen && !deleteUnitDialogOpen) {
+        setSelectedUnit(null);
+      }
+    }, 100);
   };
 
   const handleEditUnit = (unit = null) => {
@@ -151,37 +157,51 @@ export default function PropertyDetailPage() {
       await deleteUnitMutation.mutateAsync({
         url: `/api/units/${selectedUnit.id}`,
       });
+      // Only close dialog and clear state on success
       setDeleteUnitDialogOpen(false);
       setSelectedUnit(null);
+      // Manually refetch to ensure data consistency
+      unitsQuery.refetch();
+      propertyQuery.refetch();
     } catch (error) {
-      // Error shown via mutation
+      // Keep dialog open on error so user can retry
+      // Error message shown via mutation state
+      console.error('Failed to delete unit:', error);
     }
   };
 
-  const getStatusColor = (status) => {
+  // Memoize expensive functions to prevent unnecessary re-renders
+  const getStatusColor = useCallback((status) => {
     const colors = {
+      // Property statuses
       ACTIVE: 'success',
       INACTIVE: 'default',
       UNDER_MAINTENANCE: 'warning',
+      UNDER_MAJOR_MAINTENANCE: 'error',
+      // Unit statuses
       AVAILABLE: 'success',
       OCCUPIED: 'info',
       MAINTENANCE: 'warning',
       VACANT: 'default',
+      // Job statuses
       OPEN: 'warning',
       ASSIGNED: 'info',
       IN_PROGRESS: 'warning',
       COMPLETED: 'success',
       CANCELLED: 'error',
+      // Inspection statuses
       SCHEDULED: 'info',
+      // Service request statuses
       SUBMITTED: 'warning',
       UNDER_REVIEW: 'info',
       APPROVED: 'success',
       REJECTED: 'error',
+      CONVERTED_TO_JOB: 'success',
     };
     return colors[status] || 'default';
-  };
+  }, []);
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = useCallback((priority) => {
     const colors = {
       LOW: 'default',
       MEDIUM: 'info',
@@ -189,7 +209,20 @@ export default function PropertyDetailPage() {
       URGENT: 'error',
     };
     return colors[priority] || 'default';
-  };
+  }, []);
+
+  const formatDate = useCallback((date) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return 'Invalid date';
+      }
+      return d.toLocaleString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  }, []);
 
   return (
     <Box sx={{ py: { xs: 2, md: 4 } }}>
@@ -209,7 +242,12 @@ export default function PropertyDetailPage() {
               justifyContent="space-between"
             >
               <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
-                <IconButton onClick={handleBack} size="large" sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <IconButton 
+                  onClick={handleBack} 
+                  size="large" 
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                  aria-label="Go back to properties list"
+                >
                   <ArrowBackIcon />
                 </IconButton>
                 <Box>
@@ -231,6 +269,7 @@ export default function PropertyDetailPage() {
                   onClick={() => navigate('/team')}
                   fullWidth
                   sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                  aria-label="Manage team members for this property"
                 >
                   Manage Team
                 </Button>
@@ -475,8 +514,22 @@ export default function PropertyDetailPage() {
                               transform: 'translateY(-4px)',
                               boxShadow: 4,
                             },
+                            '&:focus': {
+                              outline: '2px solid',
+                              outlineColor: 'primary.main',
+                              outlineOffset: '2px',
+                            },
                           }}
                           onClick={() => navigate(`/units/${unit.id}`)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              navigate(`/units/${unit.id}`);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`View details for unit ${unit.unitNumber}`}
                         >
                           <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                             <Box
@@ -614,7 +667,7 @@ export default function PropertyDetailPage() {
                   <List>
                     {activityQuery.data?.activities?.map((activity, index) => (
                       <ListItem
-                        key={`${activity.type}-${activity.id}-${index}`}
+                        key={`${activity.type}-${activity.id}-${activity.date}-${index}`}
                         divider={index < activityQuery.data.activities.length - 1}
                         sx={{ px: 0 }}
                       >
@@ -685,6 +738,8 @@ export default function PropertyDetailPage() {
         onSuccess={() => {
           setEditDialogOpen(false);
           propertyQuery.refetch();
+          // Also refetch units in case totalUnits or other related data changed
+          unitsQuery.refetch();
         }}
       />
 
@@ -693,14 +748,17 @@ export default function PropertyDetailPage() {
         open={unitDialogOpen}
         onClose={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          // Delay clearing selectedUnit to prevent flash of wrong data during close animation
+          setTimeout(() => setSelectedUnit(null), 200);
         }}
         propertyId={id}
         unit={selectedUnit}
         onSuccess={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          setTimeout(() => setSelectedUnit(null), 200);
           unitsQuery.refetch();
+          // Also refetch property to update unit count
+          propertyQuery.refetch();
         }}
       />
 
