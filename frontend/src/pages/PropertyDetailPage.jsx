@@ -78,10 +78,10 @@ export default function PropertyDetailPage() {
   });
 
   // Fetch activity for this property
+  // Fix: Removed enabled condition to ensure activity loads on bookmarks and refreshes properly
   const activityQuery = useApiQuery({
     queryKey: ['property-activity', id],
     url: `/api/properties/${id}/activity?limit=20`,
-    enabled: currentTab === 3, // Only fetch when Activity tab is active
   });
 
   // Delete unit mutation
@@ -141,10 +141,16 @@ export default function PropertyDetailPage() {
       await deleteUnitMutation.mutateAsync({
         url: `/api/units/${selectedUnit.id}`,
       });
+      // Only close dialog and clear state on success
       setDeleteUnitDialogOpen(false);
       setSelectedUnit(null);
+      // Manually refetch to ensure data consistency
+      unitsQuery.refetch();
+      propertyQuery.refetch();
     } catch (error) {
-      // Error shown via mutation
+      // Keep dialog open on error so user can retry
+      // Error message shown via mutation state
+      console.error('Failed to delete unit:', error);
     }
   };
 
@@ -675,6 +681,8 @@ export default function PropertyDetailPage() {
         onSuccess={() => {
           setEditDialogOpen(false);
           propertyQuery.refetch();
+          // Also refetch units in case totalUnits or other related data changed
+          unitsQuery.refetch();
         }}
       />
 
@@ -683,14 +691,17 @@ export default function PropertyDetailPage() {
         open={unitDialogOpen}
         onClose={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          // Delay clearing selectedUnit to prevent flash of wrong data during close animation
+          setTimeout(() => setSelectedUnit(null), 200);
         }}
         propertyId={id}
         unit={selectedUnit}
         onSuccess={() => {
           setUnitDialogOpen(false);
-          setSelectedUnit(null);
+          setTimeout(() => setSelectedUnit(null), 200);
           unitsQuery.refetch();
+          // Also refetch property to update unit count
+          propertyQuery.refetch();
         }}
       />
 
