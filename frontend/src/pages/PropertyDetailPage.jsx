@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -160,7 +160,8 @@ export default function PropertyDetailPage() {
     }
   };
 
-  const getStatusColor = (status) => {
+  // Memoize expensive functions to prevent unnecessary re-renders
+  const getStatusColor = useCallback((status) => {
     const colors = {
       // Property statuses
       ACTIVE: 'success',
@@ -188,9 +189,9 @@ export default function PropertyDetailPage() {
       CONVERTED_TO_JOB: 'success',
     };
     return colors[status] || 'default';
-  };
+  }, []);
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = useCallback((priority) => {
     const colors = {
       LOW: 'default',
       MEDIUM: 'info',
@@ -198,9 +199,9 @@ export default function PropertyDetailPage() {
       URGENT: 'error',
     };
     return colors[priority] || 'default';
-  };
+  }, []);
 
-  const formatDate = (date) => {
+  const formatDate = useCallback((date) => {
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) {
@@ -211,7 +212,7 @@ export default function PropertyDetailPage() {
       console.error('Error formatting date:', error);
       return 'Invalid date';
     }
-  };
+  }, []);
 
   return (
     <Box sx={{ py: { xs: 2, md: 4 } }}>
@@ -231,7 +232,12 @@ export default function PropertyDetailPage() {
               justifyContent="space-between"
             >
               <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
-                <IconButton onClick={handleBack} size="large" sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <IconButton 
+                  onClick={handleBack} 
+                  size="large" 
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                  aria-label="Go back to properties list"
+                >
                   <ArrowBackIcon />
                 </IconButton>
                 <Box>
@@ -253,6 +259,7 @@ export default function PropertyDetailPage() {
                   onClick={() => navigate('/team')}
                   fullWidth
                   sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                  aria-label="Manage team members for this property"
                 >
                   Manage Team
                 </Button>
@@ -497,8 +504,22 @@ export default function PropertyDetailPage() {
                               transform: 'translateY(-4px)',
                               boxShadow: 4,
                             },
+                            '&:focus': {
+                              outline: '2px solid',
+                              outlineColor: 'primary.main',
+                              outlineOffset: '2px',
+                            },
                           }}
                           onClick={() => navigate(`/units/${unit.id}`)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              navigate(`/units/${unit.id}`);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`View details for unit ${unit.unitNumber}`}
                         >
                           <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                             <Box
