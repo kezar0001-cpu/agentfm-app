@@ -38,26 +38,34 @@ const parseOptionalString = (value) => {
 const ensurePropertyAccess = async (user, propertyId) => {
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
-    select: { id: true, managerId: true },
+    select: { 
+      id: true, 
+      managerId: true,
+      owners: {
+        select: { ownerId: true },
+      },
+    },
   });
 
   if (!property) {
     return { allowed: false, status: 404, message: 'Property not found' };
   }
 
-  if (user.role === ROLE_MANAGER) {
+  // Property managers can only access properties they manage
+  if (user.role === ROLE_MANAGER && property.managerId === user.id) {
     return { allowed: true, property };
   }
 
-  if (user.role === ROLE_MANAGER && property.managerId === user.id) {
-    return { allowed: true, property };
+  // Owners can access properties they own (read-only for units)
+  if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
+    return { allowed: true, property, readOnly: true };
   }
 
   return { allowed: false, status: 403, message: 'Access denied' };
 };
 
 const ensureManagerAccess = async (user, propertyId) => {
-  if (user.role !== ROLE_MANAGER && user.role !== ROLE_MANAGER) {
+  if (user.role !== ROLE_MANAGER) {
     return { allowed: false, status: 403, message: 'Only property managers can manage units' };
   }
 
@@ -66,7 +74,8 @@ const ensureManagerAccess = async (user, propertyId) => {
     return access;
   }
 
-  if (user.role === ROLE_MANAGER && access.property.managerId !== user.id) {
+  // Ensure the property manager owns this property
+  if (access.property.managerId !== user.id) {
     return { allowed: false, status: 403, message: 'Access denied' };
   }
 
