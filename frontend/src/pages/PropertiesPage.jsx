@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,  // Add this
+  InputLabel,   // Add this
+  Select,       // Add this
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -31,18 +35,21 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import useApiQuery from '../hooks/useApiQuery';
-import useApiMutation from '../hooks/useApiMutation';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../api/client';
 import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
 import { normaliseArray } from '../utils/error';
+import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 
 export default function PropertiesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  
+  const location = useLocation();
+  const queryClient = useQueryClient();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
@@ -51,19 +58,51 @@ export default function PropertiesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
-  // Fetch properties
-  const query = useApiQuery({
+  useEffect(() => {
+    if (!location.state?.openCreateDialog) {
+      return;
+    }
+
+    setEditMode(false);
+    setSelectedProperty(null);
+    setDialogOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state?.openCreateDialog, location.pathname, navigate]);
+
+  // Fetch properties with infinite query
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['properties'],
-    url: '/api/properties',
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await apiClient.get(`/properties?limit=50&offset=${pageParam}`);
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    },
+    initialPageParam: 0,
   });
 
   // Delete mutation
-  const deleteMutation = useApiMutation({
-    method: 'delete',
-    invalidateKeys: [['properties']],
+  const deleteMutation = useMutation({
+    mutationFn: async (propertyId) => {
+      const response = await apiClient.delete(`/properties/${propertyId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['properties']);
+    },
   });
 
-  const properties = normaliseArray(query.data);
+  // Flatten all pages into a single array
+  const properties = data?.pages?.flatMap(page => page.items) || [];
 
   // Filter properties
   const filteredProperties = properties.filter((property) => {
@@ -110,9 +149,7 @@ export default function PropertiesPage() {
     if (!selectedProperty) return;
 
     try {
-      await deleteMutation.mutateAsync({
-        url: `/api/properties/${selectedProperty.id}`,
-      });
+      await deleteMutation.mutateAsync(selectedProperty.id);
       setDeleteDialogOpen(false);
       setSelectedProperty(null);
     } catch (error) {
@@ -140,10 +177,15 @@ export default function PropertiesPage() {
   };
 
   return (
-    <Box sx={{ py: 3 }}>
+    <Box sx={{ py: { xs: 2, md: 4 } }}>
       <Stack spacing={3}>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={{ xs: 2, md: 0 }}
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          justifyContent="space-between"
+        >
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
               Properties
@@ -157,13 +199,15 @@ export default function PropertiesPage() {
             startIcon={<AddIcon />}
             onClick={handleCreate}
             size="large"
+            fullWidth
+            sx={{ maxWidth: { xs: '100%', md: 'none' } }}
           >
             Add Property
           </Button>
-        </Box>
+        </Stack>
 
         {/* Search and Filter */}
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 } }}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={8}>
               <TextField
@@ -183,22 +227,21 @@ export default function PropertiesPage() {
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                select
-                id="properties-filter-status"
-                name="filterStatus"
-                inputProps={{ id: 'properties-filter-status', name: 'filterStatus' }}
-                InputLabelProps={{ htmlFor: 'properties-filter-status' }}
-                label="Status"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <MenuItem value="all">All Statuses</MenuItem>
-                <MenuItem value="ACTIVE">Active</MenuItem>
-                <MenuItem value="INACTIVE">Inactive</MenuItem>
-                <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
-              </TextField>
+              <FormControl fullWidth>
+                <InputLabel id="properties-filter-status-label">Status</InputLabel>
+                <Select
+                  labelId="properties-filter-status-label"
+                  id="properties-filter-status"
+                  name="filterStatus"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <MenuItem value="all">All Statuses</MenuItem>
+                  <MenuItem value="ACTIVE">Active</MenuItem>
+                  <MenuItem value="INACTIVE">Inactive</MenuItem>
+                  <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
         </Paper>
@@ -212,59 +255,68 @@ export default function PropertiesPage() {
 
         {/* Properties Grid */}
         <DataState
-          isLoading={query.isLoading}
-          isError={query.isError}
-          error={query.error}
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
           isEmpty={filteredProperties.length === 0}
-          emptyMessage={searchTerm || filterStatus !== 'all' 
-            ? 'No properties match your filters' 
+          emptyMessage={searchTerm || filterStatus !== 'all'
+            ? 'No properties match your filters'
             : 'No properties yet. Add your first property to get started!'}
-          onRetry={query.refetch}
         >
-          <Grid container spacing={3}>
-            {filteredProperties.map((property) => (
-              <Grid item xs={12} sm={6} md={4} key={property.id}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 4,
-                    },
-                  }}
-                  onClick={() => handleCardClick(property.id)}
-                >
-                  {property.imageUrl ? (
-                    <Box
-                      component="img"
-                      src={property.imageUrl}
-                      alt={property.name}
-                      sx={{
-                        height: 200,
-                        objectFit: 'cover',
-                      }}
-                    />
-                  ) : (
-                    <Box
-                      sx={{
-                        height: 200,
-                        bgcolor: 'grey.100',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <HomeIcon sx={{ fontSize: 80, color: 'grey.400' }} />
-                    </Box>
-                  )}
+          <Stack spacing={3}>
+            <Grid container spacing={3}>
+              {filteredProperties.map((property) => (
+                <Grid item xs={12} sm={6} md={4} key={property.id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                      },
+                      borderRadius: 3,
+                    }}
+                    onClick={() => handleCardClick(property.id)}
+                  >
+                    {property.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={property.imageUrl}
+                        alt={property.name}
+                        sx={{
+                          height: { xs: 180, sm: 200 },
+                          objectFit: 'cover',
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          height: { xs: 180, sm: 200 },
+                          bgcolor: 'grey.100',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'grey.400',
+                        }}
+                      >
+                        <HomeIcon sx={{ fontSize: 64 }} />
+                      </Box>
+                    )}
 
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Stack spacing={1.5}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: 1,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         <Typography variant="h6" sx={{ fontWeight: 600 }}>
                           {property.name}
                         </Typography>
@@ -278,8 +330,12 @@ export default function PropertiesPage() {
 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <LocationIcon fontSize="small" color="action" />
-                        <Typography variant="body2" color="text.secondary">
-                          {property.address}, {property.city}, {property.state}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ flexGrow: 1, minWidth: 0 }}
+                        >
+                          {formatPropertyAddressLine(property)}
                         </Typography>
                       </Box>
 
@@ -311,25 +367,40 @@ export default function PropertiesPage() {
                           {property.description}
                         </Typography>
                       )}
-                    </Stack>
-                  </CardContent>
+                    </CardContent>
 
-                  <CardActions sx={{ px: 2, pb: 2 }}>
-                    <Stack spacing={0.5} sx={{ width: '100%' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Type: {property.propertyType}
-                      </Typography>
-                      {property._count && (
+                    <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
+                      <Stack spacing={0.5} sx={{ width: '100%' }}>
                         <Typography variant="caption" color="text.secondary">
-                          {property._count.jobs} active jobs • {property._count.inspections} inspections
+                          Type: {property.propertyType}
                         </Typography>
-                      )}
-                    </Stack>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                        {property._count && (
+                          <Typography variant="caption" color="text.secondary">
+                            {property._count.jobs} active jobs • {property._count.inspections} inspections
+                          </Typography>
+                        )}
+                      </Stack>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* Load More Button */}
+            {hasNextPage && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
+                >
+                  {isFetchingNextPage ? 'Loading...' : 'Load More'}
+                </Button>
+              </Box>
+            )}
+          </Stack>
         </DataState>
       </Stack>
 

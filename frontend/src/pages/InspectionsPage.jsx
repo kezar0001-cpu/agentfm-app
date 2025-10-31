@@ -25,11 +25,11 @@ import {
   PlayArrow as PlayArrowIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
-import ensureArray from '../utils/ensureArray';
+import { CircularProgress } from '@mui/material';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -49,28 +49,43 @@ const InspectionsPage = () => {
   if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
   if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
-  // Fetch inspections
+  // Fetch inspections with infinite query
   const {
-    data: inspections = [],
+    data,
     isLoading,
     error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-  } = useQuery({
+  } = useInfiniteQuery({
     queryKey: ['inspections', filters],
+    queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams(queryParams);
+      params.append('limit', '50');
+      params.append('offset', pageParam.toString());
+      const response = await apiClient.get(`/inspections?${params.toString()}`);
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    },
+    initialPageParam: 0,
+  });
+
+  // Flatten all pages into a single array
+  const inspections = data?.pages?.flatMap(page => page.items) || [];
+
+  // Fetch properties for filter
+  const { data: propertiesData } = useQuery({
+    queryKey: ['properties-list'],
     queryFn: async () => {
-      const response = await apiClient.get(`/inspections?${queryParams.toString()}`);
-      return ensureArray(response.data, ['inspections', 'data', 'items', 'results']);
+      const response = await apiClient.get('/properties?limit=100&offset=0');
+      return response.data;
     },
   });
 
-  // Fetch properties for filter
-  const { data: properties = [] } = useQuery({
-    queryKey: ['properties-list'],
-    queryFn: async () => {
-      const response = await apiClient.get('/properties');
-      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
-    },
-  });
+  const properties = propertiesData?.items || [];
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -121,7 +136,7 @@ const InspectionsPage = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState type="loading" message="Loading inspections..." />
       </Container>
     );
@@ -129,7 +144,7 @@ const InspectionsPage = () => {
 
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <DataState
           type="error"
           message="Failed to load inspections"
@@ -140,9 +155,15 @@ const InspectionsPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2, md: 0 }}
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Inspections
@@ -155,23 +176,21 @@ const InspectionsPage = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreate}
+          fullWidth
+          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
         >
           Schedule Inspection
         </Button>
-      </Box>
+      </Stack>
 
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 select
                 fullWidth
-                id="inspections-filter-status"
-                name="status"
-                inputProps={{ id: 'inspections-filter-status', name: 'status' }}
-                InputLabelProps={{ htmlFor: 'inspections-filter-status' }}
                 label="Status"
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -188,17 +207,13 @@ const InspectionsPage = () => {
               <TextField
                 select
                 fullWidth
-                id="inspections-filter-property"
-                name="propertyId"
-                inputProps={{ id: 'inspections-filter-property', name: 'propertyId' }}
-                InputLabelProps={{ htmlFor: 'inspections-filter-property' }}
                 label="Property"
                 value={filters.propertyId}
                 onChange={(e) => handleFilterChange('propertyId', e.target.value)}
                 size="small"
               >
                 <MenuItem value="">All Properties</MenuItem>
-                {properties.map((property) => (
+                {Array.isArray(properties) && properties.map((property) => (
                   <MenuItem key={property.id} value={property.id}>
                     {property.name}
                   </MenuItem>
@@ -208,29 +223,23 @@ const InspectionsPage = () => {
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspections-filter-date-from"
-                name="dateFrom"
-                inputProps={{ id: 'inspections-filter-date-from', name: 'dateFrom' }}
-                InputLabelProps={{ htmlFor: 'inspections-filter-date-from', shrink: true }}
                 label="From Date"
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                 size="small"
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
-                id="inspections-filter-date-to"
-                name="dateTo"
-                inputProps={{ id: 'inspections-filter-date-to', name: 'dateTo' }}
-                InputLabelProps={{ htmlFor: 'inspections-filter-date-to', shrink: true }}
                 label="To Date"
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                 size="small"
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>
@@ -238,7 +247,7 @@ const InspectionsPage = () => {
       </Card>
 
       {/* Inspections List */}
-      {!inspections || inspections.length === 0 ? (
+      {!Array.isArray(inspections) || inspections.length === 0 ? (
         <DataState
           type="empty"
           message="No inspections found"
@@ -253,8 +262,9 @@ const InspectionsPage = () => {
           }
         />
       ) : (
-        <Grid container spacing={3}>
-          {inspections.map((inspection) => (
+        <Stack spacing={3}>
+          <Grid container spacing={{ xs: 2, md: 3 }}>
+            {inspections.map((inspection) => (
             <Grid item xs={12} md={6} lg={4} key={inspection.id}>
               <Card
                 sx={{
@@ -266,10 +276,19 @@ const InspectionsPage = () => {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
+                  borderRadius: 3,
                 }}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      justifyContent: 'space-between',
+                      alignItems: { xs: 'flex-start', sm: 'flex-start' },
+                      gap: { xs: 1, sm: 2 },
+                    }}
+                  >
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" gutterBottom>
                         {inspection.title}
@@ -286,6 +305,7 @@ const InspectionsPage = () => {
                       label={inspection.type}
                       size="small"
                       variant="outlined"
+                      sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                     />
                   </Box>
 
@@ -343,7 +363,16 @@ const InspectionsPage = () => {
                   </Stack>
                 </CardContent>
 
-                <Box sx={{ p: 2, pt: 0, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    pt: 0,
+                    display: 'flex',
+                    gap: 1,
+                    justifyContent: 'flex-end',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <Tooltip title="View Details">
                     <IconButton
                       size="small"
@@ -367,8 +396,24 @@ const InspectionsPage = () => {
                 </Box>
               </Card>
             </Grid>
-          ))}
-        </Grid>
+            ))}
+          </Grid>
+
+          {/* Load More Button */}
+          {hasNextPage && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
+              >
+                {isFetchingNextPage ? 'Loading...' : 'Load More'}
+              </Button>
+            </Box>
+          )}
+        </Stack>
       )}
 
       {/* Create/Edit Dialog */}

@@ -181,8 +181,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-title"
               name="title"
-              inputProps={{ id: 'job-form-title', name: 'title' }}
-              InputLabelProps={{ htmlFor: 'job-form-title' }}
               label="Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -198,8 +196,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-description"
               name="description"
-              inputProps={{ id: 'job-form-description', name: 'description' }}
-              InputLabelProps={{ htmlFor: 'job-form-description' }}
               label="Description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
@@ -218,8 +214,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-priority"
               name="priority"
-              inputProps={{ id: 'job-form-priority', name: 'priority' }}
-              InputLabelProps={{ htmlFor: 'job-form-priority' }}
               label="Priority"
               value={formData.priority}
               onChange={(e) => handleChange('priority', e.target.value)}
@@ -239,8 +233,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
                 fullWidth
                 id="job-form-status"
                 name="status"
-                inputProps={{ id: 'job-form-status', name: 'status' }}
-                InputLabelProps={{ htmlFor: 'job-form-status' }}
                 label="Status"
                 value={formData.status}
                 onChange={(e) => handleChange('status', e.target.value)}
@@ -261,8 +253,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-property"
               name="propertyId"
-              inputProps={{ id: 'job-form-property', name: 'propertyId' }}
-              InputLabelProps={{ htmlFor: 'job-form-property' }}
               label="Property"
               value={formData.propertyId}
               onChange={(e) => handleChange('propertyId', e.target.value)}
@@ -271,7 +261,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               required
               disabled={loadingProperties}
             >
-              {Array.isArray(properties) && properties.map((property) => (
+              {properties?.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -285,15 +275,13 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-unit"
               name="unitId"
-              inputProps={{ id: 'job-form-unit', name: 'unitId' }}
-              InputLabelProps={{ htmlFor: 'job-form-unit' }}
               label="Unit (Optional)"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
               disabled={!formData.propertyId || !units?.length}
             >
               <MenuItem value="">No specific unit</MenuItem>
-              {Array.isArray(units) && units.map((unit) => (
+              {units?.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>
@@ -307,14 +295,12 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-assigned-to"
               name="assignedToId"
-              inputProps={{ id: 'job-form-assigned-to', name: 'assignedToId' }}
-              InputLabelProps={{ htmlFor: 'job-form-assigned-to' }}
               label="Assign to Technician (Optional)"
               value={formData.assignedToId}
               onChange={(e) => handleChange('assignedToId', e.target.value)}
             >
               <MenuItem value="">Unassigned</MenuItem>
-              {Array.isArray(technicians) && technicians.map((tech) => (
+              {technicians?.map((tech) => (
                 <MenuItem key={tech.id} value={tech.id}>
                   {tech.firstName} {tech.lastName} ({tech.email})
                 </MenuItem>
@@ -327,12 +313,11 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-scheduled-date"
               name="scheduledDate"
-              inputProps={{ id: 'job-form-scheduled-date', name: 'scheduledDate' }}
-              InputLabelProps={{ htmlFor: 'job-form-scheduled-date', shrink: true }}
               label="Scheduled Date (Optional)"
               type="datetime-local"
               value={formData.scheduledDate}
               onChange={(e) => handleChange('scheduledDate', e.target.value)}
+              InputLabelProps={{ shrink: true }}
             />
           </Grid>
 
@@ -341,14 +326,16 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-estimated-cost"
               name="estimatedCost"
-              inputProps={{ id: 'job-form-estimated-cost', name: 'estimatedCost', min: 0, step: 0.01 }}
-              InputLabelProps={{ htmlFor: 'job-form-estimated-cost' }}
               label="Estimated Cost (Optional)"
               type="number"
               value={formData.estimatedCost}
               onChange={(e) => handleChange('estimatedCost', e.target.value)}
               InputProps={{
                 startAdornment: '$',
+              }}
+              inputProps={{
+                min: 0,
+                step: 0.01,
               }}
             />
           </Grid>
@@ -358,8 +345,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               fullWidth
               id="job-form-notes"
               name="notes"
-              inputProps={{ id: 'job-form-notes', name: 'notes' }}
-              InputLabelProps={{ htmlFor: 'job-form-notes' }}
               label="Notes (Optional)"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
