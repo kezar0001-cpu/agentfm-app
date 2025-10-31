@@ -29,7 +29,7 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
-import { getCurrentUser, refreshCurrentUser } from '../lib/auth.js'; // Import auth helpers
+import { getCurrentUser, refreshCurrentUser, USER_UPDATED_EVENT } from '../lib/auth.js'; // Import auth helpers
 import { calculateDaysRemaining } from '../utils/date.js';
 
 const STATUSES = {
@@ -66,7 +66,6 @@ export default function SubscriptionsPage() {
   const showSuccess = params.get('success') === '1';
   const showCanceled = params.get('canceled') === '1';
 
-  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
   const [displaySuccess, setDisplaySuccess] = useState(showSuccess);
 
   useEffect(() => {
