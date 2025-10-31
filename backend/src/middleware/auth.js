@@ -114,17 +114,17 @@ export async function requireAuth(req, res, next) {
 export async function optionalAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // No token provided, continue without user
       return next();
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     try {
       const decoded = verifyToken(token);
-      
+
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
         include: { org: true }
@@ -137,7 +137,7 @@ export async function optionalAuth(req, res, next) {
       // Token is invalid, but that's okay for optional auth
       console.debug('Optional auth: Invalid token provided');
     }
-    
+
     next();
   } catch (error) {
     console.error('Optional auth middleware error:', error);
@@ -145,7 +145,84 @@ export async function optionalAuth(req, res, next) {
   }
 }
 
+/**
+ * Middleware to check if user has one of the required roles
+ * @param {Array<string>} allowedRoles - Array of roles that can access the route
+ */
+export function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const userRole = req.user.role;
+
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
+      });
+    }
+
+    next();
+  };
+}
+
+/**
+ * Middleware to check if user has an active subscription (placeholder)
+ * TODO: Implement actual subscription checking logic
+ */
+export function isSubscriptionActive(req, res, next) {
+  // For now, allow all authenticated users through
+  // Implement actual subscription logic when needed
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
+  }
+  next();
+}
+
+/**
+ * Middleware to require active subscription (placeholder)
+ * TODO: Implement actual subscription checking logic
+ */
+export function requireActiveSubscription(req, res, next) {
+  return isSubscriptionActive(req, res, next);
+}
+
+/**
+ * Middleware to require property manager subscription (placeholder)
+ * TODO: Implement actual subscription checking logic
+ */
+export function requirePropertyManagerSubscription(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
+  }
+
+  if (req.user.role !== 'PROPERTY_MANAGER') {
+    return res.status(403).json({
+      success: false,
+      message: 'Property manager access required'
+    });
+  }
+
+  // TODO: Add subscription check
+  next();
+}
+
 export default {
   requireAuth,
-  optionalAuth
+  optionalAuth,
+  requireRole,
+  isSubscriptionActive,
+  requireActiveSubscription,
+  requirePropertyManagerSubscription
 };
