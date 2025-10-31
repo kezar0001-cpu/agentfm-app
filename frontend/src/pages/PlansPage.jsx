@@ -3,7 +3,6 @@ import {
   Typography,
   Paper,
   Table,
-  TableContainer,
   TableHead,
   TableRow,
   TableCell,
@@ -12,8 +11,6 @@ import {
   TextField,
   Button,
   Alert,
-  MenuItem,
-  Chip,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
@@ -60,14 +57,11 @@ export default function PlansPage() {
     <Stack spacing={4}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Maintenance Plans
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Create and manage recurring maintenance schedules for your properties
+          {t('plans.title')}
         </Typography>
       </Box>
 
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
+      <Paper sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           {t('actions.create')} {t('plans.title')}
         </Typography>
@@ -76,6 +70,8 @@ export default function PlansPage() {
             <TextField
               id="plans-form-name"
               name="name"
+              inputProps={{ id: 'plans-form-name', name: 'name' }}
+              InputLabelProps={{ htmlFor: 'plans-form-name' }}
               label={t('plans.name')}
               fullWidth
               autoComplete="off"
@@ -86,24 +82,20 @@ export default function PlansPage() {
             <TextField
               id="plans-form-frequency"
               name="frequency"
-              label="Frequency"
-              select
+              inputProps={{ id: 'plans-form-frequency', name: 'frequency' }}
+              InputLabelProps={{ htmlFor: 'plans-form-frequency' }}
+              label={t('plans.frequency')}
               fullWidth
+              autoComplete="off"
               {...register('frequency')}
               error={Boolean(errors.frequency)}
               helperText={errors.frequency && t(errors.frequency.message)}
-            >
-              <MenuItem value="DAILY">Daily</MenuItem>
-              <MenuItem value="WEEKLY">Weekly</MenuItem>
-              <MenuItem value="BIWEEKLY">Bi-weekly</MenuItem>
-              <MenuItem value="MONTHLY">Monthly</MenuItem>
-              <MenuItem value="QUARTERLY">Quarterly</MenuItem>
-              <MenuItem value="SEMIANNUALLY">Semi-annually</MenuItem>
-              <MenuItem value="ANNUALLY">Annually</MenuItem>
-            </TextField>
+            />
             <TextField
               id="plans-form-description"
               name="description"
+              inputProps={{ id: 'plans-form-description', name: 'description' }}
+              InputLabelProps={{ htmlFor: 'plans-form-description' }}
               label="Description"
               multiline
               minRows={3}
@@ -121,7 +113,7 @@ export default function PlansPage() {
         </form>
       </Paper>
 
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
+      <Paper>
         <DataState
           isLoading={query.isLoading}
           isError={query.isError}
@@ -129,41 +121,24 @@ export default function PlansPage() {
           isEmpty={!query.isLoading && !query.isError && plans.length === 0}
           onRetry={query.refetch}
         >
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t('plans.name')}</TableCell>
-                  <TableCell>{t('plans.frequency')}</TableCell>
-                  <TableCell>Description</TableCell>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>{t('plans.name')}</TableCell>
+                <TableCell>{t('plans.frequency')}</TableCell>
+                <TableCell>Description</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {plans.map((plan) => (
+                <TableRow key={plan.id || plan.name}>
+                  <TableCell>{plan.name}</TableCell>
+                  <TableCell>{plan.frequency}</TableCell>
+                  <TableCell>{plan.description}</TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {plans.map((plan) => (
-                  <TableRow key={plan.id || plan.name}>
-                    <TableCell>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {plan.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={plan.frequency} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {plan.description || 'No description'}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              ))}
+            </TableBody>
+          </Table>
         </DataState>
       </Paper>
     </Stack>

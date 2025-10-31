@@ -229,4 +229,7 @@ export const api = {
   },
 };
 
+// Legacy export for compatibility
+export const apiRequest = apiCall;
+
 export default api;
