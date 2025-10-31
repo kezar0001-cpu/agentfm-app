@@ -1,9 +1,37 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import jwt from 'jsonwebtoken';
+import getJwtSecret from '../utils/getJwtSecret.js';
 
 const router = Router();
+
+// Middleware to verify JWT token
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, getJwtSecret());
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: { org: true }
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
 
 // Validation schema
 const maintenanceRequestSchema = z.object({
@@ -19,7 +47,7 @@ const maintenanceRequestSchema = z.object({
 });
 
 // GET /api/maintenance - Get all maintenance requests
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const { status, propertyId } = req.query;
 
@@ -83,7 +111,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/maintenance - Create maintenance request
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const validatedData = maintenanceRequestSchema.parse(req.body);
 
@@ -162,7 +190,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // GET /api/maintenance/:id - Get specific request
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const request = await prisma.maintenanceRequest.findFirst({
       where: {
@@ -221,7 +249,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // PATCH /api/maintenance/:id - Update request status
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', authenticate, async (req, res) => {
   try {
     const { status, technicianId, rating } = req.body;
 
@@ -291,7 +319,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/maintenance/:id/messages - Add message to request
-router.post('/:id/messages', requireAuth, async (req, res) => {
+router.post('/:id/messages', authenticate, async (req, res) => {
   try {
     const { message, attachments } = req.body;
 
