@@ -31,7 +31,7 @@ import {
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '../utils/api';
+import { apiRequest } from '../api';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
 
