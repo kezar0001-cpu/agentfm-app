@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-const STATUSES = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const STATUSES = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 const jobCreateSchema = z.object({
@@ -66,13 +66,6 @@ router.get('/', async (req, res) => {
       where,
       include: {
         assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        createdBy: {
           select: {
             id: true,
             name: true,
@@ -187,18 +180,10 @@ router.post('/', async (req, res) => {
         propertyId,
         unitId: unitId || null,
         assignedToId: assignedToId || null,
-        createdById: req.user.id,
-        status: assignedToId ? 'ASSIGNED' : 'PENDING'
+        status: assignedToId ? 'ASSIGNED' : 'OPEN'
       },
       include: {
         assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        createdBy: {
           select: {
             id: true,
             name: true,
@@ -233,13 +218,6 @@ router.get('/:id', async (req, res) => {
             name: true,
             email: true,
             phone: true
-          }
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
           }
         }
       }
@@ -356,13 +334,6 @@ router.patch('/:id', async (req, res) => {
       data: parsed.data,
       include: {
         assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        createdBy: {
           select: {
             id: true,
             name: true,

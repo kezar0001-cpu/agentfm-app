@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import passport from 'passport';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
 import { signToken, verifyToken } from '../utils/jwt.js';
 
