@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import ensureArray from '../utils/ensureArray';
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
@@ -36,31 +35,31 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   // Fetch properties
-  const { data: properties = [], isLoading: loadingProperties } = useQuery({
+  const { data: properties, isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
+      return response.data;
     },
   });
 
   // Fetch units for selected property
-  const { data: units = [] } = useQuery({
+  const { data: units } = useQuery({
     queryKey: ['units', formData.propertyId],
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return ensureArray(response.data, ['units', 'data', 'items', 'results']);
+      return response.data;
     },
     enabled: !!formData.propertyId,
   });
 
   // Fetch technicians
-  const { data: technicians = [] } = useQuery({
+  const { data: technicians } = useQuery({
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
+      return response.data;
     },
   });
 

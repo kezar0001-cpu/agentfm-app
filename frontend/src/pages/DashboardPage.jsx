@@ -60,8 +60,7 @@ const DashboardPage = () => {
     queryKey: ['dashboard-summary'],
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/summary');
-      // Backend returns { success: true, summary: {...} }
-      return response.data?.summary || response.data;
+      return response.data;
     },
     refetchInterval: autoRefresh ? 5 * 60 * 1000 : false, // 5 minutes
   });
@@ -71,8 +70,7 @@ const DashboardPage = () => {
     queryKey: ['dashboard-activity'],
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/activity?limit=10');
-      // Backend returns { success: true, items: [...] }
-      return response.data?.items || response.data;
+      return response.data;
     },
     refetchInterval: autoRefresh ? 5 * 60 * 1000 : false,
   });

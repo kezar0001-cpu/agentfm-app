@@ -12,8 +12,6 @@ import {
   TextField,
   Button,
   Alert,
-  MenuItem,
-  Chip,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
@@ -60,10 +58,7 @@ export default function PlansPage() {
     <Stack spacing={4}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Maintenance Plans
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Create and manage recurring maintenance schedules for your properties
+          {t('plans.title')}
         </Typography>
       </Box>
 
@@ -86,21 +81,13 @@ export default function PlansPage() {
             <TextField
               id="plans-form-frequency"
               name="frequency"
-              label="Frequency"
-              select
+              label={t('plans.frequency')}
               fullWidth
+              autoComplete="off"
               {...register('frequency')}
               error={Boolean(errors.frequency)}
               helperText={errors.frequency && t(errors.frequency.message)}
-            >
-              <MenuItem value="DAILY">Daily</MenuItem>
-              <MenuItem value="WEEKLY">Weekly</MenuItem>
-              <MenuItem value="BIWEEKLY">Bi-weekly</MenuItem>
-              <MenuItem value="MONTHLY">Monthly</MenuItem>
-              <MenuItem value="QUARTERLY">Quarterly</MenuItem>
-              <MenuItem value="SEMIANNUALLY">Semi-annually</MenuItem>
-              <MenuItem value="ANNUALLY">Annually</MenuItem>
-            </TextField>
+            />
             <TextField
               id="plans-form-description"
               name="description"
@@ -141,24 +128,9 @@ export default function PlansPage() {
               <TableBody>
                 {plans.map((plan) => (
                   <TableRow key={plan.id || plan.name}>
-                    <TableCell>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {plan.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={plan.frequency} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {plan.description || 'No description'}
-                      </Typography>
-                    </TableCell>
+                    <TableCell>{plan.name}</TableCell>
+                    <TableCell>{plan.frequency}</TableCell>
+                    <TableCell>{plan.description}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

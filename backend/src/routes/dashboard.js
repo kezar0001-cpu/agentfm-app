@@ -1,171 +1,44 @@
 import express from 'express';
+// 👇 This path needs to be correct
 import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js'; 
-import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
-import prisma from '../config/prismaClient.js';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../config/prismaClient.js';
 
 const router = express.Router();
 
-/**
- * All routes below are protected by JWT authentication.
- * The requireAuth middleware verifies the token,
- * attaches the user to req.user, and proceeds if valid.
- */
+// Middleware to verify JWT token
+const requireAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: { org: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
+
 router.use(requireAuth);
 
-// GET /api/dashboard/summary - Returns dashboard summary data
-router.get('/summary', asyncHandler(async (req, res) => {
-  const data = await getDashboardSummary(req, res);
-  return data;
-}));
+// Wires up the /summary route
+router.get('/summary', getDashboardSummary);
 
-// GET /api/dashboard/activity - Returns recent activity data
-router.get('/activity', asyncHandler(async (req, res) => {
-  const data = await getRecentActivity(req, res);
-  return data;
-}));
-
-// GET /api/dashboard/analytics - Returns detailed analytics
-router.get('/analytics', requireActiveSubscription, asyncHandler(async (req, res) => {
-  const { startDate, endDate, propertyId } = req.query;
-  
-  // Build date filter
-  const dateFilter = {};
-  if (startDate) dateFilter.gte = new Date(startDate);
-  if (endDate) dateFilter.lte = new Date(endDate);
-  
-  // Build property filter based on user role
-  let propertyFilter = {};
-  if (req.user.role === 'PROPERTY_MANAGER') {
-    const properties = await prisma.property.findMany({
-      where: { managerId: req.user.id },
-      select: { id: true }
-    });
-    propertyFilter = { propertyId: { in: properties.map(p => p.id) } };
-  } else if (req.user.role === 'OWNER') {
-    const ownerships = await prisma.propertyOwner.findMany({
-      where: { ownerId: req.user.id },
-      select: { propertyId: true }
-    });
-    propertyFilter = { propertyId: { in: ownerships.map(o => o.propertyId) } };
-  }
-  
-  // If specific property requested, add to filter
-  if (propertyId) {
-    propertyFilter.propertyId = propertyId;
-  }
-  
-  // Calculate job completion rate
-  const totalJobs = await prisma.job.count({
-    where: {
-      ...propertyFilter,
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
-    }
-  });
-  
-  const completedJobs = await prisma.job.count({
-    where: {
-      ...propertyFilter,
-      status: 'COMPLETED',
-      ...(Object.keys(dateFilter).length > 0 && { completedDate: dateFilter })
-    }
-  });
-  
-  const jobCompletionRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
-  
-  // Calculate average response time (time from job creation to assignment)
-  const assignedJobs = await prisma.job.findMany({
-    where: {
-      ...propertyFilter,
-      assignedToId: { not: null },
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
-    },
-    select: {
-      createdAt: true,
-      updatedAt: true,
-    }
-  });
-  
-  const avgResponseTime = assignedJobs.length > 0
-    ? assignedJobs.reduce((sum, job) => {
-        const diff = new Date(job.updatedAt) - new Date(job.createdAt);
-        return sum + diff;
-      }, 0) / assignedJobs.length / (1000 * 60 * 60) // Convert to hours
-    : 0;
-  
-  // Calculate cost trends
-  const jobsWithCost = await prisma.job.findMany({
-    where: {
-      ...propertyFilter,
-      actualCost: { not: null },
-      ...(Object.keys(dateFilter).length > 0 && { completedDate: dateFilter })
-    },
-    select: {
-      actualCost: true,
-      completedDate: true,
-    },
-    orderBy: { completedDate: 'asc' }
-  });
-  
-  const totalCost = jobsWithCost.reduce((sum, job) => sum + (job.actualCost || 0), 0);
-  const avgCost = jobsWithCost.length > 0 ? totalCost / jobsWithCost.length : 0;
-  
-  // Top issues by category
-  const serviceRequests = await prisma.serviceRequest.groupBy({
-    by: ['category'],
-    where: {
-      ...propertyFilter,
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
-    },
-    _count: {
-      category: true
-    },
-    orderBy: {
-      _count: {
-        category: 'desc'
-      }
-    },
-    take: 5
-  });
-  
-  const topIssues = serviceRequests.map(sr => ({
-    category: sr.category,
-    count: sr._count.category
-  }));
-  
-  // Job status distribution
-  const jobsByStatus = await prisma.job.groupBy({
-    by: ['status'],
-    where: {
-      ...propertyFilter,
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
-    },
-    _count: {
-      status: true
-    }
-  });
-  
-  const statusDistribution = jobsByStatus.reduce((acc, item) => {
-    acc[item.status] = item._count.status;
-    return acc;
-  }, {});
-  
-  const analytics = {
-    jobCompletionRate: Math.round(jobCompletionRate * 10) / 10,
-    avgResponseTime: Math.round(avgResponseTime * 10) / 10, // hours
-    totalCost,
-    avgCost: Math.round(avgCost * 100) / 100,
-    costTrends: jobsWithCost.map(job => ({
-      date: job.completedDate,
-      cost: job.actualCost
-    })),
-    topIssues,
-    statusDistribution,
-    totalJobs,
-    completedJobs,
-  };
-  
-  res.json({ success: true, data: analytics });
-}));
+// 👇 Adds the missing /activity route
+router.get('/activity', getRecentActivity);
 
 export default router;

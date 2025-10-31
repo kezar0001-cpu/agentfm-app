@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -19,10 +19,6 @@ import {
   TextField,
   Avatar,
   Divider,
-  CircularProgress,
-  Alert,
-  Stack,
-  IconButton,
 } from '@mui/material';
 import {
   CalendarToday as CalendarTodayIcon,
@@ -32,59 +28,23 @@ import {
   AttachFile as AttachFileIcon,
   CheckCircleOutline as CheckCircleOutlineIcon,
   Comment as CommentIcon,
-  Send as SendIcon,
 } from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
-import { formatDistanceToNow } from 'date-fns';
 
-const JobDetailModal = ({ job, open, onClose }) => {
-  const queryClient = useQueryClient();
-  const [commentText, setCommentText] = useState('');
-
-  // Fetch comments for this job
-  const {
-    data: commentsData,
-    isLoading: commentsLoading,
-    error: commentsError,
-  } = useQuery({
-    queryKey: ['jobComments', job?.id],
-    queryFn: async () => {
-      const response = await apiClient.get(`/jobs/${job.id}/comments`);
-      return response.data;
-    },
-    enabled: open && !!job?.id,
-  });
-
-  const comments = commentsData?.comments || [];
-
-  // Mutation to post a new comment
-  const postCommentMutation = useMutation({
-    mutationFn: async (content) => {
-      const response = await apiClient.post(`/jobs/${job.id}/comments`, { content });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['jobComments', job.id]);
-      setCommentText('');
-    },
-  });
-
-  const handlePostComment = () => {
-    if (commentText.trim()) {
-      postCommentMutation.mutate(commentText.trim());
-    }
-  };
-
+const JobDetailModal = ({ job, onClose }) => {
   if (!job) {
     return null;
   }
 
-  // Placeholder data for subtasks and attachments (to be implemented later)
+  // Placeholder data
   const subtasks = [
     { id: 1, text: 'Purchase materials', completed: true },
     { id: 2, text: 'Schedule with tenant', completed: false },
     { id: 3, text: 'Complete post-job cleanup', completed: false },
+  ];
+
+  const activity = [
+    { id: 1, user: 'John Doe', comment: 'Initial assessment complete.', timestamp: '2 hours ago' },
+    { id: 2, user: 'Jane Smith', comment: 'Tenant has been contacted.', timestamp: '1 hour ago' },
   ];
 
   const attachments = [
@@ -92,21 +52,8 @@ const JobDetailModal = ({ job, open, onClose }) => {
     { id: 2, name: 'Damage_Photo.jpg', url: '#' },
   ];
 
-  const getRoleBadgeColor = (role) => {
-    switch (role) {
-      case 'PROPERTY_MANAGER':
-        return 'primary';
-      case 'TECHNICIAN':
-        return 'success';
-      case 'OWNER':
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
-
   return (
-    <Dialog open={open && !!job} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={!!job} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Typography variant="h5" component="span">
           {job.title}
@@ -174,106 +121,38 @@ const JobDetailModal = ({ job, open, onClose }) => {
           {/* Right Column: Activity & Attachments */}
           <Grid item xs={12} md={6}>
             {/* Activity Feed */}
-            <Paper elevation={2} sx={{ p: 2, mb: 2, maxHeight: 400, overflow: 'auto' }}>
+            <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
               <Typography variant="h6" gutterBottom>
                 <CommentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Comments ({comments.length})
+                Activity
               </Typography>
-              
-              {commentsLoading && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                  <CircularProgress size={24} />
-                </Box>
-              )}
-              
-              {commentsError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  Failed to load comments
-                </Alert>
-              )}
-              
-              {!commentsLoading && comments.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                  No comments yet. Be the first to comment!
-                </Typography>
-              )}
-              
-              <Stack spacing={2}>
-                {comments.map((comment) => (
-                  <Box key={comment.id} sx={{ display: 'flex' }}>
-                    <Avatar 
-                      sx={{ 
-                        width: 32, 
-                        height: 32, 
-                        mr: 1.5, 
-                        bgcolor: getRoleBadgeColor(comment.user.role) + '.main' 
-                      }}
-                    >
-                      {comment.user.firstName.charAt(0)}
+              <Box>
+                {activity.map((item) => (
+                  <Box key={item.id} sx={{ display: 'flex', mb: 2 }}>
+                    <Avatar sx={{ width: 32, height: 32, mr: 1.5, bgcolor: 'primary.main' }}>
+                      {item.user.charAt(0)}
                     </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" fontWeight="bold">
-                          {comment.user.firstName} {comment.user.lastName}
-                        </Typography>
-                        <Chip 
-                          label={comment.user.role.replace('_', ' ')} 
-                          size="small" 
-                          color={getRoleBadgeColor(comment.user.role)}
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      </Box>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {comment.content}
+                    <Box>
+                      <Typography variant="body2">
+                        <strong>{item.user}</strong>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.comment}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                        {item.timestamp}
                       </Typography>
                     </Box>
                   </Box>
                 ))}
-              </Stack>
-              
-              <Divider sx={{ my: 2 }} />
-              
-              {/* Comment Input */}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  label="Add a comment..."
-                  size="small"
-                  multiline
-                  maxRows={4}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handlePostComment();
-                    }
-                  }}
-                  disabled={postCommentMutation.isPending}
-                  error={postCommentMutation.isError}
-                  helperText={
-                    postCommentMutation.isError 
-                      ? 'Failed to post comment' 
-                      : `${commentText.length}/2000`
-                  }
-                />
-                <IconButton 
-                  color="primary" 
-                  onClick={handlePostComment}
-                  disabled={!commentText.trim() || postCommentMutation.isPending}
-                  size="small"
-                >
-                  {postCommentMutation.isPending ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <SendIcon />
-                  )}
-                </IconButton>
               </Box>
+              <Divider sx={{ my: 2 }} />
+              <TextField
+                fullWidth
+                variant="outlined"
+                label="Add a comment..."
+                size="small"
+              />
             </Paper>
 
             {/* Attachments */}

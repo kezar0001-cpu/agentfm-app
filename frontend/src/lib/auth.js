@@ -137,7 +137,7 @@ export function getCurrentUser() {
 export async function logout() {
   try {
     // Using the api helper function for consistency, though fetch works too
-    await api.post('/auth/logout', undefined, { credentials: 'include' });
+    await api.post('/auth/logout');
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
   sessionStorage.clear();
   removeAuthToken();

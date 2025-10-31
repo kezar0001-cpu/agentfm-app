@@ -1,16 +1,53 @@
 // backend/src/routes/properties.js
 import { Router } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
+
 import prisma from '../config/prismaClient.js';
-import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
+import { requireRole, ROLES } from '../../middleware/roleAuth.js';
 import unitsRouter from './units.js';
 
 const router = Router();
 
-// All property routes require authentication
-router.use(requireAuth);
+// ---------------------------------------------------------------------------
+// Authentication middleware
+// ---------------------------------------------------------------------------
+const requireAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
 
-// Nested units routes
+    const token = authHeader.split(' ')[1];
+    let decoded;
+
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (error) {
+      console.error('JWT verification failed:', {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+      });
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error?.message);
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+};
+
+router.use(requireAuth);
+router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
 router.use('/:id/units', unitsRouter);
 
 // ---------------------------------------------------------------------------
@@ -147,62 +184,19 @@ const toPublicProperty = (property) => {
   };
 };
 
-const ensurePropertyAccess = (property, user, options = {}) => {
-  const { requireWrite = false } = options;
-  
+const ensurePropertyAccess = (property, user) => {
   if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
-  
-  // Property managers who manage the property have full access
-  if (user.role === 'PROPERTY_MANAGER' && property.managerId === user.id) {
-    return { allowed: true, canWrite: true };
-  }
-  
-  // Owners who own the property have read-only access
-  if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
-    if (requireWrite) {
-      return { allowed: false, reason: 'Owners have read-only access', status: 403 };
-    }
-    return { allowed: true, canWrite: false };
-  }
-  
+  if (user.role === ROLES.ADMIN) return { allowed: true };
+  if (property.managerId === user.id) return { allowed: true };
   return { allowed: false, reason: 'Forbidden', status: 403 };
 };
 
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
-// GET / - List properties (PROPERTY_MANAGER sees their properties, OWNER sees owned properties)
 router.get('/', async (req, res) => {
   try {
-    let where = {};
-
-    // Property managers see properties they manage
-    if (req.user.role === 'PROPERTY_MANAGER') {
-      where = { managerId: req.user.id };
-    }
-
-    // Owners see properties they own
-    if (req.user.role === 'OWNER') {
-      where = {
-        owners: {
-          some: {
-            ownerId: req.user.id,
-          },
-        },
-      };
-    }
-
-    // Technicians and tenants should not access this route
-    if (req.user.role === 'TECHNICIAN' || req.user.role === 'TENANT') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. This endpoint is for property managers and owners only.'
-      });
-    }
-
-    // Parse pagination parameters
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const where = req.user.role === ROLES.ADMIN ? {} : { managerId: req.user.id };
 
     const select = {
       id: true,
@@ -225,29 +219,13 @@ router.get('/', async (req, res) => {
       _count: { select: { units: true } },
     };
 
-    // Fetch properties and total count in parallel
-    const [properties, total] = await Promise.all([
-      prisma.property.findMany({
-        where,
-        select,
-        orderBy: { createdAt: 'desc' },
-        skip: offset,
-        take: limit,
-      }),
-      prisma.property.count({ where }),
-    ]);
-
-    // Calculate page number and hasMore
-    const page = Math.floor(offset / limit) + 1;
-    const hasMore = offset + limit < total;
-
-    // Return paginated response
-    res.json({
-      items: properties.map(toPublicProperty),
-      total,
-      page,
-      hasMore,
+    const properties = await prisma.property.findMany({
+      where,
+      select,
+      orderBy: { createdAt: 'desc' },
     });
+
+    res.json({ success: true, properties: properties.map(toPublicProperty) });
   } catch (error) {
     console.error('Get properties error:', {
       message: error?.message,
@@ -259,29 +237,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST / - Create property (PROPERTY_MANAGER only, requires active subscription)
-router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
-    // Remove legacy alias fields (they've been converted to standard fields)
-    // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    // Property managers can only create properties for themselves
-    const managerId = req.user.id;
-
-    // Ensure converted fields are included in the data
-    const propertyData = {
-      ...data,
-      managerId,
-      // Include converted fields if they exist
-      ...(parsed.zipCode && { zipCode: parsed.zipCode }),
-      ...(parsed.propertyType && { propertyType: parsed.propertyType }),
-      ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
-    };
+    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : req.user.id;
 
     const property = await prisma.property.create({
-      data: propertyData,
+      data: {
+        ...data,
+        managerId,
+      },
     });
 
     res.status(201).json({ success: true, property: toPublicProperty(property) });
@@ -299,7 +266,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
   }
 });
 
-// GET /:id - Get property by ID (with access check)
 router.get('/:id', async (req, res) => {
   try {
     const property = await prisma.property.findUnique({
@@ -313,19 +279,6 @@ router.get('/:id', async (req, res) => {
             lastName: true,
             email: true,
             phone: true,
-          },
-        },
-        owners: {
-          include: {
-            owner: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-              },
-            },
           },
         },
       },
@@ -347,43 +300,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PATCH /:id - Update property (PROPERTY_MANAGER only, must be property manager)
-router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+router.patch('/:id', async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ 
-      where: { id: req.params.id },
-      include: {
-        owners: {
-          select: { ownerId: true },
-        },
-      },
-    });
-    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.reason });
     }
 
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
-    // Remove legacy alias fields (they've been converted to standard fields)
-    // Keep the converted fields: zipCode, propertyType, imageUrl
     const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    // Property manager can only update their own properties (already checked by ensurePropertyAccess)
-    const managerId = property.managerId;
-
-    // Ensure converted fields are included in the data
-    const updateData = {
-      ...data,
-      managerId,
-      // Include converted fields if they exist
-      ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
-      ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
-      ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
-    };
+    const managerId = req.user.role === ROLES.ADMIN && managerIdInput ? managerIdInput : property.managerId;
 
     const updated = await prisma.property.update({
       where: { id: property.id },
-      data: updateData,
+      data: {
+        ...data,
+        managerId,
+      },
     });
 
     res.json({ success: true, property: toPublicProperty(updated) });
@@ -401,18 +336,10 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   }
 });
 
-// DELETE /:id - Delete property (PROPERTY_MANAGER only, must be property manager)
-router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ 
-      where: { id: req.params.id },
-      include: {
-        owners: {
-          select: { ownerId: true },
-        },
-      },
-    });
-    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+    const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.reason });
     }
@@ -426,143 +353,6 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       meta: error?.meta,
     });
     res.status(500).json({ success: false, message: 'Failed to delete property' });
-  }
-});
-
-// GET /:id/activity - Get recent activity for a property
-router.get('/:id/activity', async (req, res) => {
-  try {
-    const property = await prisma.property.findUnique({ 
-      where: { id: req.params.id },
-      include: {
-        owners: {
-          select: { ownerId: true },
-        },
-      },
-    });
-    const access = ensurePropertyAccess(property, req.user);
-    if (!access.allowed) {
-      return res.status(access.status).json({ success: false, message: access.reason });
-    }
-
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
-
-    // Fetch recent activity for this property
-    const [jobs, inspections, serviceRequests, units] = await Promise.all([
-      prisma.job.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          updatedAt: true,
-          assignedTo: {
-            select: { firstName: true, lastName: true },
-          },
-        },
-      }),
-      prisma.inspection.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          scheduledDate: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.serviceRequest.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          updatedAt: true,
-          requestedBy: {
-            select: { firstName: true, lastName: true },
-          },
-        },
-      }),
-      prisma.unit.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          unitNumber: true,
-          status: true,
-          updatedAt: true,
-        },
-      }),
-    ]);
-
-    const activities = [];
-
-    jobs.forEach((job) => {
-      activities.push({
-        type: 'job',
-        id: job.id,
-        title: job.title,
-        description: job.assignedTo
-          ? `Assigned to ${job.assignedTo.firstName} ${job.assignedTo.lastName}`
-          : 'Job update',
-        status: job.status,
-        priority: job.priority,
-        date: job.updatedAt,
-      });
-    });
-
-    inspections.forEach((inspection) => {
-      activities.push({
-        type: 'inspection',
-        id: inspection.id,
-        title: inspection.title,
-        description: `Inspection ${inspection.status.toLowerCase()}`,
-        status: inspection.status,
-        date: inspection.updatedAt,
-      });
-    });
-
-    serviceRequests.forEach((sr) => {
-      activities.push({
-        type: 'service_request',
-        id: sr.id,
-        title: sr.title,
-        description: sr.requestedBy
-          ? `Requested by ${sr.requestedBy.firstName} ${sr.requestedBy.lastName}`
-          : 'Service request update',
-        status: sr.status,
-        priority: sr.priority,
-        date: sr.updatedAt,
-      });
-    });
-
-    units.forEach((unit) => {
-      activities.push({
-        type: 'unit',
-        id: unit.id,
-        title: `Unit ${unit.unitNumber}`,
-        description: `Status: ${unit.status}`,
-        status: unit.status,
-        date: unit.updatedAt,
-      });
-    });
-
-    // Sort by date descending
-    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    res.json({ success: true, activities: activities.slice(0, limit) });
-  } catch (error) {
-    console.error('Get property activity error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch property activity' });
   }
 });
 

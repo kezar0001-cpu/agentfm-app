@@ -25,11 +25,10 @@ import {
   PlayArrow as PlayArrowIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
-import { CircularProgress } from '@mui/material';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -49,43 +48,28 @@ const InspectionsPage = () => {
   if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
   if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
-  // Fetch inspections with infinite query
+  // Fetch inspections
   const {
-    data,
+    data: inspections,
     isLoading,
     error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
     refetch,
-  } = useInfiniteQuery({
+  } = useQuery({
     queryKey: ['inspections', filters],
-    queryFn: async ({ pageParam = 0 }) => {
-      const params = new URLSearchParams(queryParams);
-      params.append('limit', '50');
-      params.append('offset', pageParam.toString());
-      const response = await apiClient.get(`/inspections?${params.toString()}`);
+    queryFn: async () => {
+      const response = await apiClient.get(`/inspections?${queryParams.toString()}`);
       return response.data;
     },
-    getNextPageParam: (lastPage) => {
-      return lastPage.hasMore ? lastPage.page * 50 : undefined;
-    },
-    initialPageParam: 0,
   });
-
-  // Flatten all pages into a single array
-  const inspections = data?.pages?.flatMap(page => page.items) || [];
 
   // Fetch properties for filter
-  const { data: propertiesData } = useQuery({
+  const { data: properties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
-      const response = await apiClient.get('/properties?limit=100&offset=0');
+      const response = await apiClient.get('/properties');
       return response.data;
     },
   });
-
-  const properties = propertiesData?.items || [];
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -213,7 +197,7 @@ const InspectionsPage = () => {
                 size="small"
               >
                 <MenuItem value="">All Properties</MenuItem>
-                {Array.isArray(properties) && properties.map((property) => (
+                {properties?.map((property) => (
                   <MenuItem key={property.id} value={property.id}>
                     {property.name}
                   </MenuItem>
@@ -247,7 +231,7 @@ const InspectionsPage = () => {
       </Card>
 
       {/* Inspections List */}
-      {!Array.isArray(inspections) || inspections.length === 0 ? (
+      {!inspections || inspections.length === 0 ? (
         <DataState
           type="empty"
           message="No inspections found"
@@ -262,9 +246,8 @@ const InspectionsPage = () => {
           }
         />
       ) : (
-        <Stack spacing={3}>
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            {inspections.map((inspection) => (
+        <Grid container spacing={{ xs: 2, md: 3 }}>
+          {inspections.map((inspection) => (
             <Grid item xs={12} md={6} lg={4} key={inspection.id}>
               <Card
                 sx={{
@@ -396,24 +379,8 @@ const InspectionsPage = () => {
                 </Box>
               </Card>
             </Grid>
-            ))}
-          </Grid>
-
-          {/* Load More Button */}
-          {hasNextPage && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
-              >
-                {isFetchingNextPage ? 'Loading...' : 'Load More'}
-              </Button>
-            </Box>
-          )}
-        </Stack>
+          ))}
+        </Grid>
       )}
 
       {/* Create/Edit Dialog */}

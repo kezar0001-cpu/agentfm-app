@@ -1,7 +1,5 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import { prisma } from '../config/prismaClient.js';
 
 // ========================================
@@ -12,61 +10,9 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback';
 
 // Only configure Google OAuth if credentials are provided
-const OAUTH_TRIAL_DAYS = 14;
-
-function deriveNameParts(profile, email) {
-  const givenName = profile?.name?.givenName?.trim();
-  const familyName = profile?.name?.familyName?.trim();
-
-  if (givenName || familyName) {
-    return {
-      firstName: givenName || familyName || 'Google',
-      lastName: familyName || givenName || 'User',
-    };
-  }
-
-  const displayName = profile?.displayName?.trim();
-  if (displayName) {
-    const parts = displayName.split(/\s+/);
-    const firstName = parts.shift();
-    const lastName = parts.join(' ') || 'User';
-    return {
-      firstName: firstName || 'Google',
-      lastName,
-    };
-  }
-
-  const [localPart] = email.split('@');
-  if (localPart) {
-    const cleaned = localPart.replace(/[._-]+/g, ' ').trim();
-    if (cleaned) {
-      const parts = cleaned.split(/\s+/);
-      const firstName = parts.shift();
-      const lastName = parts.join(' ') || 'User';
-      return {
-        firstName: firstName || 'Google',
-        lastName,
-      };
-    }
-  }
-
-  return { firstName: 'Google', lastName: 'User' };
-}
-
-async function generatePlaceholderPasswordHash() {
-  const randomSecret = crypto.randomBytes(32).toString('hex');
-  return bcrypt.hash(randomSecret, 10);
-}
-
-function calculateTrialEndDate() {
-  const trialEnd = new Date();
-  trialEnd.setDate(trialEnd.getDate() + OAUTH_TRIAL_DAYS);
-  return trialEnd;
-}
-
 if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
   console.log('✅ Google OAuth enabled');
-
+  
   passport.use(
     new GoogleStrategy(
       {
@@ -78,36 +24,25 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
       async (req, accessToken, refreshToken, profile, done) => {
         try {
           const email = profile.emails[0].value;
-          const { firstName, lastName } = deriveNameParts(profile, email);
+          const name = profile.displayName;
+          const googleId = profile.id;
           const role = req.query.state || 'PROPERTY_MANAGER';
 
           // Check if user exists
           let user = await prisma.user.findUnique({
-            where: { email }
+            where: { email },
+            include: { org: true }
           });
 
           if (user) {
-            const updates = {};
-
-            if (!user.emailVerified) {
-              updates.emailVerified = true;
-            }
-
-            if ((!user.firstName || !user.firstName.trim()) && firstName) {
-              updates.firstName = firstName;
-            }
-
-            if ((!user.lastName || !user.lastName.trim()) && lastName) {
-              updates.lastName = lastName;
-            }
-
-            if (Object.keys(updates).length > 0) {
+            // User exists, update Google ID if needed
+            if (!user.googleId) {
               user = await prisma.user.update({
                 where: { id: user.id },
-                data: updates
+                data: { googleId },
+                include: { org: true }
               });
             }
-
             return done(null, user);
           }
 
@@ -119,56 +54,43 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
           // Create organization
           const org = await prisma.org.create({
             data: {
-              name: `${firstName}'s Organization`
+              name: `${name}'s Organization`
             }
           });
 
           // Calculate trial end date (14 days)
-          const trialEndDate = calculateTrialEndDate();
-
-          const passwordHash = await generatePlaceholderPasswordHash();
+          const trialEndDate = new Date();
+          trialEndDate.setDate(trialEndDate.getDate() + 14);
 
           // Create user
           user = await prisma.user.create({
             data: {
               email,
-              firstName,
-              lastName,
-              passwordHash,
+              name,
+              googleId,
               role: 'PROPERTY_MANAGER',
               emailVerified: true, // Google emails are verified
               subscriptionPlan: 'FREE_TRIAL',
               subscriptionStatus: 'TRIAL',
               trialEndDate,
               orgId: org.id
-            }
+            },
+            include: { org: true }
           });
 
-          // Create Property Manager profile when the model is available.
-          // Some deployments may still be on an earlier Prisma schema where
-          // the PropertyManagerProfile model has not been generated. In that
-          // case prisma.propertyManagerProfile will be undefined, which used
-          // to throw an error and stop the OAuth callback flow.
-          if (prisma.propertyManagerProfile?.create) {
-            await prisma.propertyManagerProfile.create({
-              data: {
-                userId: user.id,
-                managedProperties: [],
-                permissions: {
-                  canCreateProperties: true,
-                  canManageTenants: true,
-                  canAssignJobs: true,
-                  canViewReports: true
-                },
-                updatedAt: new Date()
+          // Create Property Manager profile
+          await prisma.propertyManagerProfile.create({
+            data: {
+              userId: user.id,
+              managedProperties: [],
+              permissions: {
+                canCreateProperties: true,
+                canManageTenants: true,
+                canAssignJobs: true,
+                canViewReports: true
               }
-            });
-          } else {
-            console.warn(
-              'PropertyManagerProfile model is not available in Prisma client; skipping profile creation for user',
-              user.id
-            );
-          }
+            }
+          });
 
           return done(null, user);
         } catch (error) {

@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import getJwtSecret from './getJwtSecret.js';
+import { getJwtSecret } from './jwt.js';
 
 const COOKIE_NAME = 'session';
 const ONE_DAY = 24 * 60 * 60; // seconds

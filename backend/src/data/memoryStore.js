@@ -103,14 +103,11 @@ const jobs = [
     unitName: properties[0].units[0].name,
     title: 'HVAC filter replacement',
     description: 'Replace clogged filters and balance air flow in Unit 1201.',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    scheduledDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    assignedToId: 'tech-001',
+    status: 'in_progress',
+    scheduledFor: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
     assignedTo: 'BlueAir Services',
     assignee: { name: 'BlueAir Services' },
-    estimatedCost: 250.00,
-    notes: 'Customer requested morning appointment',
+    priority: 'high',
     createdAt: now().toISOString(),
     updatedAt: now().toISOString(),
     completedAt: null,
@@ -124,14 +121,11 @@ const jobs = [
     unitName: properties[1].units[0].name,
     title: 'Lobby deep clean',
     description: 'Quarterly lobby deep clean and marble polishing.',
-    status: 'ASSIGNED',
-    priority: 'MEDIUM',
-    scheduledDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    assignedToId: 'tech-002',
+    status: 'scheduled',
+    scheduledFor: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     assignedTo: 'Sparkle Co.',
     assignee: { name: 'Sparkle Co.' },
-    estimatedCost: 800.00,
-    notes: 'Schedule after business hours',
+    priority: 'medium',
     createdAt: now().toISOString(),
     updatedAt: now().toISOString(),
     completedAt: null,
@@ -145,14 +139,11 @@ const jobs = [
     unitName: properties[0].units[1].name,
     title: 'Facade lighting repair',
     description: 'Replace faulty facade lighting controllers and bulbs.',
-    status: 'COMPLETED',
-    priority: 'HIGH',
-    scheduledDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    assignedToId: 'tech-003',
+    status: 'completed',
+    scheduledFor: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
     assignedTo: 'Lumina FM',
     assignee: { name: 'Lumina FM' },
-    estimatedCost: 1500.00,
-    notes: 'Warranty work included',
+    priority: 'high',
     createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     completedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
@@ -358,7 +349,7 @@ function listJobs(orgId, { status, propertyId } = {}) {
   );
 }
 
-function createJob(orgId, { propertyId, unitId, title, description, priority = 'MEDIUM', scheduledDate, assignedToId, estimatedCost, notes }) {
+function createJob(orgId, { propertyId, unitId, title, description, scheduledFor }) {
   const property = requireProperty(orgId, propertyId);
   if (!property) {
     const error = new Error('Property not found');
@@ -383,14 +374,11 @@ function createJob(orgId, { propertyId, unitId, title, description, priority = '
     unitName: unit ? unit.name : null,
     title,
     description,
-    status: scheduledDate ? 'ASSIGNED' : 'OPEN',
-    priority: priority || 'MEDIUM',
-    scheduledDate: scheduledDate ? new Date(scheduledDate).toISOString() : null,
-    assignedToId: assignedToId || null,
-    assignedTo: null, // Legacy field for compatibility
-    assignee: null, // Legacy field for compatibility
-    estimatedCost: estimatedCost || null,
-    notes: notes || null,
+    status: scheduledFor ? 'scheduled' : 'open',
+    scheduledFor: scheduledFor ? new Date(scheduledFor).toISOString() : null,
+    assignedTo: null,
+    assignee: null,
+    priority: 'medium',
     createdAt: now().toISOString(),
     updatedAt: now().toISOString(),
     completedAt: null,
@@ -400,42 +388,25 @@ function createJob(orgId, { propertyId, unitId, title, description, priority = '
   return clone(job);
 }
 
-function updateJob(orgId, jobId, { title, description, status, priority, scheduledDate, assignedToId, estimatedCost, notes }) {
+function updateJob(orgId, jobId, { status, scheduledFor, assignedTo }) {
   const job = jobs.find((item) => item.id === jobId && item.orgId === orgId);
   if (!job) {
     const error = new Error('Job not found');
     error.code = 'NOT_FOUND';
     return error;
   }
-  if (title !== undefined) {
-    job.title = title;
-  }
-  if (description !== undefined) {
-    job.description = description;
-  }
-  if (status !== undefined) {
+  if (status) {
     job.status = status;
-    if (status === 'COMPLETED') {
+    if (status === 'completed') {
       job.completedAt = now().toISOString();
     }
   }
-  if (priority !== undefined) {
-    job.priority = priority;
+  if (scheduledFor !== undefined) {
+    job.scheduledFor = scheduledFor ? new Date(scheduledFor).toISOString() : null;
   }
-  if (scheduledDate !== undefined) {
-    job.scheduledDate = scheduledDate ? new Date(scheduledDate).toISOString() : null;
-  }
-  if (assignedToId !== undefined) {
-    job.assignedToId = assignedToId;
-    // Keep legacy fields for backward compatibility
-    job.assignedTo = assignedToId;
-    job.assignee = assignedToId ? { name: assignedToId } : null;
-  }
-  if (estimatedCost !== undefined) {
-    job.estimatedCost = estimatedCost;
-  }
-  if (notes !== undefined) {
-    job.notes = notes;
+  if (assignedTo !== undefined) {
+    job.assignedTo = assignedTo;
+    job.assignee = assignedTo ? { name: assignedTo } : null;
   }
   job.updatedAt = now().toISOString();
   markUpdated();

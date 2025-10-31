@@ -13,20 +13,3 @@ export function calculateDaysRemaining(endDateString) {
   if (diffTime < 0) return 0; // Trial has expired
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
-
-export function formatDateTime(dateString) {
-  if (!dateString) return '—';
-
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}

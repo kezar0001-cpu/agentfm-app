@@ -41,9 +41,6 @@ import DataState from '../components/DataState';
 import InspectionAttachmentManager from '../components/InspectionAttachmentManager';
 import InspectionForm from '../components/InspectionForm';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
-import { formatDateTime } from '../utils/date';
-import { STATUS_COLOR, TYPE_COLOR } from '../constants/inspections';
-import { useCurrentUser } from '../context/UserContext';
 
 export default function InspectionDetailPage() {
   const { id } = useParams();

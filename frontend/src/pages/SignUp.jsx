@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
   IconButton, InputAdornment, Grid, FormControl, InputLabel, Select, MenuItem
@@ -10,9 +10,6 @@ import { api } from '../api.js';
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get('invite');
-
   // MINIMAL CHANGE: Add 'role' to the initial state
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: '', role: 'PROPERTY_MANAGER'
@@ -21,40 +18,12 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [inviteData, setInviteData] = useState(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
 
   useEffect(() => {
     saveTokenFromUrl?.();
     const token = localStorage.getItem('auth_token');
     if (token) navigate('/dashboard');
   }, [navigate]);
-
-  // Fetch invite details if invite token is present
-  useEffect(() => {
-    const fetchInviteDetails = async () => {
-      if (!inviteToken) return;
-
-      setInviteLoading(true);
-      try {
-        const res = await api.get(`/api/invites/${inviteToken}`);
-        setInviteData(res);
-        // Pre-fill email and role from invite
-        setFormData(prev => ({
-          ...prev,
-          email: res.email || prev.email,
-          role: res.role || prev.role
-        }));
-      } catch (err) {
-        setError('Invalid or expired invitation link');
-        console.error('Invite fetch error:', err);
-      } finally {
-        setInviteLoading(false);
-      }
-    };
-
-    fetchInviteDetails();
-  }, [inviteToken]);
 
   const googleUrl = useMemo(() => {
     const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
@@ -101,12 +70,7 @@ export default function SignUp() {
         role: formData.role,
       };
 
-      // Add invite token if present
-      if (inviteToken) {
-        payload.inviteToken = inviteToken;
-      }
-
-      const res = await api.post('/api/auth/register', payload, { credentials: 'include' });
+      const res = await api.post('/api/auth/register', payload);
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
@@ -186,11 +150,7 @@ export default function SignUp() {
             <TextField
               margin="normal" required fullWidth id="email" label="Email Address" name="email"
               type="email" autoComplete="email" value={formData.email}
-              onChange={handleChange} disabled={loading || inviteData}
-              InputProps={{
-                readOnly: !!inviteData,
-              }}
-              helperText={inviteData ? 'Email from invitation' : ''}
+              onChange={handleChange} disabled={loading}
             />
 
             <TextField
@@ -199,33 +159,24 @@ export default function SignUp() {
               value={formData.phone} onChange={handleChange} disabled={loading}
             />
 
-            {/* Role selection only shown for invite-based signup */}
-            {inviteToken && inviteData && (
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="role-select-label">Role</InputLabel>
-                <Select
-                  labelId="role-select-label"
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  label="Role"
-                  onChange={handleChange}
-                  disabled={true}
-                >
-                  <MenuItem value="PROPERTY_MANAGER">Property Manager</MenuItem>
-                  <MenuItem value="OWNER">Owner</MenuItem>
-                  <MenuItem value="TENANT">Tenant</MenuItem>
-                  <MenuItem value="TECHNICIAN">Technician</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-
-            {/* Show info text for non-invite signups */}
-            {!inviteToken && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                You are signing up as a Property Manager. Other roles require an invitation.
-              </Alert>
-            )}
+            {/* MINIMAL CHANGE: Add the Role selection dropdown */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="role-select-label">I am a...</InputLabel>
+              <Select
+                labelId="role-select-label"
+                id="role"
+                name="role"
+                value={formData.role}
+                label="I am a..."
+                onChange={handleChange}
+                disabled={loading}
+              >
+                <MenuItem value="PROPERTY_MANAGER">Property Manager</MenuItem>
+                <MenuItem value="OWNER">Owner</MenuItem>
+                <MenuItem value="TENANT">Tenant</MenuItem>
+                <MenuItem value="TECHNICIAN">Technician</MenuItem>
+              </Select>
+            </FormControl>
 
             <TextField
               margin="normal" required fullWidth name="password" label="Password"

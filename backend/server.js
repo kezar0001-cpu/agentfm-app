@@ -2,7 +2,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
 import propertyRoutes from './src/routes/index.js';
 dotenv.config();
 
@@ -35,34 +34,20 @@ const dynamicOriginMatchers = [
 
 const corsOptions = {
   origin(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowlist
     if (allowlist.has(origin)) return callback(null, true);
-    
-    // Check if origin matches dynamic patterns
     if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
       return callback(null, true);
     }
-    
-    // Log blocked origins for debugging
-    console.warn(`CORS blocked for origin: ${origin}`);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['set-cookie'],
-  // Explicitly enable preflight caching
-  maxAge: 86400, // 24 hours
-  // Ensure preflight requests succeed
-  preflightContinue: false,
-  optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
-app.use(cookieParser());
 app.use(express.json());
 
 // API routes

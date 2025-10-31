@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
-import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -36,64 +35,32 @@ const upload = multer({
 // ---
 
 /**
- * POST /uploads/single
+ * POST /uploads/single (Existing route, no changes)
  * FormData field name must be: "file"
  * Returns: { url: "/uploads/<filename>" }
- * Requires authentication
  */
-router.post('/single', requireAuth, upload.single('file'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
-    }
-    
-    const url = `/uploads/${req.file.filename}`;
-    console.log('✅ Uploaded by user', req.user.id, ':', req.file.originalname, '->', req.file.path);
-    res.status(201).json({ success: true, url });
-  } catch (error) {
-    console.error('Upload error:', error);
-    // Clean up file if it was saved
-    if (req.file?.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Failed to clean up file:', cleanupError);
-      }
-    }
-    res.status(500).json({ success: false, error: 'Upload failed' });
-  }
+router.post('/single', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const url = `/uploads/${req.file.filename}`;
+  console.log('✅ Uploaded:', req.file.originalname, '->', req.file.path);
+  res.status(201).json({ url });
 });
 
+// 👇 MINIMAL CHANGE: Added a new route to handle multiple file uploads.
 /**
  * POST /uploads/multiple
  * FormData field name must be: "files"
  * Returns: { urls: ["/uploads/<filename1>", "/uploads/<filename2>"] }
- * Requires authentication
  */
-router.post('/multiple', requireAuth, upload.array('files', 5), (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, error: 'No files uploaded' });
-    }
-    
-    const urls = req.files.map(file => `/uploads/${file.filename}`);
-    console.log(`✅ Uploaded ${req.files.length} files by user`, req.user.id);
-    res.status(201).json({ success: true, urls });
-  } catch (error) {
-    console.error('Multiple upload error:', error);
-    // Clean up any uploaded files
-    if (req.files) {
-      req.files.forEach(file => {
-        try {
-          fs.unlinkSync(file.path);
-        } catch (cleanupError) {
-          console.error('Failed to clean up file:', cleanupError);
-        }
-      });
-    }
-    res.status(500).json({ success: false, error: 'Upload failed' });
+router.post('/multiple', upload.array('files', 5), (req, res) => { // Handles up to 5 files
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'No files uploaded' });
   }
+  const urls = req.files.map(file => `/uploads/${file.filename}`);
+  console.log(`✅ Uploaded ${req.files.length} files`);
+  res.status(201).json({ urls });
 });
+// ---
 
 /** GET /uploads/ping -> { ok: true }  (sanity check) */
 router.get('/ping', (_req, res) => res.json({ ok: true }));

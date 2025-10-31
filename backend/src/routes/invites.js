@@ -30,8 +30,16 @@ const createInviteSchema = z.object({
  * POST /api/invites
  * Property Manager creates an invite for Owner, Technician, or Tenant
  */
-router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
+    // Only Property Managers can create invites
+    if (req.user.role !== 'PROPERTY_MANAGER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Property Managers can send invites',
+      });
+    }
+
     const { email, role, propertyId, unitId } = createInviteSchema.parse(req.body);
 
     // Check if user already exists
@@ -226,8 +234,15 @@ router.get('/:token', async (req, res) => {
  * GET /api/invites
  * Get all invites created by the authenticated Property Manager
  */
-router.get('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'PROPERTY_MANAGER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Property Managers can view invites',
+      });
+    }
+
     const invites = await prisma.invite.findMany({
       where: {
         invitedById: req.user.id,
@@ -266,8 +281,15 @@ router.get('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) =
  * DELETE /api/invites/:id
  * Cancel/delete a pending invite
  */
-router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'PROPERTY_MANAGER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Property Managers can delete invites',
+      });
+    }
+
     const { id } = req.params;
 
     const invite = await prisma.invite.findUnique({

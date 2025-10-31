@@ -7,17 +7,3 @@ node_modules/
 *.swp
 *.tmp
 .vercel
-backend/.env
-
-# Ignore environment secrets
-backend/.env
-
-# Ignore environment secrets
-backend/.env
-
-# Environment files
-.env
-*.env
-frontend/.env
-backend/.env
-nul

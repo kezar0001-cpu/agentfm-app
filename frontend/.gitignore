@@ -10,11 +10,3 @@ node_modules/
 .env.*
 !.env
 .vercel
-# Ignore local environment files
-*.env
-.env
-frontend/.env
-backend/.env
-
-# Windows ghost file
-nul

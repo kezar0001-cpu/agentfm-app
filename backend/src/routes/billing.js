@@ -1,4 +1,3 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
@@ -84,7 +83,7 @@ router.post('/checkout', async (req, res) => {
 
     let user;
     try {
-      user = jwt.verify(token, getJwtSecret());
+      user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     } catch {
       return res.status(401).json({ error: 'Invalid token' });
     }

@@ -25,12 +25,10 @@ import {
   Cancel as CancelIcon,
   Build as BuildIcon,
 } from '@mui/icons-material';
-import { useQuery, useMutation, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import ServiceRequestForm from '../components/ServiceRequestForm';
-import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
-import { CircularProgress } from '@mui/material';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
@@ -43,7 +41,6 @@ const ServiceRequestsPage = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [reviewDialog, setReviewDialog] = useState(null);
   const [convertDialog, setConvertDialog] = useState(null);
-  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Get user role (you'd get this from auth context)
   const userRole = 'PROPERTY_MANAGER'; // This should come from your auth context
@@ -54,43 +51,28 @@ const ServiceRequestsPage = () => {
   if (filters.category) queryParams.append('category', filters.category);
   if (filters.propertyId) queryParams.append('propertyId', filters.propertyId);
 
-  // Fetch service requests with infinite query
+  // Fetch service requests
   const {
-    data,
+    data: requests,
     isLoading,
     error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
     refetch,
-  } = useInfiniteQuery({
+  } = useQuery({
     queryKey: ['service-requests', filters],
-    queryFn: async ({ pageParam = 0 }) => {
-      const params = new URLSearchParams(queryParams);
-      params.append('limit', '50');
-      params.append('offset', pageParam.toString());
-      const response = await apiClient.get(`/service-requests?${params.toString()}`);
+    queryFn: async () => {
+      const response = await apiClient.get(`/service-requests?${queryParams.toString()}`);
       return response.data;
     },
-    getNextPageParam: (lastPage) => {
-      return lastPage.hasMore ? lastPage.page * 50 : undefined;
-    },
-    initialPageParam: 0,
   });
-
-  // Flatten all pages into a single array
-  const requests = data?.pages?.flatMap(page => page.items) || [];
 
   // Fetch properties for filter
-  const { data: propertiesData } = useQuery({
+  const { data: properties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
-      const response = await apiClient.get('/properties?limit=100&offset=0');
+      const response = await apiClient.get('/properties');
       return response.data;
     },
   });
-
-  const properties = propertiesData?.items || [];
 
   const requestList = Array.isArray(requests) ? requests : [];
   const propertyOptions = Array.isArray(properties) ? properties : [];
@@ -293,9 +275,8 @@ const ServiceRequestsPage = () => {
           }
         />
       ) : (
-        <Stack spacing={3}>
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            {requestList.map((request) => {
+        <Grid container spacing={{ xs: 2, md: 3 }}>
+          {requestList.map((request) => {
             const description = typeof request.description === 'string' ? request.description : '';
             const displayDescription = description
               ? description.length > 100
@@ -315,13 +296,11 @@ const ServiceRequestsPage = () => {
                     flexDirection: 'column',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     borderRadius: 3,
-                    cursor: 'pointer',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 4,
                     },
                   }}
-                  onClick={() => setSelectedRequest(request.id)}
                 >
                   <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     <Box>
@@ -448,25 +427,9 @@ const ServiceRequestsPage = () => {
                   )}
                 </Card>
               </Grid>
-              );
-            })}
-          </Grid>
-
-          {/* Load More Button */}
-          {hasNextPage && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
-              >
-                {isFetchingNextPage ? 'Loading...' : 'Load More'}
-              </Button>
-            </Box>
-          )}
-        </Stack>
+            );
+          })}
+        </Grid>
       )}
 
       {/* Create Dialog */}
@@ -505,13 +468,6 @@ const ServiceRequestsPage = () => {
           }}
         />
       )}
-
-      {/* Service Request Detail Modal */}
-      <ServiceRequestDetailModal
-        requestId={selectedRequest}
-        open={!!selectedRequest}
-        onClose={() => setSelectedRequest(null)}
-      />
     </Container>
   );
 };

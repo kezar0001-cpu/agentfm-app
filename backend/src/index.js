@@ -1,3 +1,4 @@
+console.log('>>> STARTING index.js - Webhook Fix Deployed <<<');
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -6,17 +7,10 @@ import session from 'express-session';
 import passport from 'passport';
 import path from 'path';
 import fs from 'fs';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import mongoSanitize from 'express-mongo-sanitize';
-import compression from 'compression';
 import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
-import logger from './utils/logger.js';
 
 // ---- Load env
 dotenv.config();
-
-logger.info('>>> STARTING AgentFM Backend <<<');
 
 // ---- Prisma (re-exported for backwards compatibility)
 export { prismaInstance as prisma };
@@ -27,50 +21,6 @@ const PORT = process.env.PORT || 3000;
 
 // Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);
-
-// ---- Security Middleware
-// Helmet helps secure Express apps by setting various HTTP headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  crossOriginEmbedderPolicy: false, // Allow embedding for OAuth
-}));
-
-// Rate limiting to prevent brute force attacks
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Apply rate limiting to all API routes
-app.use('/api/', limiter);
-
-// Stricter rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: 'Too many authentication attempts, please try again later.',
-  skipSuccessfulRequests: true,
-});
-
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
-
-// Data sanitization against NoSQL query injection
-app.use(mongoSanitize());
-
-// Compression middleware
-app.use(compression());
 
 // ---- CORS
 const allowlist = new Set(
@@ -141,7 +91,7 @@ import authRoutes from './routes/auth.js';
 import billingRoutes, { webhook as stripeWebhook } from './routes/billing.js';
 import propertiesRoutes from './routes/properties.js';
 import tenantsRoutes from './routes/tenants.js';
-// import maintenanceRoutes from './routes/maintenance.js'; // DISABLED: Uses non-existent models, use serviceRequests instead
+import maintenanceRoutes from './routes/maintenance.js';
 import unitsRoutes from './routes/units.js';
 import jobsRoutes from './routes/jobs.js';
 import inspectionsRoutes from './routes/inspections.js';
@@ -154,8 +104,6 @@ import dashboardRoutes from './routes/dashboard.js';
 import serviceRequestsRoutes from './routes/serviceRequests.js';
 import usersRouter from './routes/users.js';
 import invitesRoutes from './routes/invites.js';
-import notificationsRoutes from './routes/notifications.js';
-import searchRoutes from './routes/search.js';
 
 // ===================================================================
 //
@@ -174,7 +122,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/billing', billingRoutes); // This will now correctly ignore the webhook path
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/tenants', tenantsRoutes);
-// app.use('/api/maintenance', maintenanceRoutes); // DISABLED: Uses non-existent models, use /api/service-requests instead
+app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/units', unitsRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/inspections', inspectionsRoutes);
@@ -187,32 +135,16 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/service-requests', serviceRequestsRoutes);
 app.use('/api/users', usersRouter);
 app.use('/api/invites', invitesRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/search', searchRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    const healthData = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      database: 'connected',
-      memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-      }
-    };
-    res.json(healthData);
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(503).json({ 
-      status: 'unhealthy', 
-      timestamp: new Date().toISOString(),
-      error: 'Database connection failed' 
-    });
+    console.error('Health check failed:', error);
+    res.status(500).json({ status: 'error', message: 'Database connection failed' });
   }
 });
 
@@ -221,48 +153,32 @@ app.get('/', (_req, res) => {
 });
 
 app.use('*', (req, res) => {
-  logger.warn(`404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-app.use((err, req, res, _next) => {
-  logger.error('Unhandled error:', {
-    error: err.message,
-    stack: err.stack,
-    url: req.originalUrl,
-    method: req.method,
-    ip: req.ip
-  });
-  
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err);
   if (res.headersSent) {
     return;
   }
-  
   const status = err.statusCode || err.status || 500;
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal server error' 
-    : err.message || 'Internal server error';
-    
   res.status(status).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    message: err.message || 'Internal server error',
   });
 });
 
 async function startServer() {
   try {
     const server = app.listen(PORT, () => {
-      logger.info(`✅ AgentFM backend listening on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
+      console.log(`✅ AgentFM backend listening on port ${PORT}`);
     });
 
     let shuttingDown = false;
     const shutdown = async (signal) => {
       if (shuttingDown) return;
       shuttingDown = true;
-      logger.info(`Received ${signal}. Shutting down gracefully...`);
+      console.log(`Received ${signal}. Shutting down gracefully...`);
       const closeServer = new Promise((resolve) => {
         server.close(() => {
           resolve();
@@ -270,10 +186,10 @@ async function startServer() {
       });
       try {
         await Promise.allSettled([closeServer, prisma.$disconnect()]);
-        logger.info('Shutdown complete. Goodbye!');
+        console.log('Shutdown complete. Goodbye!');
         process.exit(0);
       } catch (error) {
-        logger.error('Error during shutdown:', error);
+        console.error('Error during shutdown:', error);
         process.exit(1);
       }
     };
@@ -281,21 +197,9 @@ async function startServer() {
     process.on('SIGINT', () => shutdown('SIGINT'));
     process.on('SIGTERM', () => shutdown('SIGTERM'));
   } catch (error) {
-    logger.error('❌ Failed to start AgentFM backend:', error);
+    console.error('❌ Failed to start AgentFM backend:', error);
     process.exit(1);
   }
 }
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 startServer();
