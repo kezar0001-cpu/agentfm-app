@@ -1,66 +1,75 @@
 // frontend/src/lib/auth.js
+import { api } from '../api.js';
+
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
 export const USER_UPDATED_EVENT = 'agentfm:user-updated';
 
-export function broadcastUserUpdate(user) {
-  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
-    return;
+function dispatchUserUpdated(user) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  try {
+    const detail = user ?? null;
+    window.dispatchEvent(new CustomEvent(USER_UPDATED_EVENT, { detail }));
+  } catch (error) {
+    console.error('Failed to dispatch user update event:', error);
   }
-
-  let event;
-  if (typeof window.CustomEvent === 'function') {
-    event = new window.CustomEvent(USER_UPDATED_EVENT, { detail: user });
-  } else {
-    event = new Event(USER_UPDATED_EVENT);
-    try {
-      Object.defineProperty(event, 'detail', {
-        configurable: true,
-        enumerable: true,
-        value: user,
-      });
-    } catch {
-      event.detail = user;
-    }
-  }
-
-  window.dispatchEvent(event);
 }
 
-export async function api(endpoint, options = {}) {
-  const { json, ...fetchOptions } = options;
+export function setCurrentUser(user) {
+  try {
+    if (user) {
+      const serialised = typeof user === 'string' ? user : JSON.stringify(user);
+      localStorage.setItem('user', serialised);
+      const parsed = typeof user === 'string'
+        ? (() => { try { return JSON.parse(user); } catch { return null; } })()
+        : user;
+      dispatchUserUpdated(parsed ?? null);
+      return parsed ?? null;
+    }
 
-  let url = endpoint;
-  if (!endpoint?.startsWith('http')) {
-    const path = endpoint.startsWith('/api')
-      ? endpoint
-      : `/api${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-    url = API_BASE ? `${API_BASE}${path}` : path;
+    localStorage.removeItem('user');
+  } catch (error) {
+    console.error('Failed to persist user data:', error);
   }
 
-  const headers = { ...(fetchOptions.headers || {}) };
-  if (json !== undefined) headers['Content-Type'] = 'application/json';
+  dispatchUserUpdated(null);
+  return null;
+}
 
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+export function getAuthToken() {
+  try {
+    return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  } catch (error) {
+    console.error('Failed to read auth token from storage:', error);
+    return null;
+  }
+}
 
-  const config = { ...fetchOptions, headers, credentials: 'include' };
-  if (json !== undefined) config.body = JSON.stringify(json);
+export function saveAuthToken(token) {
+  if (!token) {
+    removeAuthToken();
+    return null;
+  }
 
   try {
-    const response = await fetch(url, config);
-    const text = await response.text();
-    let data;
-    try { data = text ? JSON.parse(text) : undefined; } catch {}
-    if (!response.ok) {
-      const message = data?.message || data?.error || text || `HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    return data ?? text;
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('token', token);
   } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+    console.error('Failed to persist auth token:', error);
   }
+
+  return token;
+}
+
+export function removeAuthToken() {
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
+  } catch (error) {
+    console.error('Failed to clear auth token:', error);
+  }
+
+  setCurrentUser(null);
 }
 
 export function portalPathForRole(role) {
@@ -82,20 +91,14 @@ export function saveTokenFromUrl(autoRedirect = true) {
     const userParam = u.searchParams.get('user');
     if (!token) return false;
 
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('token', token);
+    saveAuthToken(token);
 
     if (userParam) {
       try {
         const decoded = decodeURIComponent(userParam);
-        localStorage.setItem('user', decoded);
-        try {
-          broadcastUserUpdate(JSON.parse(decoded));
-        } catch {
-          broadcastUserUpdate(getCurrentUser());
-        }
-      } catch {
-        broadcastUserUpdate(getCurrentUser());
+        setCurrentUser(decoded);
+      } catch (error) {
+        console.error('Failed to restore user from URL parameter:', error);
       }
     } else if (!localStorage.getItem('user')) {
       const meUrl = API_BASE ? `${API_BASE}/api/auth/me` : '/api/auth/me';
@@ -105,8 +108,7 @@ export function saveTokenFromUrl(autoRedirect = true) {
           if (!t) return;
           let payload; try { payload = JSON.parse(t); } catch { return; }
           if (payload?.user) {
-            localStorage.setItem('user', JSON.stringify(payload.user));
-            broadcastUserUpdate(payload.user);
+            setCurrentUser(payload.user);
             const target = portalPathForRole(payload.user.role);
             const here = window.location.pathname;
             if (autoRedirect && !here.startsWith(target)) window.location.replace(target);
@@ -132,60 +134,44 @@ export function getCurrentUser() {
   const userStr = localStorage.getItem('user'); if (!userStr) return null;
   try { return JSON.parse(userStr); } catch (e) { console.error('Error parsing user data:', e); return null; }
 }
-
-export function setCurrentUser(user) {
-  if (!user) {
-    localStorage.removeItem('user');
-  } else {
-    localStorage.setItem('user', JSON.stringify(user));
-  }
-  broadcastUserUpdate(user);
-}
-
-export function saveAuthToken(token) {
-  if (!token) return;
-  localStorage.setItem('auth_token', token);
-  localStorage.setItem('token', token);
-}
-
-export function removeAuthToken() {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  sessionStorage.clear();
-  broadcastUserUpdate(null);
-}
-
 export async function logout() {
   try {
     // Using the api helper function for consistency, though fetch works too
-    await api('/auth/logout', { method: 'POST' });
+    await api.post('/auth/logout', undefined, { credentials: 'include' });
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
+  sessionStorage.clear();
   removeAuthToken();
 }
-export function getAuthToken() { return localStorage.getItem('auth_token') || localStorage.getItem('token'); }
 
 /**
  * Fetches the latest user data from the server and updates localStorage.
  * This is useful after events like subscription changes.
  */
 export async function refreshCurrentUser() {
+  const token = getAuthToken();
+  if (!token) {
+    console.warn('Cannot refresh user without an auth token.');
+    removeAuthToken();
+    return null;
+  }
+
   try {
-    const data = await api('/auth/me'); // Use the api helper
-    if (data?.user) {
-      localStorage.setItem('user', JSON.stringify(data.user));
-      broadcastUserUpdate(data.user);
-      return data.user;
+    const data = await api.get('/auth/me');
+    const user = data?.user ?? data ?? null;
+
+    if (user) {
+      return setCurrentUser(user);
     }
+
+    removeAuthToken();
     return null;
   } catch (error) {
-    console.error("Failed to refresh user data:", error);
-    // If token is invalid, the api helper might throw an error.
-    // A 401 status would indicate we should log the user out.
-    if (error.message.includes('401')) {
-      await logout();
-      window.location.href = '/signin';
+    console.error('Failed to refresh user data:', error);
+
+    if (error?.status === 401) {
+      removeAuthToken();
     }
+
     return null;
   }
 }

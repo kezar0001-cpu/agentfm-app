@@ -1,24 +1,30 @@
 import express from 'express';
 import { z } from 'zod';
+import validate from '../middleware/validate.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import { prisma } from '../config/prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import { notifyJobAssigned, notifyJobCompleted, notifyJobStarted, notifyJobReassigned } from '../utils/notificationService.js';
 
 const router = express.Router();
-
-router.use(requireAuth);
 
 const STATUSES = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 const jobCreateSchema = z.object({
-  propertyId: z.string().min(1, 'Property ID is required'),
-  unitId: z.string().optional().nullable(),
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().min(1, 'Description is required'),
+  propertyId: z.string().min(1),
+  unitId: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().min(1),
   priority: z.enum(PRIORITIES).optional().default('MEDIUM'),
-  scheduledStart: z.string().datetime().optional().nullable(),
-  scheduledEnd: z.string().datetime().optional().nullable(),
-  assignedToId: z.string().optional().nullable(),
+  scheduledDate: z
+    .string()
+    .optional()
+    .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
+      message: 'scheduledDate must be a valid ISO date string',
+    }),
+  assignedToId: z.string().optional(),
+  estimatedCost: z.number().optional(),
+  notes: z.string().optional(),
 });
 
 const jobUpdateSchema = z.object({
@@ -26,30 +32,46 @@ const jobUpdateSchema = z.object({
   description: z.string().min(1).optional(),
   status: z.enum(STATUSES).optional(),
   priority: z.enum(PRIORITIES).optional(),
-  scheduledStart: z.string().datetime().optional().nullable(),
-  scheduledEnd: z.string().datetime().optional().nullable(),
+  scheduledDate: z
+    .string()
+    .optional()
+    .refine((value) => value === undefined || !Number.isNaN(Date.parse(value)), {
+      message: 'scheduledDate must be a valid ISO date string',
+    }),
   assignedToId: z.string().optional().nullable(),
-  actualStart: z.string().datetime().optional().nullable(),
-  actualEnd: z.string().datetime().optional().nullable(),
+  estimatedCost: z.number().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
-// GET /api/jobs - Get all jobs
-router.get('/', async (req, res) => {
+// GET / - List jobs (role-based filtering)
+router.get('/', requireAuth, async (req, res) => {
   try {
     const { status, propertyId, assignedToId } = req.query;
 
+    // Build where clause based on filters and user role
     const where = {};
 
-    // Filter by organization through property
+    // Role-based filtering
     if (req.user.role === 'TECHNICIAN') {
-      // Technicians see only their assigned jobs
+      // Technicians only see jobs assigned to them
       where.assignedToId = req.user.id;
-    } else {
-      // Admins/managers see all jobs for their org
-      // We need to join through property to check orgId
-      // For now, we'll fetch all and filter (not ideal for large datasets)
+    } else if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers see jobs for their properties
+      where.property = {
+        managerId: req.user.id,
+      };
+    } else if (req.user.role === 'OWNER') {
+      // Owners see jobs for properties they own
+      where.property = {
+        owners: {
+          some: {
+            ownerId: req.user.id,
+          },
+        },
+      };
     }
 
+    // Apply query filters
     if (status) {
       where.status = status;
     }
@@ -58,355 +80,559 @@ router.get('/', async (req, res) => {
       where.propertyId = propertyId;
     }
 
-    if (assignedToId) {
+    if (assignedToId && (req.user.role === 'PROPERTY_MANAGER' || req.user.role === 'OWNER')) {
+      // Only managers and owners can filter by assignedToId
       where.assignedToId = assignedToId;
     }
 
-    const jobs = await prisma.job.findMany({
-      where,
-      include: {
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { scheduledStart: 'asc' },
-        { createdAt: 'desc' }
-      ]
-    });
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
-    // Filter by orgId if not a technician
-    let filteredJobs = jobs;
-    if (req.user.role !== 'TECHNICIAN') {
-      const orgProperties = await prisma.property.findMany({
-        where: { orgId: req.user.orgId },
-        select: { id: true }
-      });
-      const propertyIds = new Set(orgProperties.map(p => p.id));
-      filteredJobs = jobs.filter(job => propertyIds.has(job.propertyId));
-    }
+    // Fetch jobs and total count in parallel
+    const [jobs, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              state: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.job.count({ where }),
+    ]);
 
-    res.json({ 
-      success: true, 
-      jobs: filteredJobs 
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    res.json({
+      items: jobs,
+      total,
+      page,
+      hasMore,
     });
   } catch (error) {
-    console.error('Get jobs error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch jobs' 
-    });
+    console.error('Error fetching jobs:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch jobs' });
   }
 });
 
-// POST /api/jobs - Create a new job
-router.post('/', async (req, res) => {
+// POST / - Create job (PROPERTY_MANAGER only, requires active subscription)
+router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubscription, validate(jobCreateSchema), async (req, res) => {
   try {
-    const parsed = jobCreateSchema.safeParse(req.body);
+    const { propertyId, unitId, title, description, priority, scheduledDate, assignedToId, estimatedCost, notes } = req.body;
     
-    if (!parsed.success) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Validation error',
-        errors: parsed.error.errors
-      });
-    }
-
-    const { propertyId, unitId, assignedToId, ...jobData } = parsed.data;
-
-    // Verify property exists and user has access
-    const property = await prisma.property.findFirst({
-      where: {
-        id: propertyId,
-        orgId: req.user.orgId
-      }
+    // Verify property exists
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
     });
-
+    
     if (!property) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Property not found or access denied' 
-      });
+      return res.status(404).json({ success: false, message: 'Property not found' });
     }
-
-    // Verify unit if provided
+    
+    // Verify unit exists if provided
     if (unitId) {
-      const unit = await prisma.unit.findFirst({
-        where: {
-          id: unitId,
-          propertyId
-        }
+      const unit = await prisma.unit.findUnique({
+        where: { id: unitId },
       });
-
+      
       if (!unit) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Unit not found' 
-        });
+        return res.status(404).json({ success: false, message: 'Unit not found' });
       }
     }
-
-    // Verify assigned user if provided
+    
+    // Verify assigned user exists if provided
     if (assignedToId) {
       const assignedUser = await prisma.user.findUnique({
-        where: { id: assignedToId }
+        where: { id: assignedToId },
       });
-
+      
       if (!assignedUser) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Assigned user not found' 
-        });
-      }
-
-      // Check if user is a technician or admin
-      if (!['TECHNICIAN', 'ADMIN', 'PROPERTY_MANAGER'].includes(assignedUser.role)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Can only assign jobs to technicians, admins, or property managers' 
-        });
+        return res.status(404).json({ success: false, message: 'Assigned user not found' });
       }
     }
-
-    // Create the job
+    
+    // Create job
     const job = await prisma.job.create({
       data: {
-        ...jobData,
+        title,
+        description,
+        priority: priority || 'MEDIUM',
+        status: 'OPEN',
         propertyId,
         unitId: unitId || null,
         assignedToId: assignedToId || null,
-        status: assignedToId ? 'ASSIGNED' : 'OPEN'
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        estimatedCost: estimatedCost || null,
+        notes: notes || null,
       },
       include: {
-        assignedTo: {
+        property: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
-    });
-
-    res.status(201).json({ 
-      success: true, 
-      job 
-    });
-  } catch (error) {
-    console.error('Create job error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to create job' 
-    });
-  }
-});
-
-// GET /api/jobs/:id - Get a specific job
-router.get('/:id', async (req, res) => {
-  try {
-    const job = await prisma.job.findUnique({
-      where: { id: req.params.id },
-      include: {
+            address: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
         assignedTo: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
-            phone: true
-          }
-        }
+          },
+        },
+      },
+    });
+    
+    // Send notification if job is assigned
+    if (job.assignedToId && job.assignedTo) {
+      try {
+        await notifyJobAssigned(job, job.assignedTo, job.property);
+      } catch (notifError) {
+        console.error('Failed to send job assignment notification:', notifError);
+        // Don't fail the job creation if notification fails
       }
-    });
-
-    if (!job) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Job not found' 
-      });
     }
-
-    // Verify user has access (through property orgId)
-    const property = await prisma.property.findFirst({
-      where: {
-        id: job.propertyId,
-        orgId: req.user.orgId
-      }
-    });
-
-    if (!property && req.user.role !== 'TECHNICIAN') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied' 
-      });
-    }
-
-    // Technicians can only see their own jobs
-    if (req.user.role === 'TECHNICIAN' && job.assignedToId !== req.user.id) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied' 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      job 
-    });
+    
+    res.status(201).json(job);
   } catch (error) {
-    console.error('Get job error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch job' 
-    });
+    console.error('Error creating job:', error);
+    res.status(500).json({ success: false, message: 'Failed to create job' });
   }
 });
 
-// PATCH /api/jobs/:id - Update a job
-router.patch('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const parsed = jobUpdateSchema.safeParse(req.body);
+    const { id } = req.params;
     
-    if (!parsed.success) {
-      return res.status(400).json({ 
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+            managerId: true,
+            owners: {
+              select: { ownerId: true },
+            },
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Access control: Check user has permission to view this job
+    let hasAccess = false;
+    
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers can view jobs for properties they manage
+      hasAccess = job.property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      // Owners can view jobs for properties they own
+      hasAccess = job.property.owners?.some(o => o.ownerId === req.user.id);
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians can view jobs assigned to them
+      hasAccess = job.assignedToId === req.user.id;
+    } else if (req.user.role === 'TENANT') {
+      // Tenants cannot view jobs directly (they use service requests)
+      hasAccess = false;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ 
         success: false, 
-        message: 'Validation error',
-        errors: parsed.error.errors
+        message: 'Access denied. You do not have permission to view this job.' 
       });
     }
+    
+    // Remove sensitive fields before sending response
+    const { property, ...jobData } = job;
+    const { managerId, owners, ...propertyData } = property;
+    
+    res.json({
+      ...jobData,
+      property: propertyData,
+    });
+  } catch (error) {
+    console.error('Error fetching job:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch job' });
+  }
+});
 
-    // Find existing job
+// PATCH /:id - Update job (PROPERTY_MANAGER and TECHNICIAN can update)
+router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'), validate(jobUpdateSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Check if job exists
     const existingJob = await prisma.job.findUnique({
-      where: { id: req.params.id }
+      where: { id },
+      include: {
+        property: true,
+      },
     });
-
+    
     if (!existingJob) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Job not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Job not found' });
     }
-
-    // Verify user has access
-    const property = await prisma.property.findFirst({
-      where: {
-        id: existingJob.propertyId,
-        orgId: req.user.orgId
-      }
-    });
-
-    if (!property && req.user.role !== 'TECHNICIAN') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied' 
-      });
-    }
-
-    // Technicians can only update their own jobs
-    if (req.user.role === 'TECHNICIAN' && existingJob.assignedToId !== req.user.id) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied' 
-      });
-    }
-
-    // Verify assigned user if being changed
-    if (parsed.data.assignedToId !== undefined && parsed.data.assignedToId !== null) {
-      const assignedUser = await prisma.user.findUnique({
-        where: { id: parsed.data.assignedToId }
-      });
-
-      if (!assignedUser) {
-        return res.status(404).json({ 
+    
+    // Access control: Technicians can only update jobs assigned to them
+    if (req.user.role === 'TECHNICIAN') {
+      if (existingJob.assignedToId !== req.user.id) {
+        return res.status(403).json({ 
           success: false, 
-          message: 'Assigned user not found' 
+          message: 'You can only update jobs assigned to you' 
+        });
+      }
+      
+      // Technicians can only update status, notes, and evidence
+      const allowedFields = ['status', 'notes', 'actualCost', 'evidence'];
+      const requestedFields = Object.keys(updates);
+      const unauthorizedFields = requestedFields.filter(f => !allowedFields.includes(f));
+      
+      if (unauthorizedFields.length > 0) {
+        return res.status(403).json({ 
+          success: false, 
+          message: `Technicians can only update: ${allowedFields.join(', ')}` 
         });
       }
     }
-
-    // Update the job
+    
+    // Property managers can only update jobs for their properties
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      if (existingJob.property.managerId !== req.user.id) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You can only update jobs for your properties' 
+        });
+      }
+    }
+    
+    // Prepare update data
+    const updateData = {};
+    
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.priority !== undefined) updateData.priority = updates.priority;
+    if (updates.scheduledDate !== undefined) {
+      updateData.scheduledDate = updates.scheduledDate ? new Date(updates.scheduledDate) : null;
+    }
+    if (updates.assignedToId !== undefined) updateData.assignedToId = updates.assignedToId;
+    if (updates.estimatedCost !== undefined) updateData.estimatedCost = updates.estimatedCost;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    
+    // If status is being set to COMPLETED, set completedDate
+    if (updates.status === 'COMPLETED' && !existingJob.completedDate) {
+      updateData.completedDate = new Date();
+    }
+    
+    // Update job
     const job = await prisma.job.update({
-      where: { id: req.params.id },
-      data: parsed.data,
+      where: { id },
+      data: updateData,
       include: {
-        assignedTo: {
+        property: {
           select: {
             id: true,
             name: true,
-            email: true
+            address: true,
+            managerId: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    
+    // Send notifications for various events
+    try {
+      // Job assignment notification
+      if (updates.assignedToId !== undefined && updates.assignedToId !== existingJob.assignedToId) {
+        if (updates.assignedToId && job.assignedTo) {
+          // New assignment or reassignment
+          if (existingJob.assignedToId) {
+            // Reassignment - notify both old and new technician
+            const previousTechnician = await prisma.user.findUnique({
+              where: { id: existingJob.assignedToId },
+              select: { id: true, firstName: true, lastName: true, email: true },
+            });
+            if (previousTechnician) {
+              await notifyJobReassigned(job, previousTechnician, job.assignedTo, job.property);
+            }
+          } else {
+            // New assignment
+            await notifyJobAssigned(job, job.assignedTo, job.property);
           }
         }
       }
-    });
-
-    res.json({ 
-      success: true, 
-      job 
-    });
+      
+      // Job completion notification
+      if (updates.status === 'COMPLETED' && existingJob.status !== 'COMPLETED') {
+        // Notify property manager
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+          
+          const technician = job.assignedTo || { firstName: 'Unknown', lastName: 'Technician' };
+          
+          if (manager) {
+            await notifyJobCompleted(job, technician, job.property, manager);
+          }
+        }
+      }
+      
+      // Job started notification
+      if (updates.status === 'IN_PROGRESS' && existingJob.status !== 'IN_PROGRESS') {
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+          
+          if (manager) {
+            await notifyJobStarted(job, job.property, manager);
+          }
+        }
+      }
+    } catch (notifError) {
+      console.error('Failed to send job notification:', notifError);
+      // Don't fail the job update if notification fails
+    }
+    
+    res.json(job);
   } catch (error) {
-    console.error('Update job error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to update job' 
-    });
+    console.error('Error updating job:', error);
+    res.status(500).json({ success: false, message: 'Failed to update job' });
   }
 });
 
-// DELETE /api/jobs/:id - Delete a job
-router.delete('/:id', async (req, res) => {
+// DELETE /:id - Delete job (PROPERTY_MANAGER only)
+router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const job = await prisma.job.findUnique({
-      where: { id: req.params.id }
+    const { id } = req.params;
+    
+    // Check if job exists
+    const existingJob = await prisma.job.findUnique({
+      where: { id },
     });
-
-    if (!job) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Job not found' 
-      });
+    
+    if (!existingJob) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
     }
-
-    // Verify user has access
-    const property = await prisma.property.findFirst({
-      where: {
-        id: job.propertyId,
-        orgId: req.user.orgId
-      }
-    });
-
-    if (!property) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied' 
-      });
-    }
-
-    // Don't allow deletion of completed jobs
-    if (job.status === 'COMPLETED') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete completed jobs. Consider cancelling instead.'
-      });
-    }
-
+    
+    // Delete job
     await prisma.job.delete({
-      where: { id: req.params.id }
+      where: { id },
     });
-
-    res.json({ 
-      success: true, 
-      message: 'Job deleted successfully' 
-    });
+    
+    res.json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
-    console.error('Delete job error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to delete job' 
+    console.error('Error deleting job:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete job' });
+  }
+});
+
+// ========================================
+// JOB COMMENTS
+// ========================================
+
+const commentSchema = z.object({
+  content: z.string().min(1, 'Comment cannot be empty').max(2000, 'Comment too long'),
+});
+
+// GET /:id/comments - Get all comments for a job
+router.get('/:id/comments', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if job exists and user has access
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            managerId: true,
+            owners: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
     });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Check access based on role
+    const hasAccess = 
+      req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
+      req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
+      req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Fetch comments
+    const comments = await prisma.jobComment.findMany({
+      where: { jobId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    
+    res.json({ success: true, comments });
+  } catch (error) {
+    console.error('Error fetching job comments:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch comments' });
+  }
+});
+
+// POST /:id/comments - Add a comment to a job
+router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    
+    // Check if job exists and user has access
+    const job = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            managerId: true,
+            owners: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+    
+    // Check access based on role
+    const hasAccess = 
+      req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
+      req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
+      req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Create comment
+    const comment = await prisma.jobComment.create({
+      data: {
+        jobId: id,
+        userId: req.user.id,
+        content,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+    
+    res.status(201).json({ success: true, comment });
+  } catch (error) {
+    console.error('Error creating job comment:', error);
+    res.status(500).json({ success: false, message: 'Failed to create comment' });
   }
 });
 

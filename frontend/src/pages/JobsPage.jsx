@@ -306,8 +306,6 @@ const JobsPage = () => {
                 fullWidth
                 id="jobs-filter-status"
                 name="status"
-                inputProps={{ id: 'jobs-filter-status', name: 'status' }}
-                InputLabelProps={{ htmlFor: 'jobs-filter-status' }}
                 label="Status"
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -327,8 +325,6 @@ const JobsPage = () => {
                 fullWidth
                 id="jobs-filter-priority"
                 name="priority"
-                inputProps={{ id: 'jobs-filter-priority', name: 'priority' }}
-                InputLabelProps={{ htmlFor: 'jobs-filter-priority' }}
                 label="Priority"
                 value={filters.priority}
                 onChange={(e) => handleFilterChange('priority', e.target.value)}
@@ -347,8 +343,6 @@ const JobsPage = () => {
                 fullWidth
                 id="jobs-filter-property"
                 name="propertyId"
-                inputProps={{ id: 'jobs-filter-property', name: 'propertyId' }}
-                InputLabelProps={{ htmlFor: 'jobs-filter-property' }}
                 label="Property"
                 value={filters.propertyId}
                 onChange={(e) => handleFilterChange('propertyId', e.target.value)}
@@ -368,8 +362,6 @@ const JobsPage = () => {
                 fullWidth
                 id="jobs-filter-quick"
                 name="filter"
-                inputProps={{ id: 'jobs-filter-quick', name: 'filter' }}
-                InputLabelProps={{ htmlFor: 'jobs-filter-quick' }}
                 label="Quick Filter"
                 value={filters.filter}
                 onChange={(e) => handleFilterChange('filter', e.target.value)}

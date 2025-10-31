@@ -1,7 +1,7 @@
 // frontend/src/components/GlobalGuard.jsx
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getAuthToken, broadcastUserUpdate } from '../lib/auth.js';
+import { getAuthToken, setCurrentUser } from '../lib/auth.js';
 import { api } from '../api.js';
 
 const PUBLIC_PATHS = new Set(['/signin', '/signup']);
@@ -24,8 +24,7 @@ export default function GlobalGuard() {
         const user = data?.user;
         if (!user) return;
 
-        localStorage.setItem('user', JSON.stringify(user));
-        broadcastUserUpdate(user);
+        setCurrentUser(user);
         const trialEndDate = user.trialEndDate ? new Date(user.trialEndDate) : null;
         const trialActive =
           user.subscriptionStatus === 'TRIAL' && (!trialEndDate || trialEndDate.getTime() > Date.now());

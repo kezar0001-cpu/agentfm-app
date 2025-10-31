@@ -148,8 +148,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-title"
               name="title"
-              inputProps={{ id: 'service-request-form-title', name: 'title' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-title' }}
               fullWidth
               label="Title"
               value={formData.title}
@@ -165,8 +163,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-description"
               name="description"
-              inputProps={{ id: 'service-request-form-description', name: 'description' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-description' }}
               fullWidth
               label="Description"
               value={formData.description}
@@ -184,8 +180,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-category"
               name="category"
-              inputProps={{ id: 'service-request-form-category', name: 'category' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-category' }}
               select
               fullWidth
               label="Category"
@@ -211,8 +205,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-priority"
               name="priority"
-              inputProps={{ id: 'service-request-form-priority', name: 'priority' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-priority' }}
               select
               fullWidth
               label="Priority"
@@ -231,8 +223,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-property"
               name="propertyId"
-              inputProps={{ id: 'service-request-form-property', name: 'propertyId' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-property' }}
               select
               fullWidth
               label="Property"
@@ -255,8 +245,6 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
             <TextField
               id="service-request-form-unit"
               name="unitId"
-              inputProps={{ id: 'service-request-form-unit', name: 'unitId' }}
-              InputLabelProps={{ htmlFor: 'service-request-form-unit' }}
               select
               fullWidth
               label="Unit"

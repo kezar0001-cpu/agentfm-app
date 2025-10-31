@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -739,7 +739,7 @@ export default function PropertyDetailPage() {
                                 {activity.description}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {formatDate(activity.date)} • {activity.type.replace(/_/g, ' ')}
+                                {new Date(activity.date).toLocaleString()} • {activity.type.replace(/_/g, ' ')}
                               </Typography>
                             </Box>
                           }

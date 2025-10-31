@@ -2,253 +2,252 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prismaClient.js';
-import { requireAuth as authMiddleware } from '../middleware/auth.js';
-import { requireRole, ROLES } from '../../middleware/roleAuth.js';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
+import unitsRouter from './units.js';
 
 const router = Router();
-const F_MINIMAL = process.env.PROPS_MINIMAL === '1';
 
-// --- Helpers ---
-const uploadPath = path.join(process.cwd(), 'uploads');
-const absoluteUploadPath = path.resolve(uploadPath);
-const fsp = fs.promises;
+// All property routes require authentication
+router.use(requireAuth);
 
-const ensureUserOrg = async (user, client = prisma) => {
-  if (!user) throw new Error('User context is required');
+// Nested units routes
+router.use('/:id/units', unitsRouter);
 
-  if (user.orgId && typeof user.orgId === 'string') {
-    const found = await client.org.findUnique({ where: { id: user.orgId }, select: { id: true } });
-    if (found) return found.id;
-  }
+// ---------------------------------------------------------------------------
+// Zod helpers
+// ---------------------------------------------------------------------------
+const trimToNull = (value) => {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
 
-  const orgId = await client.$transaction(async (tx) => {
-    const fresh = await tx.user.findUnique({ where: { id: user.id }, select: { orgId: true, company: true, name: true } });
-    if (fresh?.orgId) {
-      const chk = await tx.org.findUnique({ where: { id: fresh.orgId }, select: { id: true } });
-      if (chk) return chk.id;
-    }
-    const orgName = (fresh?.company?.trim() || fresh?.name?.trim() || 'New Organization');
-    const org = await tx.org.create({ data: { name: orgName }, select: { id: true } });
-    await tx.user.update({ where: { id: user.id }, data: { orgId: org.id } });
-    return org.id;
+const requiredString = (message) =>
+  z.preprocess((value) => (typeof value === 'string' ? value.trim() : value), z.string().min(1, message));
+
+const optionalString = () =>
+  z.preprocess((value) => trimToNull(value), z.string().min(1).nullable().optional());
+
+const optionalUrl = () =>
+  z
+    .preprocess((value) => trimToNull(value), z.string().url({ message: 'Must be a valid URL' }))
+    .nullable()
+    .optional();
+
+const optionalInt = (opts = {}) =>
+  z
+    .preprocess((value) => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.trunc(parsed) : value;
+    }, z.number({ invalid_type_error: 'Must be a number' }).int())
+    .nullable()
+    .optional()
+    .refine((value) => (value == null ? true : value >= (opts.min ?? Number.MIN_SAFE_INTEGER)), {
+      message: opts.minMessage || 'Value is too small',
+    })
+    .refine((value) => (value == null ? true : value <= (opts.max ?? Number.MAX_SAFE_INTEGER)), {
+      message: opts.maxMessage || 'Value is too large',
+    });
+
+const optionalFloat = () =>
+  z
+    .preprocess((value) => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : value;
+    }, z.number({ invalid_type_error: 'Must be a number' }))
+    .nullable()
+    .optional();
+
+const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
+
+const basePropertySchema = z.object({
+    name: requiredString('Property name is required'),
+    address: requiredString('Address is required'),
+    city: requiredString('City is required'),
+    state: optionalString(),
+    zipCode: optionalString(),
+    postcode: optionalString(),
+    country: requiredString('Country is required'),
+    propertyType: optionalString(),
+    type: optionalString(),
+    status: z
+      .preprocess((value) => (typeof value === 'string' ? value.trim().toUpperCase() : value), z.enum(STATUS_VALUES))
+      .default('ACTIVE'),
+    yearBuilt: optionalInt({
+      min: 1800,
+      minMessage: 'Year must be 1800 or later',
+      max: new Date().getFullYear(),
+      maxMessage: `Year cannot be later than ${new Date().getFullYear()}`,
+    }),
+    totalUnits: optionalInt({ min: 0, minMessage: 'Total units cannot be negative' }).default(0),
+    totalArea: optionalFloat(),
+    description: optionalString(),
+    imageUrl: optionalUrl(),
+    managerId: optionalString(),
+
+    // Legacy aliases – accepted but converted internally
+    coverImage: optionalString(),
+    images: z.array(z.string()).optional(),
   });
 
-  return orgId;
-};
-
-const normalizePropertyPayload = (payload = {}) => {
-  const out = {};
-  for (const [k, v] of Object.entries(payload)) {
-    if (v === undefined || v === null) continue;
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (t === '') {
-        if (k === 'status') continue;
-        out[k] = null;
-      } else {
-        out[k] = t;
-      }
-    } else {
-      out[k] = v;
+const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
+  schema.superRefine((data, ctx) => {
+    if (requireCoreFields && !data.propertyType && !data.type) {
+      ctx.addIssue({
+        path: ['propertyType'],
+        code: z.ZodIssueCode.custom,
+        message: 'Property type is required',
+      });
     }
-  }
-  return out;
-};
+  });
 
-const toAbsoluteUploadPath = (imagePath) => {
-  if (!imagePath || typeof imagePath !== 'string') return null;
-  if (!imagePath.startsWith('/uploads')) return null;
-  const relative = imagePath.replace(/^\/+/, '');
-  const resolved = path.resolve(process.cwd(), relative);
-  if (!resolved.startsWith(absoluteUploadPath)) return null;
-  return resolved;
-};
-
-const removeImageFiles = async (imagePaths = []) => {
-  if (!Array.isArray(imagePaths) || imagePaths.length === 0) return;
-  await Promise.allSettled(
-    imagePaths.map(async (p) => {
-      const absolutePath = toAbsoluteUploadPath(p);
-      if (!absolutePath) return;
-      try {
-        await fsp.unlink(absolutePath);
-      } catch (e) {
-        if (e.code !== 'ENOENT') console.warn('unlink failed:', absolutePath, e.message);
-      }
-    }),
-  );
-};
-
-const normaliseSingleImage = (value, { defaultToNull = false } = {}) => {
-  if (value === undefined) return defaultToNull ? null : undefined;
-  if (value === null) return null;
-  if (typeof value === 'string') {
-    const t = value.trim();
-    return t ? t : (defaultToNull ? null : undefined);
-  }
-  if (value && typeof value === 'object' && typeof value.url === 'string') {
-    const t = value.url.trim();
-    return t ? t : (defaultToNull ? null : undefined);
-  }
-  return defaultToNull ? null : undefined;
-};
-
-const normaliseImageList = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((it) => normaliseSingleImage(it, { defaultToNull: false }))
-    .filter((s) => typeof s === 'string' && s.trim().length > 0);
-};
-
-const parseExistingImages = (value, fallback = []) => {
-  if (value === undefined || value === null) return Array.isArray(fallback) ? fallback : [];
-  if (Array.isArray(value)) return value.filter((s) => typeof s === 'string' && s.trim().length > 0);
-  if (typeof value === 'string') {
-    const t = value.trim();
-    if (!t) return [];
-    try {
-      const parsed = JSON.parse(t);
-      if (!Array.isArray(parsed)) throw new Error('existingImages must be an array');
-      return parsed.filter((s) => typeof s === 'string' && s.trim().length > 0);
-    } catch {
-      throw new Error('Invalid existingImages payload');
-    }
-  }
-  throw new Error('Invalid existingImages payload');
-};
-
-const dedupeImages = (images = []) => {
-  const seen = new Set();
-  const out = [];
-  for (const img of images) {
-    if (typeof img !== 'string') continue;
-    const t = img.trim();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
-};
-
-// --- Auth/Role ---
-router.use(authMiddleware);
-router.use(requireRole(ROLES.ADMIN, ROLES.PROPERTY_MANAGER));
-
-// --- Multer ---
-const UPLOAD_DIR = uploadPath;
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
-const upload = multer({ storage });
-
-// --- Zod ---
-const optionalStringField = z.preprocess((v) => {
-  if (v === undefined || v === null) return v;
-  if (typeof v !== 'string') return v;
-  const t = v.trim();
-  return t === '' ? null : t;
-}, z.string().min(1).nullable().optional());
-
-const imageField = z.preprocess((v) => normaliseSingleImage(v), z.string().min(1).nullable().optional());
-const imageListField = z.preprocess((v) => normaliseImageList(v), z.array(z.string().min(1)).nullable().optional());
-
-const propertyFieldSchemas = {
-  name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.string().min(1, 'Name is required')),
-  address: optionalStringField,
-  city: optionalStringField,
-  postcode: optionalStringField,
-  country: optionalStringField,
-  type: optionalStringField,
-  coverImage: imageField,
-  images: imageListField,
-  status: z.preprocess((v) => {
-    if (v === undefined || v === null) return v;
-    if (typeof v !== 'string') return v;
-    const t = v.trim();
-    return t === '' ? undefined : t;
-  }, z.string().optional()),
-};
-
-const propertySchema = z.object({
-  ...propertyFieldSchemas,
-  status: propertyFieldSchemas.status.default('Active'),
-  coverImage: propertyFieldSchemas.coverImage.nullish(),
-  images: propertyFieldSchemas.images.default([]),
-});
-
-const propertyUpdateSchema = z.object({
-  name: propertyFieldSchemas.name.optional(),
-  address: propertyFieldSchemas.address,
-  city: propertyFieldSchemas.city,
-  postcode: propertyFieldSchemas.postcode,
-  country: propertyFieldSchemas.country,
-  type: propertyFieldSchemas.type,
-  status: propertyFieldSchemas.status,
-  coverImage: propertyFieldSchemas.coverImage,
-  images: propertyFieldSchemas.images,
-});
+const propertySchema = withAliasValidation(basePropertySchema);
+const propertyUpdateSchema = withAliasValidation(basePropertySchema.partial(), { requireCoreFields: false });
 
 const unitSchema = z.object({
-  unitCode: z.string().min(1, 'Unit code is required'),
-  address: z.string().optional(),
-  bedrooms: z.preprocess((v) => {
-    if (v === undefined || v === null) return null;
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (t === '') return null;
-      const n = Number(t);
-      return Number.isNaN(n) ? v : n;
-    }
-    return v;
-  }, z.number().int().min(0).nullable()).optional(),
-  status: z.string().optional(),
+  unitNumber: requiredString('Unit number is required'),
+  address: optionalString(),
+  bedrooms: optionalInt({ min: 0, minMessage: 'Bedrooms cannot be negative' }),
+  status: optionalString(),
 });
 
-// --- Routes ---
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const applyLegacyAliases = (input = {}) => {
+  const data = { ...input };
+  if (!data.zipCode && data.postcode) {
+    data.zipCode = data.postcode;
+  }
+  if (!data.propertyType && data.type) {
+    data.propertyType = data.type;
+  }
+  if (!data.imageUrl && (data.coverImage || data.images?.length)) {
+    const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
+    const firstUrl = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    if (firstUrl) {
+      data.imageUrl = firstUrl;
+    }
+  }
+  return data;
+};
 
-// GET /api/properties
+const toPublicProperty = (property) => {
+  if (!property) return property;
+
+  return {
+    ...property,
+    postcode: property.postcode ?? property.zipCode ?? null,
+    type: property.type ?? property.propertyType ?? null,
+    coverImage: property.coverImage ?? property.imageUrl ?? null,
+    images: property.images ?? (property.imageUrl ? [property.imageUrl] : []),
+  };
+};
+
+const ensurePropertyAccess = (property, user, options = {}) => {
+  const { requireWrite = false } = options;
+  
+  if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
+  
+  // Property managers who manage the property have full access
+  if (user.role === 'PROPERTY_MANAGER' && property.managerId === user.id) {
+    return { allowed: true, canWrite: true };
+  }
+  
+  // Owners who own the property have read-only access
+  if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
+    if (requireWrite) {
+      return { allowed: false, reason: 'Owners have read-only access', status: 403 };
+    }
+    return { allowed: true, canWrite: false };
+  }
+  
+  return { allowed: false, reason: 'Forbidden', status: 403 };
+};
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+// GET / - List properties (PROPERTY_MANAGER sees their properties, OWNER sees owned properties)
 router.get('/', async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
+    let where = {};
 
-    const selectMinimal = {
-      id: true,
-      name: true,
-      orgId: true,
-      createdAt: true,
-      updatedAt: true,
-    };
+    // Property managers see properties they manage
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      where = { managerId: req.user.id };
+    }
 
-    const selectFull = {
+    // Owners see properties they own
+    if (req.user.role === 'OWNER') {
+      where = {
+        owners: {
+          some: {
+            ownerId: req.user.id,
+          },
+        },
+      };
+    }
+
+    // Technicians and tenants should not access this route
+    if (req.user.role === 'TECHNICIAN' || req.user.role === 'TENANT') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. This endpoint is for property managers and owners only.'
+      });
+    }
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const select = {
       id: true,
       name: true,
       address: true,
       city: true,
-      postcode: true,
+      state: true,
+      zipCode: true,
       country: true,
-      type: true,
+      propertyType: true,
       status: true,
-      images: true,     // requires text[] column in DB
-      orgId: true,
+      description: true,
+      imageUrl: true,
+      totalUnits: true,
+      totalArea: true,
+      yearBuilt: true,
+      managerId: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { units: true } },
     };
 
-    const properties = await prisma.property.findMany({
-      where: { orgId },
-      select: F_MINIMAL ? selectMinimal : selectFull,
-      orderBy: { createdAt: 'desc' },
-    });
+    // Fetch properties and total count in parallel
+    const [properties, total] = await Promise.all([
+      prisma.property.findMany({
+        where,
+        select,
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.property.count({ where }),
+    ]);
 
-    res.json({ success: true, properties });
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
+
+    // Return paginated response
+    res.json({
+      items: properties.map(toPublicProperty),
+      total,
+      page,
+      hasMore,
+    });
   } catch (error) {
     console.error('Get properties error:', {
       message: error?.message,
@@ -260,137 +259,319 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/properties
-router.post('/', upload.array('images', 10), async (req, res) => {
-  const uploadedImagePaths = (req.files ? req.files.map((f) => `/uploads/${f.filename}`) : []);
+// POST / - Create property (PROPERTY_MANAGER only, requires active subscription)
+router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
-    const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
-    const validated = propertySchema.parse(payload);
-    const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validated;
+    const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
+    // Remove legacy alias fields (they've been converted to standard fields)
+    // Keep the converted fields: zipCode, propertyType, imageUrl
+    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
-    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
-    const imagesToPersist = dedupeImages([ ...(coverImagePath ? [coverImagePath] : []), ...bodyImageList, ...uploadedImagePaths ]);
+    // Property managers can only create properties for themselves
+    const managerId = req.user.id;
+
+    // Ensure converted fields are included in the data
+    const propertyData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
+    };
 
     const property = await prisma.property.create({
-      data: { ...propertyData, images: imagesToPersist, orgId },
+      data: propertyData,
     });
 
-    res.status(201).json({ success: true, property });
+    res.status(201).json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
     }
-    console.error('Create property error:', { message: error?.message, code: error?.code, meta: error?.meta });
-    await removeImageFiles(uploadedImagePaths);
+
+    console.error('Create property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to create property' });
   }
 });
 
-// GET /api/properties/:id
+// GET /:id - Get property by ID (with access check)
 router.get('/:id', async (req, res) => {
   try {
-    const orgId = await ensureUserOrg(req.user);
-    const property = await prisma.property.findFirst({
-      where: { id: req.params.id, orgId },
-      select: {
-        id: true, name: true, address: true, city: true, postcode: true, country: true,
-        type: true, status: true, images: true, orgId: true, createdAt: true, updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: {
+        units: { orderBy: { unitNumber: 'asc' } },
+        manager: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        owners: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
       },
     });
-    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
-    res.json({ success: true, property });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
+
+    res.json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
-    console.error('Get property error:', { message: error?.message, code: error?.code, meta: error?.meta });
+    console.error('Get property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to fetch property' });
   }
 });
 
-// PATCH /api/properties/:id
-router.patch('/:id', upload.array('images', 10), async (req, res) => {
-  const uploadedImagePaths = (req.files ? req.files.map((f) => `/uploads/${f.filename}`) : []);
+// PATCH /:id - Update property (PROPERTY_MANAGER only, must be property manager)
+router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const { id } = req.params;
-    const orgId = await ensureUserOrg(req.user);
-    const existing = await prisma.property.findFirst({ where: { id, orgId } });
-    if (!existing) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(404).json({ success: false, message: 'Property not found' });
-    }
-
-    const { name, address, city, postcode, country, type, status, coverImage, images } = req.body;
-    const payload = normalizePropertyPayload({ name, address, city, postcode, country, type, status, coverImage, images });
-    const validated = propertyUpdateSchema.parse(payload);
-    const { coverImage: coverImageInput, images: bodyImages, ...propertyData } = validated;
-
-    let keepImages;
-    try {
-      keepImages = parseExistingImages(req.body.existingImages, existing.images);
-    } catch (parseError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: parseError.message });
-    }
-
-    const bodyImageList = Array.isArray(bodyImages) ? bodyImages : [];
-    let nextImages = [...keepImages, ...bodyImageList, ...uploadedImagePaths];
-
-    const coverImagePath = typeof coverImageInput === 'string' ? coverImageInput : undefined;
-    if (coverImagePath) nextImages = [coverImagePath, ...nextImages.filter((i) => i !== coverImagePath)];
-
-    const imagesToPersist = dedupeImages(nextImages);
-    const updateData = { ...propertyData, images: imagesToPersist };
-
-    const updated = await prisma.property.update({ where: { id: existing.id }, data: updateData });
-
-    const removedImages = (existing.images || []).filter((p) => !keepImages.includes(p));
-    await removeImageFiles(removedImages);
-
-    const property = await prisma.property.findFirst({
-      where: { id: updated.id, orgId },
-      select: {
-        id: true, name: true, address: true, city: true, postcode: true, country: true,
-        type: true, status: true, images: true, orgId: true, createdAt: true, updatedAt: true,
-        units: { orderBy: { unitCode: 'asc' } },
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
       },
     });
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
 
-    res.json({ success: true, property });
+    const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
+    // Remove legacy alias fields (they've been converted to standard fields)
+    // Keep the converted fields: zipCode, propertyType, imageUrl
+    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+
+    // Property manager can only update their own properties (already checked by ensurePropertyAccess)
+    const managerId = property.managerId;
+
+    // Ensure converted fields are included in the data
+    const updateData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
+    };
+
+    const updated = await prisma.property.update({
+      where: { id: property.id },
+      data: updateData,
+    });
+
+    res.json({ success: true, property: toPublicProperty(updated) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      await removeImageFiles(uploadedImagePaths);
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
     }
-    console.error('Update property error:', { message: error?.message, code: error?.code, meta: error?.meta });
-    await removeImageFiles(uploadedImagePaths);
+
+    console.error('Update property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to update property' });
   }
 });
 
-// DELETE /api/properties/:id
-router.delete('/:id', async (req, res) => {
+// DELETE /:id - Delete property (PROPERTY_MANAGER only, must be property manager)
+router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const { id } = req.params;
-    const orgId = await ensureUserOrg(req.user);
-    const property = await prisma.property.findFirst({ where: { id, orgId }, select: { id: true, images: true } });
-    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
+    });
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
 
     await prisma.property.delete({ where: { id: property.id } });
-    await removeImageFiles(property.images || []);
     res.json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
-    console.error('Delete property error:', { message: error?.message, code: error?.code, meta: error?.meta });
+    console.error('Delete property error:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ success: false, message: 'Failed to delete property' });
   }
 });
 
+// GET /:id/activity - Get recent activity for a property
+router.get('/:id/activity', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({ 
+      where: { id: req.params.id },
+      include: {
+        owners: {
+          select: { ownerId: true },
+        },
+      },
+    });
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.reason });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+
+    // Fetch recent activity for this property
+    const [jobs, inspections, serviceRequests, units] = await Promise.all([
+      prisma.job.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          assignedTo: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.inspection.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          scheduledDate: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.serviceRequest.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          requestedBy: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.unit.findMany({
+        where: { propertyId: req.params.id },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          unitNumber: true,
+          status: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const activities = [];
+
+    jobs.forEach((job) => {
+      activities.push({
+        type: 'job',
+        id: job.id,
+        title: job.title,
+        description: job.assignedTo
+          ? `Assigned to ${job.assignedTo.firstName} ${job.assignedTo.lastName}`
+          : 'Job update',
+        status: job.status,
+        priority: job.priority,
+        date: job.updatedAt,
+      });
+    });
+
+    inspections.forEach((inspection) => {
+      activities.push({
+        type: 'inspection',
+        id: inspection.id,
+        title: inspection.title,
+        description: `Inspection ${inspection.status.toLowerCase()}`,
+        status: inspection.status,
+        date: inspection.updatedAt,
+      });
+    });
+
+    serviceRequests.forEach((sr) => {
+      activities.push({
+        type: 'service_request',
+        id: sr.id,
+        title: sr.title,
+        description: sr.requestedBy
+          ? `Requested by ${sr.requestedBy.firstName} ${sr.requestedBy.lastName}`
+          : 'Service request update',
+        status: sr.status,
+        priority: sr.priority,
+        date: sr.updatedAt,
+      });
+    });
+
+    units.forEach((unit) => {
+      activities.push({
+        type: 'unit',
+        id: unit.id,
+        title: `Unit ${unit.unitNumber}`,
+        description: `Status: ${unit.status}`,
+        status: unit.status,
+        date: unit.updatedAt,
+      });
+    });
+
+    // Sort by date descending
+    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({ success: true, activities: activities.slice(0, limit) });
+  } catch (error) {
+    console.error('Get property activity error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch property activity' });
+  }
+});
+
 router._test = {
-  ensureUserOrg,
   propertySchema,
-  normaliseSingleImage,
-  normaliseImageList,
+  propertyUpdateSchema,
+  unitSchema,
+  applyLegacyAliases,
+  toPublicProperty,
 };
+
 export default router;

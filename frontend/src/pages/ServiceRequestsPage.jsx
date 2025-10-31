@@ -213,8 +213,6 @@ const ServiceRequestsPage = () => {
               <TextField
                 id="service-requests-filter-status"
                 name="status"
-                inputProps={{ id: 'service-requests-filter-status', name: 'status' }}
-                InputLabelProps={{ htmlFor: 'service-requests-filter-status' }}
                 select
                 fullWidth
                 label="Status"
@@ -235,8 +233,6 @@ const ServiceRequestsPage = () => {
               <TextField
                 id="service-requests-filter-category"
                 name="category"
-                inputProps={{ id: 'service-requests-filter-category', name: 'category' }}
-                InputLabelProps={{ htmlFor: 'service-requests-filter-category' }}
                 select
                 fullWidth
                 label="Category"
@@ -261,8 +257,6 @@ const ServiceRequestsPage = () => {
                 <TextField
                   id="service-requests-filter-property"
                   name="propertyId"
-                  inputProps={{ id: 'service-requests-filter-property', name: 'propertyId' }}
-                  InputLabelProps={{ htmlFor: 'service-requests-filter-property' }}
                   select
                   fullWidth
                   label="Property"
@@ -551,8 +545,6 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
             <TextField
               id="service-requests-review-status"
               name="status"
-              inputProps={{ id: 'service-requests-review-status', name: 'status' }}
-              InputLabelProps={{ htmlFor: 'service-requests-review-status' }}
               select
               fullWidth
               label="Status"
@@ -566,8 +558,6 @@ const ReviewDialog = ({ request, onClose, onSuccess }) => {
             <TextField
               id="service-requests-review-notes"
               name="reviewNotes"
-              inputProps={{ id: 'service-requests-review-notes', name: 'reviewNotes' }}
-              InputLabelProps={{ htmlFor: 'service-requests-review-notes' }}
               fullWidth
               label="Review Notes"
               value={formData.reviewNotes}
@@ -635,8 +625,6 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
             <TextField
               id="service-requests-convert-technician"
               name="assignedToId"
-              inputProps={{ id: 'service-requests-convert-technician', name: 'assignedToId' }}
-              InputLabelProps={{ htmlFor: 'service-requests-convert-technician' }}
               select
               fullWidth
               label="Assign to Technician (Optional)"
@@ -653,30 +641,23 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
             <TextField
               id="service-requests-convert-scheduled-date"
               name="scheduledDate"
-              inputProps={{ id: 'service-requests-convert-scheduled-date', name: 'scheduledDate' }}
-              InputLabelProps={{ htmlFor: 'service-requests-convert-scheduled-date', shrink: true }}
               fullWidth
               label="Scheduled Date (Optional)"
               type="datetime-local"
               value={formData.scheduledDate}
               onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+              InputLabelProps={{ shrink: true }}
             />
             <TextField
               id="service-requests-convert-estimated-cost"
               name="estimatedCost"
-              inputProps={{
-                id: 'service-requests-convert-estimated-cost',
-                name: 'estimatedCost',
-                min: 0,
-                step: 0.01,
-              }}
-              InputLabelProps={{ htmlFor: 'service-requests-convert-estimated-cost' }}
               fullWidth
               label="Estimated Cost (Optional)"
               type="number"
               value={formData.estimatedCost}
               onChange={(e) => setFormData({ ...formData, estimatedCost: e.target.value })}
               InputProps={{ startAdornment: '$' }}
+              inputProps={{ min: 0, step: 0.01 }}
             />
           </Stack>
         </DialogContent>
