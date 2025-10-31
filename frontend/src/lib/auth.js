@@ -132,13 +132,27 @@ export function getCurrentUser() {
   const userStr = localStorage.getItem('user'); if (!userStr) return null;
   try { return JSON.parse(userStr); } catch (e) { console.error('Error parsing user data:', e); return null; }
 }
+
+export function saveAuthToken(token) {
+  if (!token) return;
+  localStorage.setItem('auth_token', token);
+  localStorage.setItem('token', token);
+}
+
+export function removeAuthToken() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  sessionStorage.clear();
+  broadcastUserUpdate(null);
+}
+
 export async function logout() {
   try {
     // Using the api helper function for consistency, though fetch works too
     await api('/auth/logout', { method: 'POST' });
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
-  localStorage.removeItem('auth_token'); localStorage.removeItem('user'); localStorage.removeItem('token'); sessionStorage.clear();
-  broadcastUserUpdate(null);
+  removeAuthToken();
 }
 export function getAuthToken() { return localStorage.getItem('auth_token') || localStorage.getItem('token'); }
 
