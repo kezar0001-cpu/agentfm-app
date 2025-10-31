@@ -9,26 +9,20 @@ import { verifyToken } from '../utils/jwt.js';
 /**
  * Middleware to verify JWT token and attach user to request.
  * Throws 401 if token is missing or invalid.
- *
- * Usage:
- *   router.use(requireAuth);
- *   router.get('/protected', (req, res) => {
- *     // req.user is available here
- *   });
  */
-export async function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No token provided' 
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
       });
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token (will throw if JWT_SECRET is not set or token is invalid)
     let decoded;
     try {
@@ -38,34 +32,34 @@ export async function requireAuth(req, res, next) {
         name: error.name,
         message: error.message
       });
-      
+
       // Provide specific error messages
       if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Token has expired. Please login again.' 
+        return res.status(401).json({
+          success: false,
+          message: 'Token has expired. Please login again.'
         });
       }
-      
+
       if (error.name === 'JsonWebTokenError') {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Invalid token. Please login again.' 
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token. Please login again.'
         });
       }
-      
+
       // If JWT_SECRET is not set, this will be caught here
       if (error.message.includes('JWT_SECRET')) {
         console.error('CRITICAL: JWT_SECRET not configured!');
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Server configuration error. Please contact support.' 
+        return res.status(500).json({
+          success: false,
+          message: 'Server configuration error. Please contact support.'
         });
       }
-      
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid or expired token' 
+
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
       });
     }
 
@@ -76,17 +70,17 @@ export async function requireAuth(req, res, next) {
     });
 
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
     // Check if user is active
     if (user.isActive === false) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Account has been deactivated' 
+      return res.status(403).json({
+        success: false,
+        message: 'Account has been deactivated'
       });
     }
 
@@ -95,9 +89,9 @@ export async function requireAuth(req, res, next) {
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Authentication error' 
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication error'
     });
   }
 }
@@ -105,18 +99,8 @@ export async function requireAuth(req, res, next) {
 /**
  * Optional authentication middleware.
  * Attaches user to request if token is valid, but doesn't require it.
- * 
- * Usage:
- *   router.use(optionalAuth);
- *   router.get('/public-or-private', (req, res) => {
- *     if (req.user) {
- *       // User is authenticated
- *     } else {
- *       // User is not authenticated
- *     }
- *   });
  */
-export async function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
 
@@ -154,7 +138,7 @@ export async function optionalAuth(req, res, next) {
  * Middleware to check if user has one of the required roles
  * @param {Array<string>} allowedRoles - Array of roles that can access the route
  */
-export function requireRole(...allowedRoles) {
+function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -180,7 +164,7 @@ export function requireRole(...allowedRoles) {
  * Middleware to check if user has an active subscription (placeholder)
  * TODO: Implement actual subscription checking logic
  */
-export function isSubscriptionActive(req, res, next) {
+function isSubscriptionActive(req, res, next) {
   // For now, allow all authenticated users through
   // Implement actual subscription logic when needed
   if (!req.user) {
@@ -196,7 +180,7 @@ export function isSubscriptionActive(req, res, next) {
  * Middleware to require active subscription (placeholder)
  * TODO: Implement actual subscription checking logic
  */
-export function requireActiveSubscription(req, res, next) {
+function requireActiveSubscription(req, res, next) {
   return isSubscriptionActive(req, res, next);
 }
 
@@ -204,7 +188,7 @@ export function requireActiveSubscription(req, res, next) {
  * Middleware to require property manager subscription (placeholder)
  * TODO: Implement actual subscription checking logic
  */
-export function requirePropertyManagerSubscription(req, res, next) {
+function requirePropertyManagerSubscription(req, res, next) {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -223,6 +207,17 @@ export function requirePropertyManagerSubscription(req, res, next) {
   next();
 }
 
+// Named exports
+export {
+  requireAuth,
+  optionalAuth,
+  requireRole,
+  isSubscriptionActive,
+  requireActiveSubscription,
+  requirePropertyManagerSubscription
+};
+
+// Default export
 export default {
   requireAuth,
   optionalAuth,
