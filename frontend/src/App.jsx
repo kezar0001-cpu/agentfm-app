@@ -53,6 +53,8 @@ class ErrorBoundary extends React.Component {
 const SignIn = lazy(() => import('./pages/SignIn.jsx'));
 const SignUp = lazy(() => import('./pages/SignUp.jsx'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback.jsx'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword.tsx'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword.tsx'));
 const Dashboard = lazy(() => import('./pages/DashboardPage.jsx'));
 const PropertiesPage = lazy(() => import('./pages/PropertiesPage.jsx')); // wizard inside
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage.jsx'));
@@ -85,6 +87,8 @@ export default function App() {
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected */}
           <Route path="/" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
