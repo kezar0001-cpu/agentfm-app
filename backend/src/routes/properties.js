@@ -280,6 +280,16 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
     };
 
+    // Ensure converted fields are included in the data
+    const propertyData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
+    };
+
     const property = await prisma.property.create({
       data: propertyData,
     });
@@ -370,6 +380,16 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
+
+    // Ensure converted fields are included in the data
+    const updateData = {
+      ...data,
+      managerId,
+      // Include converted fields if they exist
+      ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
+      ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
+      ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
+    };
 
     // Ensure converted fields are included in the data
     const updateData = {
