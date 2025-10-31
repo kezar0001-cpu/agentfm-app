@@ -12,33 +12,6 @@ import {
   Box,
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
-import { COUNTRIES } from '../lib/countries';
-
-const COUNTRY_ALIASES = {
-  USA: 'United States',
-  US: 'United States',
-  'U.S.A': 'United States',
-  UAE: 'United Arab Emirates',
-  'U.A.E.': 'United Arab Emirates',
-  UK: 'United Kingdom',
-  GB: 'United Kingdom',
-  'U.K.': 'United Kingdom',
-  KSA: 'Saudi Arabia',
-};
-
-const normaliseCountryValue = (input) => {
-  if (!input) return '';
-  const trimmed = input.trim();
-  if (!trimmed) return '';
-  const alias = COUNTRY_ALIASES[trimmed.toUpperCase()];
-  if (alias) return alias;
-
-  const match = COUNTRIES.find(
-    (country) => country.name.toLowerCase() === trimmed.toLowerCase(),
-  );
-
-  return match ? match.name : trimmed;
-};
 
 const PROPERTY_TYPES = [
   'Residential',
@@ -55,6 +28,14 @@ const PROPERTY_STATUSES = [
   { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
 ];
 
+const STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+];
+
 export default function PropertyForm({ open, onClose, property, onSuccess }) {
   const isEdit = !!property;
 
@@ -64,7 +45,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
     city: '',
     state: '',
     zipCode: '',
-    country: '',
+    country: 'USA',
     propertyType: '',
     yearBuilt: '',
     totalUnits: '0',
@@ -92,7 +73,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         city: property.city || '',
         state: property.state || '',
         zipCode: property.zipCode || '',
-        country: normaliseCountryValue(property.country),
+        country: property.country || 'USA',
         propertyType: property.propertyType || '',
         yearBuilt: property.yearBuilt?.toString() || '',
         totalUnits: property.totalUnits?.toString() || '0',
@@ -109,7 +90,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         city: '',
         state: '',
         zipCode: '',
-        country: normaliseCountryValue(''),
+        country: 'USA',
         propertyType: '',
         yearBuilt: '',
         totalUnits: '0',
@@ -138,8 +119,9 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
 
     if (!formData.name.trim()) newErrors.name = 'Property name is required';
     if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.city.trim()) newErrors.city = 'City / locality is required';
-    if (!formData.country) newErrors.country = 'Country is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state) newErrors.state = 'State is required';
+    if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
     if (!formData.propertyType) newErrors.propertyType = 'Property type is required';
 
     // Validate year built if provided
@@ -172,12 +154,12 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           name: formData.name.trim(),
           address: formData.address.trim(),
           city: formData.city.trim(),
-          state: formData.state.trim() || null,
-          zipCode: formData.zipCode.trim() || null,
+          state: formData.state,
+          zipCode: formData.zipCode.trim(),
           country: formData.country,
           propertyType: formData.propertyType,
-          yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt, 10) : null,
-          totalUnits: parseInt(formData.totalUnits, 10) || 0,
+          yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : null,
+          totalUnits: parseInt(formData.totalUnits) || 0,
           totalArea: formData.totalArea ? parseFloat(formData.totalArea) : null,
           status: formData.status,
           description: formData.description.trim() || null,
@@ -213,6 +195,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 required
                 id="property-form-name"
                 name="name"
+                inputProps={{ id: 'property-form-name', name: 'name' }}
+                InputLabelProps={{ htmlFor: 'property-form-name' }}
                 label="Property Name"
                 value={formData.name}
                 onChange={handleChange('name')}
@@ -228,6 +212,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 required
                 id="property-form-address"
                 name="address"
+                inputProps={{ id: 'property-form-address', name: 'address' }}
+                InputLabelProps={{ htmlFor: 'property-form-address' }}
                 label="Street Address"
                 value={formData.address}
                 onChange={handleChange('address')}
@@ -236,13 +222,15 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
               />
             </Grid>
 
-            {/* City, Region, Postal Code, Country */}
-            <Grid item xs={12} sm={6} md={3}>
+            {/* City, State, ZIP */}
+            <Grid item xs={12} sm={5}>
               <TextField
                 fullWidth
                 required
                 id="property-form-city"
                 name="city"
+                inputProps={{ id: 'property-form-city', name: 'city' }}
+                InputLabelProps={{ htmlFor: 'property-form-city' }}
                 label="City"
                 value={formData.city}
                 onChange={handleChange('city')}
@@ -250,48 +238,42 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 helperText={errors.city}
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
+                required
                 id="property-form-state"
                 name="state"
-                label="State / Province / Region"
+                inputProps={{ id: 'property-form-state', name: 'state' }}
+                InputLabelProps={{ htmlFor: 'property-form-state' }}
+                select
+                label="State"
                 value={formData.state}
                 onChange={handleChange('state')}
+                error={!!errors.state}
                 helperText={errors.state}
-              />
+              >
+                {STATES.map((state) => (
+                  <MenuItem key={state} value={state}>
+                    {state}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={3}>
               <TextField
                 fullWidth
+                required
                 id="property-form-zip-code"
                 name="zipCode"
-                label="Postal Code"
+                inputProps={{ id: 'property-form-zip-code', name: 'zipCode' }}
+                InputLabelProps={{ htmlFor: 'property-form-zip-code' }}
+                label="ZIP Code"
                 value={formData.zipCode}
                 onChange={handleChange('zipCode')}
                 error={!!errors.zipCode}
                 helperText={errors.zipCode}
               />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                required
-                id="property-form-country"
-                name="country"
-                select
-                label="Country"
-                value={formData.country}
-                onChange={handleChange('country')}
-                error={!!errors.country}
-                helperText={errors.country}
-              >
-                {COUNTRIES.map((country) => (
-                  <MenuItem key={country.code} value={country.name}>
-                    {country.name}
-                  </MenuItem>
-                ))}
-              </TextField>
             </Grid>
 
             {/* Property Type & Status */}
@@ -301,6 +283,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 required
                 id="property-form-type"
                 name="propertyType"
+                inputProps={{ id: 'property-form-type', name: 'propertyType' }}
+                InputLabelProps={{ htmlFor: 'property-form-type' }}
                 select
                 label="Property Type"
                 value={formData.propertyType}
@@ -320,6 +304,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 id="property-form-status"
                 name="status"
+                inputProps={{ id: 'property-form-status', name: 'status' }}
+                InputLabelProps={{ htmlFor: 'property-form-status' }}
                 select
                 label="Status"
                 value={formData.status}
@@ -339,6 +325,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 id="property-form-year-built"
                 name="yearBuilt"
+                inputProps={{ id: 'property-form-year-built', name: 'yearBuilt' }}
+                InputLabelProps={{ htmlFor: 'property-form-year-built' }}
                 label="Year Built"
                 type="number"
                 value={formData.yearBuilt}
@@ -352,6 +340,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 id="property-form-total-units"
                 name="totalUnits"
+                inputProps={{ id: 'property-form-total-units', name: 'totalUnits' }}
+                InputLabelProps={{ htmlFor: 'property-form-total-units' }}
                 label="Total Units"
                 type="number"
                 value={formData.totalUnits}
@@ -365,7 +355,9 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 id="property-form-total-area"
                 name="totalArea"
-                label="Total Area"
+                inputProps={{ id: 'property-form-total-area', name: 'totalArea' }}
+                InputLabelProps={{ htmlFor: 'property-form-total-area' }}
+                label="Total Area (sq ft)"
                 type="number"
                 value={formData.totalArea}
                 onChange={handleChange('totalArea')}
@@ -382,6 +374,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 rows={3}
                 id="property-form-description"
                 name="description"
+                inputProps={{ id: 'property-form-description', name: 'description' }}
+                InputLabelProps={{ htmlFor: 'property-form-description' }}
                 label="Description"
                 value={formData.description}
                 onChange={handleChange('description')}
@@ -394,6 +388,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                 fullWidth
                 id="property-form-image-url"
                 name="imageUrl"
+                inputProps={{ id: 'property-form-image-url', name: 'imageUrl' }}
+                InputLabelProps={{ htmlFor: 'property-form-image-url' }}
                 label="Image URL (optional)"
                 value={formData.imageUrl}
                 onChange={handleChange('imageUrl')}

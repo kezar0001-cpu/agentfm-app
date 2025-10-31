@@ -164,6 +164,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 required
                 id="unit-form-unit-number"
                 name="unitNumber"
+                inputProps={{ id: 'unit-form-unit-number', name: 'unitNumber' }}
+                InputLabelProps={{ htmlFor: 'unit-form-unit-number' }}
                 label="Unit Number"
                 value={formData.unitNumber}
                 onChange={handleChange('unitNumber')}
@@ -178,6 +180,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-status"
                 name="status"
+                inputProps={{ id: 'unit-form-status', name: 'status' }}
+                InputLabelProps={{ htmlFor: 'unit-form-status' }}
                 select
                 label="Status"
                 value={formData.status}
@@ -197,6 +201,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-floor"
                 name="floor"
+                inputProps={{ id: 'unit-form-floor', name: 'floor' }}
+                InputLabelProps={{ htmlFor: 'unit-form-floor' }}
                 label="Floor"
                 type="number"
                 value={formData.floor}
@@ -212,6 +218,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-bedrooms"
                 name="bedrooms"
+                inputProps={{ id: 'unit-form-bedrooms', name: 'bedrooms' }}
+                InputLabelProps={{ htmlFor: 'unit-form-bedrooms' }}
                 label="Bedrooms"
                 type="number"
                 value={formData.bedrooms}
@@ -227,9 +235,10 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-bathrooms"
                 name="bathrooms"
+                inputProps={{ id: 'unit-form-bathrooms', name: 'bathrooms', step: 0.5 }}
+                InputLabelProps={{ htmlFor: 'unit-form-bathrooms' }}
                 label="Bathrooms"
                 type="number"
-                inputProps={{ step: 0.5 }}
                 value={formData.bathrooms}
                 onChange={handleChange('bathrooms')}
                 error={!!errors.bathrooms}
@@ -243,6 +252,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-area"
                 name="area"
+                inputProps={{ id: 'unit-form-area', name: 'area' }}
+                InputLabelProps={{ htmlFor: 'unit-form-area' }}
                 label="Area (sq ft)"
                 type="number"
                 value={formData.area}
@@ -258,6 +269,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-rent-amount"
                 name="rentAmount"
+                inputProps={{ id: 'unit-form-rent-amount', name: 'rentAmount' }}
+                InputLabelProps={{ htmlFor: 'unit-form-rent-amount' }}
                 label="Monthly Rent ($)"
                 type="number"
                 value={formData.rentAmount}
@@ -275,6 +288,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 rows={3}
                 id="unit-form-description"
                 name="description"
+                inputProps={{ id: 'unit-form-description', name: 'description' }}
+                InputLabelProps={{ htmlFor: 'unit-form-description' }}
                 label="Description"
                 value={formData.description}
                 onChange={handleChange('description')}
@@ -288,6 +303,8 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
                 fullWidth
                 id="unit-form-image-url"
                 name="imageUrl"
+                inputProps={{ id: 'unit-form-image-url', name: 'imageUrl' }}
+                InputLabelProps={{ htmlFor: 'unit-form-image-url' }}
                 label="Image URL (optional)"
                 value={formData.imageUrl}
                 onChange={handleChange('imageUrl')}

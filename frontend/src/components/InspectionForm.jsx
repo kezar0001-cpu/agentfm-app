@@ -1,25 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Alert,
-  Autocomplete,
   Box,
   Button,
-  Chip,
-  CircularProgress,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  MenuItem,
   TextField,
+  MenuItem,
+  Grid,
+  Typography,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import ensureArray from '../utils/ensureArray';
 
 const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
-  const isEditing = Boolean(inspection);
-
+  const isEditing = !!inspection;
+  
   const [formData, setFormData] = useState({
     title: inspection?.title || '',
     type: inspection?.type || 'ROUTINE',
@@ -30,12 +28,12 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
     unitId: inspection?.unitId || '',
     assignedToId: inspection?.assignedToId || '',
     notes: inspection?.notes || '',
-    tags: inspection?.tags || [],
   });
 
   const [errors, setErrors] = useState({});
 
-  const { data: propertiesData, isLoading: loadingProperties } = useQuery({
+  // Fetch properties
+  const { data: properties, isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
@@ -43,89 +41,101 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
     },
   });
 
-  const properties = ensureArray(propertiesData, ['properties', 'data', 'items', 'results']);
-
-  const { data: unitsData } = useQuery({
+  // Fetch units for selected property
+  const { data: units } = useQuery({
     queryKey: ['units', formData.propertyId],
     queryFn: async () => {
       if (!formData.propertyId) return [];
-      const response = await apiClient.get('/units', { params: { propertyId: formData.propertyId } });
+      const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
       return response.data;
     },
-    enabled: Boolean(formData.propertyId),
+    enabled: !!formData.propertyId,
   });
 
-  const units = ensureArray(unitsData, ['units', 'data', 'items', 'results']);
-
-  const { data: inspectorData = { inspectors: [] } } = useQuery({
-    queryKey: ['inspections', 'inspectors'],
+  // Fetch technicians
+  const { data: technicians } = useQuery({
+    queryKey: ['technicians'],
     queryFn: async () => {
-      const response = await apiClient.get('/inspections/inspectors');
+      const response = await apiClient.get('/users?role=TECHNICIAN');
       return response.data;
     },
   });
 
-  const inspectorOptions = useMemo(() => inspectorData.inspectors || [], [inspectorData.inspectors]);
-
-  const { data: tagData = { tags: [] } } = useQuery({
-    queryKey: ['inspections', 'tags'],
-    queryFn: async () => {
-      const response = await apiClient.get('/inspections/tags');
-      return response.data;
-    },
-  });
-
+  // Create mutation
   const createMutation = useMutation({
-    mutationFn: async (payload) => {
-      const response = await apiClient.post('/inspections', payload);
+    mutationFn: async (data) => {
+      const response = await apiClient.post('/inspections', data);
       return response.data;
     },
-    onSuccess,
+    onSuccess: () => {
+      onSuccess();
+    },
     onError: (error) => {
-      setErrors({ submit: error.response?.data?.message || 'Failed to create inspection' });
+      setErrors({ submit: error.response?.data?.error || 'Failed to create inspection' });
     },
   });
 
+  // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async (payload) => {
-      const response = await apiClient.patch(`/inspections/${inspection.id}`, payload);
+    mutationFn: async (data) => {
+      const response = await apiClient.patch(`/inspections/${inspection.id}`, data);
       return response.data;
     },
-    onSuccess,
+    onSuccess: () => {
+      onSuccess();
+    },
     onError: (error) => {
-      setErrors({ submit: error.response?.data?.message || 'Failed to update inspection' });
+      setErrors({ submit: error.response?.data?.error || 'Failed to update inspection' });
     },
   });
-
-  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleChange = (field, value) => {
-    setFormData((previous) => ({ ...previous, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // Clear unit if property changes
     if (field === 'propertyId') {
-      setFormData((previous) => ({ ...previous, unitId: '' }));
+      setFormData((prev) => ({ ...prev, unitId: '' }));
     }
+    
+    // Clear error for this field
     if (errors[field]) {
       setErrors((prev) => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
       });
     }
   };
 
   const validate = () => {
-    const nextErrors = {};
-    if (!formData.title.trim()) nextErrors.title = 'Title is required';
-    if (!formData.type) nextErrors.type = 'Type is required';
-    if (!formData.scheduledDate) nextErrors.scheduledDate = 'Scheduled date is required';
-    if (!formData.propertyId) nextErrors.propertyId = 'Property is required';
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    const newErrors = {};
+
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    }
+
+    if (!formData.type) {
+      newErrors.type = 'Type is required';
+    }
+
+    if (!formData.scheduledDate) {
+      newErrors.scheduledDate = 'Scheduled date is required';
+    }
+
+    if (!formData.propertyId) {
+      newErrors.propertyId = 'Property is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    if (!validate()) return;
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
 
     const payload = {
       title: formData.title.trim(),
@@ -135,7 +145,6 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
       unitId: formData.unitId || undefined,
       assignedToId: formData.assignedToId || undefined,
       notes: formData.notes.trim() || undefined,
-      tags: formData.tags,
     };
 
     if (isEditing) {
@@ -145,9 +154,14 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
     }
   };
 
+  const isLoading = createMutation.isPending || updateMutation.isPending;
+
   return (
     <Box component="form" onSubmit={handleSubmit}>
-      <DialogTitle>{isEditing ? 'Edit inspection' : 'Schedule inspection'}</DialogTitle>
+      <DialogTitle>
+        {isEditing ? 'Edit Inspection' : 'Schedule Inspection'}
+      </DialogTitle>
+
       <DialogContent dividers>
         {errors.submit && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -158,30 +172,39 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
         <Grid container spacing={2}>
           <Grid item xs={12}>
             <TextField
-              label="Title"
               fullWidth
+              id="inspection-form-title"
+              name="title"
+              inputProps={{ id: 'inspection-form-title', name: 'title' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-title' }}
+              label="Title"
               value={formData.title}
-              onChange={(event) => handleChange('title', event.target.value)}
-              required
-              error={Boolean(errors.title)}
+              onChange={(e) => handleChange('title', e.target.value)}
+              error={!!errors.title}
               helperText={errors.title}
-              placeholder="e.g. Quarterly fire safety inspection"
+              required
+              placeholder="e.g., Quarterly Inspection - Building A"
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
               select
-              label="Inspection type"
               fullWidth
+              id="inspection-form-type"
+              name="type"
+              inputProps={{ id: 'inspection-form-type', name: 'type' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-type' }}
+              label="Type"
               value={formData.type}
-              onChange={(event) => handleChange('type', event.target.value)}
-              error={Boolean(errors.type)}
+              onChange={(e) => handleChange('type', e.target.value)}
+              error={!!errors.type}
               helperText={errors.type}
+              required
             >
               <MenuItem value="ROUTINE">Routine</MenuItem>
-              <MenuItem value="MOVE_IN">Move-in</MenuItem>
-              <MenuItem value="MOVE_OUT">Move-out</MenuItem>
+              <MenuItem value="MOVE_IN">Move-In</MenuItem>
+              <MenuItem value="MOVE_OUT">Move-Out</MenuItem>
               <MenuItem value="EMERGENCY">Emergency</MenuItem>
               <MenuItem value="COMPLIANCE">Compliance</MenuItem>
             </TextField>
@@ -189,13 +212,16 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
 
           <Grid item xs={12} sm={6}>
             <TextField
-              label="Scheduled date and time"
-              type="datetime-local"
               fullWidth
+              id="inspection-form-scheduled-date"
+              name="scheduledDate"
+              inputProps={{ id: 'inspection-form-scheduled-date', name: 'scheduledDate' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-scheduled-date', shrink: true }}
+              label="Scheduled Date & Time"
+              type="datetime-local"
               value={formData.scheduledDate}
-              onChange={(event) => handleChange('scheduledDate', event.target.value)}
-              InputLabelProps={{ shrink: true }}
-              error={Boolean(errors.scheduledDate)}
+              onChange={(e) => handleChange('scheduledDate', e.target.value)}
+              error={!!errors.scheduledDate}
               helperText={errors.scheduledDate}
               required
             />
@@ -204,16 +230,20 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               select
-              label="Property"
               fullWidth
+              id="inspection-form-property"
+              name="propertyId"
+              inputProps={{ id: 'inspection-form-property', name: 'propertyId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-property' }}
+              label="Property"
               value={formData.propertyId}
-              onChange={(event) => handleChange('propertyId', event.target.value)}
-              error={Boolean(errors.propertyId)}
+              onChange={(e) => handleChange('propertyId', e.target.value)}
+              error={!!errors.propertyId}
               helperText={errors.propertyId}
-              disabled={loadingProperties}
               required
+              disabled={loadingProperties}
             >
-              {properties.map((property) => (
+              {properties?.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -224,14 +254,18 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
           <Grid item xs={12} sm={6}>
             <TextField
               select
-              label="Unit (optional)"
               fullWidth
+              id="inspection-form-unit"
+              name="unitId"
+              inputProps={{ id: 'inspection-form-unit', name: 'unitId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-unit' }}
+              label="Unit (Optional)"
               value={formData.unitId}
-              onChange={(event) => handleChange('unitId', event.target.value)}
-              disabled={!formData.propertyId || !units.length}
+              onChange={(e) => handleChange('unitId', e.target.value)}
+              disabled={!formData.propertyId || !units?.length}
             >
-              <MenuItem value="">Common areas</MenuItem>
-              {units.map((unit) => (
+              <MenuItem value="">No specific unit</MenuItem>
+              {units?.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>
@@ -239,65 +273,56 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
             </TextField>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <Autocomplete
-              size="small"
-              options={inspectorOptions}
-              value={inspectorOptions.find((option) => option.id === formData.assignedToId) || null}
-              onChange={(_event, value) => handleChange('assignedToId', value?.id || '')}
-              getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
-              renderInput={(params) => <TextField {...params} label="Assign to" helperText="Leave blank to assign later" />}
-            />
+          <Grid item xs={12}>
+            <TextField
+              select
+              fullWidth
+              id="inspection-form-assigned-to"
+              name="assignedToId"
+              inputProps={{ id: 'inspection-form-assigned-to', name: 'assignedToId' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-assigned-to' }}
+              label="Assign to Technician (Optional)"
+              value={formData.assignedToId}
+              onChange={(e) => handleChange('assignedToId', e.target.value)}
+            >
+              <MenuItem value="">Unassigned</MenuItem>
+              {technicians?.map((tech) => (
+                <MenuItem key={tech.id} value={tech.id}>
+                  {tech.firstName} {tech.lastName} ({tech.email})
+                </MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
           <Grid item xs={12}>
             <TextField
-              label="Notes"
-              multiline
-              minRows={3}
               fullWidth
+              id="inspection-form-notes"
+              name="notes"
+              inputProps={{ id: 'inspection-form-notes', name: 'notes' }}
+              InputLabelProps={{ htmlFor: 'inspection-form-notes' }}
+              label="Notes (Optional)"
               value={formData.notes}
-              onChange={(event) => handleChange('notes', event.target.value)}
-              placeholder="Add specific instructions or context for the inspector"
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <Autocomplete
-              multiple
-              freeSolo
-              size="small"
-              options={tagData.tags || []}
-              value={formData.tags}
-              onChange={(_event, value) => handleChange('tags', value)}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip {...getTagProps({ index })} label={option} key={option} size="small" />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Tags"
-                  placeholder="Add tags such as safety, compliance, urgent"
-                />
-              )}
+              onChange={(e) => handleChange('notes', e.target.value)}
+              multiline
+              rows={3}
+              placeholder="Add any special instructions or notes..."
             />
           </Grid>
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onCancel} disabled={isSaving}>
+      <DialogActions>
+        <Button onClick={onCancel} disabled={isLoading}>
           Cancel
         </Button>
         <Button
           type="submit"
           variant="contained"
-          disabled={isSaving}
-          startIcon={isSaving ? <CircularProgress size={16} /> : null}
+          disabled={isLoading}
+          startIcon={isLoading && <CircularProgress size={16} />}
         >
-          {isEditing ? 'Update inspection' : 'Schedule inspection'}
+          {isEditing ? 'Update' : 'Schedule'} Inspection
         </Button>
       </DialogActions>
     </Box>

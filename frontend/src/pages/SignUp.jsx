@@ -1,60 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
-  IconButton, InputAdornment, Grid, FormControl, InputLabel, Select, MenuItem
+  IconButton, InputAdornment, Grid
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
-import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
+import { saveTokenFromUrl } from '../lib/auth';
 import { api } from '../api.js';
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get('invite');
-
-  // MINIMAL CHANGE: Add 'role' to the initial state
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: '', role: 'PROPERTY_MANAGER'
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', phone: '', company: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [inviteData, setInviteData] = useState(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
 
   useEffect(() => {
     saveTokenFromUrl?.();
     const token = localStorage.getItem('auth_token');
     if (token) navigate('/dashboard');
   }, [navigate]);
-
-  // Fetch invite details if invite token is present
-  useEffect(() => {
-    const fetchInviteDetails = async () => {
-      if (!inviteToken) return;
-
-      setInviteLoading(true);
-      try {
-        const res = await api.get(`/api/invites/${inviteToken}`);
-        setInviteData(res);
-        // Pre-fill email and role from invite
-        setFormData(prev => ({
-          ...prev,
-          email: res.email || prev.email,
-          role: res.role || prev.role
-        }));
-      } catch (err) {
-        setError('Invalid or expired invitation link');
-        console.error('Invite fetch error:', err);
-      } finally {
-        setInviteLoading(false);
-      }
-    };
-
-    fetchInviteDetails();
-  }, [inviteToken]);
 
   const googleUrl = useMemo(() => {
     const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
@@ -91,35 +59,33 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      // MINIMAL CHANGE: Include the selected 'role' from the form data
+      // Aligns with your Prisma schema: firstName + lastName
       const payload = {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         phone: formData.phone.trim() || undefined,
-        role: formData.role,
+        role: 'PROPERTY_MANAGER',          // self-signup role
+        // company: formData.company.trim() // optional: send only if you’ll store it server-side
       };
 
-      // Add invite token if present
-      if (inviteToken) {
-        payload.inviteToken = inviteToken;
-      }
-
-      const res = await api.post('/api/auth/register', payload, { credentials: 'include' });
+      const res = await api.post('/api/auth/register', payload);
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 
       localStorage.setItem('auth_token', res.token);
-      setCurrentUser(res.user);
+      localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/dashboard');
     } catch (err) {
+      // Try to pick the first Zod error message if available
       const msg =
         err?.response?.data?.errors?.[0]?.message ||
         err?.response?.data?.message ||
         err?.message ||
         'Registration failed. Please try again.';
       setError(msg);
+      // eslint-disable-next-line no-console
       console.error('Registration error:', err);
     } finally {
       setLoading(false);
@@ -133,8 +99,8 @@ export default function SignUp() {
 
   return (
     <Container component="main" maxWidth="sm">
-      <Box sx={{ mt: { xs: 4, md: 8 }, mb: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center', px: { xs: 1, sm: 0 } }}>
-        <Paper elevation={3} sx={{ p: { xs: 3, md: 4 }, width: '100%', borderRadius: 3 }}>
+      <Box sx={{ mt: 8, mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Paper elevation={3} sx={{ p: 4, width: '100%', borderRadius: 2 }}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography variant="h3" component="h1" sx={{
               fontWeight: 700,
@@ -169,68 +135,101 @@ export default function SignUp() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  margin="normal" required fullWidth id="firstName" label="First Name" name="firstName"
-                  autoComplete="given-name" autoFocus value={formData.firstName}
-                  onChange={handleChange} disabled={loading}
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="firstName"
+                  name="firstName"
+                  inputProps={{ id: 'firstName', name: 'firstName' }}
+                  InputLabelProps={{ htmlFor: 'firstName' }}
+                  label="First Name"
+                  autoComplete="given-name"
+                  autoFocus
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  margin="normal" required fullWidth id="lastName" label="Last Name" name="lastName"
-                  autoComplete="family-name" value={formData.lastName}
-                  onChange={handleChange} disabled={loading}
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="lastName"
+                  name="lastName"
+                  inputProps={{ id: 'lastName', name: 'lastName' }}
+                  InputLabelProps={{ htmlFor: 'lastName' }}
+                  label="Last Name"
+                  autoComplete="family-name"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
               </Grid>
             </Grid>
 
             <TextField
-              margin="normal" required fullWidth id="email" label="Email Address" name="email"
-              type="email" autoComplete="email" value={formData.email}
-              onChange={handleChange} disabled={loading || inviteData}
-              InputProps={{
-                readOnly: !!inviteData,
-              }}
-              helperText={inviteData ? 'Email from invitation' : ''}
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              name="email"
+              inputProps={{ id: 'email', name: 'email' }}
+              InputLabelProps={{ htmlFor: 'email' }}
+              label="Email Address"
+              type="email"
+              autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={loading}
             />
 
             <TextField
-              margin="normal" fullWidth id="phone" label="Phone Number" name="phone"
-              type="tel" autoComplete="tel" placeholder="e.g., +1 555 123 4567"
-              value={formData.phone} onChange={handleChange} disabled={loading}
+              margin="normal"
+              fullWidth
+              id="phone"
+              name="phone"
+              inputProps={{ id: 'phone', name: 'phone' }}
+              InputLabelProps={{ htmlFor: 'phone' }}
+              label="Phone Number"
+              type="tel"
+              autoComplete="tel"
+              placeholder="+61 400 000 000"
+              value={formData.phone}
+              onChange={handleChange}
+              disabled={loading}
             />
 
-            {/* Role selection only shown for invite-based signup */}
-            {inviteToken && inviteData && (
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="role-select-label">Role</InputLabel>
-                <Select
-                  labelId="role-select-label"
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  label="Role"
-                  onChange={handleChange}
-                  disabled={true}
-                >
-                  <MenuItem value="PROPERTY_MANAGER">Property Manager</MenuItem>
-                  <MenuItem value="OWNER">Owner</MenuItem>
-                  <MenuItem value="TENANT">Tenant</MenuItem>
-                  <MenuItem value="TECHNICIAN">Technician</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-
-            {/* Show info text for non-invite signups */}
-            {!inviteToken && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                You are signing up as a Property Manager. Other roles require an invitation.
-              </Alert>
-            )}
+            {/* Optional field for your UI — not required by schema */}
+            <TextField
+              margin="normal"
+              fullWidth
+              id="company"
+              name="company"
+              inputProps={{ id: 'company', name: 'company' }}
+              InputLabelProps={{ htmlFor: 'company' }}
+              label="Company / Organization"
+              autoComplete="organization"
+              value={formData.company}
+              onChange={handleChange}
+              disabled={loading}
+            />
 
             <TextField
-              margin="normal" required fullWidth name="password" label="Password"
-              type={showPassword ? 'text' : 'password'} id="password" autoComplete="new-password"
-              value={formData.password} onChange={handleChange} disabled={loading} helperText="Minimum 8 characters"
+              margin="normal"
+              required
+              fullWidth
+              id="password"
+              name="password"
+              inputProps={{ id: 'password', name: 'password' }}
+              InputLabelProps={{ htmlFor: 'password' }}
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={loading}
+              helperText="Minimum 8 characters"
               InputProps={{ endAdornment: (
                 <InputAdornment position="end">
                   <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
@@ -241,9 +240,19 @@ export default function SignUp() {
             />
 
             <TextField
-              margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
-              type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" autoComplete="new-password"
-              value={formData.confirmPassword} onChange={handleChange} disabled={loading}
+              margin="normal"
+              required
+              fullWidth
+              id="confirmPassword"
+              name="confirmPassword"
+              inputProps={{ id: 'confirmPassword', name: 'confirmPassword' }}
+              InputLabelProps={{ htmlFor: 'confirmPassword' }}
+              label="Confirm Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              disabled={loading}
               InputProps={{ endAdornment: (
                 <InputAdornment position="end">
                   <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" disabled={loading}>
