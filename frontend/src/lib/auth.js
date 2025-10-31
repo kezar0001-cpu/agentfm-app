@@ -133,6 +133,15 @@ export function getCurrentUser() {
   try { return JSON.parse(userStr); } catch (e) { console.error('Error parsing user data:', e); return null; }
 }
 
+export function setCurrentUser(user) {
+  if (!user) {
+    localStorage.removeItem('user');
+  } else {
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+  broadcastUserUpdate(user);
+}
+
 export function saveAuthToken(token) {
   if (!token) return;
   localStorage.setItem('auth_token', token);
