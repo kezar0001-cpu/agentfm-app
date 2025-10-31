@@ -37,11 +37,10 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch properties
   const { data: properties = [], isLoading: loadingProperties } = useQuery({
-  const { data: properties = [], isLoading: loadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'properties']);
     },
   });
 
@@ -51,7 +50,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'units']);
     },
     enabled: !!formData.propertyId,
   });
@@ -61,7 +60,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return response.data;
+      // Backend returns { success: true, users: [...] }
+      return response.data?.users || [];
     },
   });
 
@@ -262,7 +262,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               required
               disabled={loadingProperties}
             >
-              {Array.isArray(properties) && properties.map((property) => (
+              {properties?.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -282,7 +282,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               disabled={!formData.propertyId || !units?.length}
             >
               <MenuItem value="">No specific unit</MenuItem>
-              {Array.isArray(units) && units.map((unit) => (
+              {units?.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>
@@ -301,7 +301,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
               onChange={(e) => handleChange('assignedToId', e.target.value)}
             >
               <MenuItem value="">Unassigned</MenuItem>
-              {Array.isArray(technicians) && technicians.map((tech) => (
+              {technicians?.map((tech) => (
                 <MenuItem key={tech.id} value={tech.id}>
                   {tech.firstName} {tech.lastName} ({tech.email})
                 </MenuItem>

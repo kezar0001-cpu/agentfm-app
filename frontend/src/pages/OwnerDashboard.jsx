@@ -30,6 +30,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
+import ensureArray from '../utils/ensureArray';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -48,7 +49,7 @@ export default function OwnerDashboard() {
     queryKey: ['owner-properties'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'properties']);
     },
   });
 
@@ -57,7 +58,7 @@ export default function OwnerDashboard() {
     queryKey: ['owner-jobs'],
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'jobs']);
     },
   });
 
@@ -66,7 +67,7 @@ export default function OwnerDashboard() {
     queryKey: ['owner-inspections'],
     queryFn: async () => {
       const response = await apiClient.get('/inspections');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'inspections']);
     },
   });
 
