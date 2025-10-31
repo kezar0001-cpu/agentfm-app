@@ -2,9 +2,14 @@ import { prisma } from '../config/prismaClient.js';
 import { verifyToken } from '../utils/jwt.js';
 
 /**
+ * Authentication and Authorization Middleware
+ * Provides requireAuth, optionalAuth, requireRole, and subscription checking
+ */
+
+/**
  * Middleware to verify JWT token and attach user to request.
  * Throws 401 if token is missing or invalid.
- * 
+ *
  * Usage:
  *   router.use(requireAuth);
  *   router.get('/protected', (req, res) => {
