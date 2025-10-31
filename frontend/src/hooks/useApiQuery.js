@@ -42,10 +42,10 @@ const useApiQuery = ({ queryKey, url, enabled = true }) => {
     fetchData();
   }, [fetchData]);
 
-  const refetch = () => {
+  const refetch = useCallback(() => {
     setIsLoading(true);
-    fetchData();
-  };
+    return fetchData();
+  }, [fetchData]);
 
   return { data, isLoading, isError, error, isFetching, refetch };
 };

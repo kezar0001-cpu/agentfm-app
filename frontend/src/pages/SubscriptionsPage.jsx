@@ -1,3 +1,5 @@
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -23,16 +25,27 @@ import {
   Container,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useTranslation } from 'react-i18next';
 import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
+import { getCurrentUser, refreshCurrentUser } from '../lib/auth.js'; // Import auth helpers
+import { calculateDaysRemaining } from '../utils/date.js';
 
-const STATUSES = ['active', 'pending', 'suspended', 'cancelled'];
+const STATUSES = {
+  ACTIVE: 'Active',
+  PENDING: 'Pending',
+  SUSPENDED: 'Suspended',
+  CANCELLED: 'Cancelled',
+};
+
+const normaliseStatus = (status) =>
+  typeof status === 'string' ? status.toUpperCase() : '';
 
 export default function SubscriptionsPage() {
-  const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
 
   const query = useApiQuery({
     queryKey: ['subscriptions'],
@@ -48,23 +61,65 @@ export default function SubscriptionsPage() {
     url: '/api/billing/checkout',
     method: 'post',
   });
+  
+  const params = new URLSearchParams(location.search);
+  const showSuccess = params.get('success') === '1';
+  const showCanceled = params.get('canceled') === '1';
+
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const [displaySuccess, setDisplaySuccess] = useState(showSuccess);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleUserUpdated = (event) => {
+      const nextUser = event?.detail ?? getCurrentUser();
+      setCurrentUser(nextUser || null);
+    };
+
+    window.addEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+
+    return () => {
+      window.removeEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+    };
+  }, []);
+
+  // Effect to refresh user data on successful subscription
+  useEffect(() => {
+    if (!showSuccess) return;
+
+    refreshCurrentUser()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user);
+        } else {
+          setCurrentUser(getCurrentUser());
+        }
+      })
+      .finally(() => {
+        // Remove success param from URL to prevent message on reload
+        navigate(location.pathname, { replace: true });
+      });
+  }, [showSuccess, navigate, location.pathname]);
+
 
   const subscriptions = normaliseArray(query.data);
-  const hasActiveSubscription = subscriptions.some(
-    (sub) => sub.status === 'active'
-  );
+  const userStatus = normaliseStatus(currentUser?.subscriptionStatus);
+  const hasActiveSubscription =
+    userStatus === 'ACTIVE' ||
+    subscriptions.some((sub) => normaliseStatus(sub.status) === 'ACTIVE');
 
   const handleStatusChange = async (subscriptionId, status) => {
+    const normalisedStatus = normaliseStatus(status);
     await mutation.mutateAsync({
       url: `/api/subscriptions/${subscriptionId}`,
       method: 'patch',
-      data: { status },
+      data: { status: normalisedStatus },
     });
   };
 
-  const params = new URLSearchParams(window.location.search);
-  const showSuccess = params.get('success') === '1';
-  const showCanceled = params.get('canceled') === '1';
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
@@ -85,6 +140,36 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleManageBilling = () => startCheckout(planForCheckout);
+
+  const formatEnumValue = (value, fallback = 'Not available') => {
+    if (!value) return fallback;
+    return value
+      .toString()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const trialStatusLabel = () => {
+    if (trialDaysRemaining === null) return null;
+    if (trialDaysRemaining > 0) {
+      return `Trial ends in ${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'}`;
+    }
+    return 'Trial ended';
+  };
+
+  let primaryCtaLabel = 'Subscribe';
+  let primaryCtaAction = () => startCheckout(planForCheckout);
+  if (isTrialActive) {
+    primaryCtaLabel = 'Resume trial';
+  } else if (userHasActiveSubscription) {
+    primaryCtaLabel = 'Manage Billing';
+    primaryCtaAction = handleManageBilling;
+  }
+
+  const trialLabel = trialStatusLabel();
+
   return (
     <Box sx={{ py: 4 }}>
       <Container maxWidth="lg">
@@ -102,8 +187,12 @@ export default function SubscriptionsPage() {
           </Box>
 
           {/* Banners */}
-          {showSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
+          {displaySuccess && (
+            <Alert
+              severity="success"
+              sx={{ mb: 2 }}
+              onClose={() => setDisplaySuccess(false)}
+            >
               <strong>Payment successful!</strong> Your subscription is now active. Welcome to AgentFM!
             </Alert>
           )}
@@ -117,6 +206,59 @@ export default function SubscriptionsPage() {
               {checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
             </Alert>
           )}
+
+          {/* Subscription Summary */}
+          <Card sx={{ borderRadius: 3, boxShadow: 1 }}>
+            <CardContent>
+              <Stack spacing={3}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={3}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Plan
+                      </Typography>
+                      <Typography variant="h6">
+                        {formatEnumValue(subscriptionPlan, 'No plan selected')}
+                      </Typography>
+                    </Box>
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Status
+                      </Typography>
+                      <Chip
+                        label={formatEnumValue(subscriptionStatus, 'No status')}
+                        color={userHasActiveSubscription ? 'success' : isTrialActive ? 'warning' : 'default'}
+                        variant={userHasActiveSubscription ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+                  </Stack>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: { xs: '100%', sm: 'auto' } }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={primaryCtaAction}
+                      disabled={checkoutMutation.isPending}
+                    >
+                      {checkoutMutation.isPending ? 'Processing...' : primaryCtaLabel}
+                    </Button>
+                  </Box>
+                </Stack>
+                {trialLabel && (
+                  <Chip
+                    label={trialLabel}
+                    color={trialDaysRemaining > 0 ? 'warning' : 'default'}
+                    variant={trialDaysRemaining > 0 ? 'filled' : 'outlined'}
+                  />
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
 
           {/* Pricing Card - Only show if no active subscription */}
           {!hasActiveSubscription && (
@@ -260,42 +402,42 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {subscriptions.map((subscription) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell>{subscription.id}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={subscription.planName || subscription.planId}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{subscription.customerName || subscription.customerId}</TableCell>
-                        <TableCell>
-                          <Select
-                            size="small"
-                            id={`subscription-${subscription.id}-status`}
-                            name="status"
-                            inputProps={{
-                              id: `subscription-${subscription.id}-status`,
-                              name: 'status',
-                            }}
-                            value={subscription.status || ''}
-                            onChange={(event) =>
-                              handleStatusChange(subscription.id, event.target.value)
-                            }
-                            disabled={mutation.isPending}
-                          >
-                            {STATUSES.map((status) => (
-                              <MenuItem key={status} value={status}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {subscriptions.map((subscription) => {
+                      const statusValue = normaliseStatus(subscription.status);
+
+                      return (
+                        <TableRow key={subscription.id}>
+                          <TableCell>{subscription.id}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={subscription.planName || subscription.planId}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{subscription.customerName || subscription.customerId}</TableCell>
+                          <TableCell>
+                            <Select
+                              size="small"
+                              id={`subscription-${subscription.id}-status`}
+                              name="status"
+                              value={statusValue}
+                              onChange={(event) =>
+                                handleStatusChange(subscription.id, event.target.value)
+                              }
+                              disabled={mutation.isPending}
+                            >
+                            {Object.entries(STATUSES).map(([value, label]) => (
+                              <MenuItem key={value} value={value}>
+                                {label}
                               </MenuItem>
                             ))}
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </DataState>
@@ -341,3 +483,4 @@ export default function SubscriptionsPage() {
     </Box>
   );
 }
+
