@@ -1,49 +1,287 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
-import { listRecommendations, convertRecommendation } from '../data/memoryStore.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Middleware to verify JWT token
-const requireAuth = async (req, res, next) => {
+
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
+    const { reportId, status } = req.query;
+    
+    const where = {};
+    if (reportId) where.reportId = reportId;
+    if (status) where.status = status;
+    
+    // Add role-based access control
+    // Recommendations are tied to inspection reports, which are tied to properties
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      // Property managers see recommendations for their properties
+      where.report = {
+        inspection: {
+          property: {
+            managerId: req.user.id,
+          },
+        },
+      };
+    } else if (req.user.role === 'OWNER') {
+      // Owners see recommendations for properties they own
+      where.report = {
+        inspection: {
+          property: {
+            owners: {
+              some: {
+                ownerId: req.user.id,
+              },
+            },
+          },
+        },
+      };
+    } else if (req.user.role === 'TECHNICIAN') {
+      // Technicians see recommendations for inspections assigned to them
+      where.report = {
+        inspection: {
+          assignedToId: req.user.id,
+        },
+      };
+    } else {
+      // Tenants and other roles have no access to recommendations
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. You do not have permission to view recommendations.' 
+      });
     }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id }
+    
+    const recommendations = await prisma.recommendation.findMany({
+      where,
+      include: {
+        report: {
+          select: {
+            id: true,
+            title: true,
+            inspectionId: true,
+            inspection: {
+              select: {
+                id: true,
+                title: true,
+                propertyId: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
+    
+    res.json(recommendations);
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch recommendations' });
   }
-};
-
-router.get('/', requireAuth, (req, res) => {
-  res.json(listRecommendations(req.user.orgId));
 });
 
-router.post('/:id/convert', requireAuth, (req, res) => {
-  const result = convertRecommendation(req.user.orgId, req.params.id);
-  if (result instanceof Error) {
-    let status = 400;
-    if (result.code === 'NOT_FOUND') status = 404;
-    if (result.code === 'INVALID') status = 400;
-    return res.status(status).json({ error: result.message });
+router.post('/:id/approve', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const recommendation = await prisma.recommendation.findUnique({
+      where: { id },
+      include: {
+        report: {
+          include: {
+            inspection: {
+              include: {
+                property: {
+                  include: {
+                    owners: {
+                      select: { ownerId: true },
+                    },
+                    manager: {
+                      select: {
+                        id: true,
+                        subscriptionStatus: true,
+                        trialEndDate: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!recommendation) {
+      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+
+    // Access control: Only property managers and owners can approve recommendations
+    const property = recommendation.report?.inspection?.property;
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Associated property not found' });
+    }
+
+    let hasAccess = false;
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You do not have permission to approve this recommendation.'
+      });
+    }
+
+    // Check property manager's subscription
+    const manager = property.manager;
+    const isManagerSubscriptionActive =
+      manager.subscriptionStatus === 'ACTIVE' ||
+      (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
+
+    if (!isManagerSubscriptionActive) {
+      return res.status(403).json({
+        success: false,
+        message: req.user.role === 'PROPERTY_MANAGER'
+          ? 'Your trial period has expired. Please upgrade your plan to continue.'
+          : 'This property\'s subscription has expired. Please contact your property manager.',
+        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
+      });
+    }
+    
+    const updated = await prisma.recommendation.update({
+      where: { id },
+      data: {
+        status: 'APPROVED',
+        approvedById: req.user.id,
+        approvedAt: new Date(),
+      },
+      include: {
+        report: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error approving recommendation:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve recommendation' });
   }
-  res.json(result);
+});
+
+router.post('/:id/reject', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+
+    const recommendation = await prisma.recommendation.findUnique({
+      where: { id },
+      include: {
+        report: {
+          include: {
+            inspection: {
+              include: {
+                property: {
+                  include: {
+                    owners: {
+                      select: { ownerId: true },
+                    },
+                    manager: {
+                      select: {
+                        id: true,
+                        subscriptionStatus: true,
+                        trialEndDate: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!recommendation) {
+      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+    }
+
+    // Access control: Only property managers and owners can reject recommendations
+    const property = recommendation.report?.inspection?.property;
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Associated property not found' });
+    }
+
+    let hasAccess = false;
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      hasAccess = property.managerId === req.user.id;
+    } else if (req.user.role === 'OWNER') {
+      hasAccess = property.owners?.some(o => o.ownerId === req.user.id);
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You do not have permission to reject this recommendation.'
+      });
+    }
+
+    // Check property manager's subscription
+    const manager = property.manager;
+    const isManagerSubscriptionActive =
+      manager.subscriptionStatus === 'ACTIVE' ||
+      (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
+
+    if (!isManagerSubscriptionActive) {
+      return res.status(403).json({
+        success: false,
+        message: req.user.role === 'PROPERTY_MANAGER'
+          ? 'Your trial period has expired. Please upgrade your plan to continue.'
+          : 'This property\'s subscription has expired. Please contact your property manager.',
+        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
+      });
+    }
+    
+    const updated = await prisma.recommendation.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: rejectionReason || null,
+      },
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error rejecting recommendation:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject recommendation' });
+  }
 });
 
 export default router;

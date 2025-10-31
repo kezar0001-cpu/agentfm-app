@@ -2,6 +2,7 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Toaster } from 'react-hot-toast';
 import GlobalGuard from './components/GlobalGuard.jsx';
 import AuthGate from './authGate';
 import Layout from './components/Layout';
@@ -59,13 +60,21 @@ const Dashboard = lazy(() => import('./pages/DashboardPage.jsx'));
 const PropertiesPage = lazy(() => import('./pages/PropertiesPage.jsx')); // wizard inside
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage.jsx'));
 const EditPropertyPage = lazy(() => import('./pages/EditPropertyPage.jsx'));
+const UnitDetailPage = lazy(() => import('./pages/UnitDetailPage.jsx'));
 const InspectionsPage = lazy(() => import('./pages/InspectionsPage.jsx'));
+const InspectionDetailPage = lazy(() => import('./pages/InspectionDetailPage.jsx'));
 const JobsPage = lazy(() => import('./pages/JobsPage.jsx'));
 const PlansPage = lazy(() => import('./pages/PlansPage.jsx'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
 const RecommendationsPage = lazy(() => import('./pages/RecommendationsPage.jsx'));
 const ServiceRequestsPage = lazy(() => import('./pages/ServiceRequestsPage.jsx'));
 const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage.jsx'));
+const TechnicianDashboard = lazy(() => import('./pages/TechnicianDashboard.jsx'));
+const TechnicianJobDetail = lazy(() => import('./pages/TechnicianJobDetail.jsx'));
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
+const TenantDashboard = lazy(() => import('./pages/TenantDashboard.jsx'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
+const TeamManagementPage = lazy(() => import('./pages/TeamManagementPage.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -81,6 +90,30 @@ export default function App() {
     <ErrorBoundary>
       <CssBaseline />
       <GlobalGuard />
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#4caf50',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#f44336',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public */}
@@ -98,15 +131,29 @@ export default function App() {
           <Route path="/properties" element={<AuthGate><Layout><PropertiesPage /></Layout></AuthGate>} />
           <Route path="/properties/:id" element={<AuthGate><Layout><PropertyDetailPage /></Layout></AuthGate>} />
           <Route path="/properties/:id/edit" element={<AuthGate><Layout><EditPropertyPage /></Layout></AuthGate>} />
+          
+          {/* Units */}
+          <Route path="/units/:id" element={<AuthGate><Layout><UnitDetailPage /></Layout></AuthGate>} />
 
           {/* Other feature pages */}
           <Route path="/inspections" element={<AuthGate><Layout><InspectionsPage /></Layout></AuthGate>} />
+          <Route path="/inspections/:id" element={<AuthGate><Layout><InspectionDetailPage /></Layout></AuthGate>} />
           <Route path="/jobs" element={<AuthGate><Layout><JobsPage /></Layout></AuthGate>} />
           <Route path="/plans" element={<AuthGate><Layout><PlansPage /></Layout></AuthGate>} />
           <Route path="/service-requests" element={<AuthGate><Layout><ServiceRequestsPage /></Layout></AuthGate>} />
           <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
           <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
           <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+          <Route path="/profile" element={<AuthGate><Layout><ProfilePage /></Layout></AuthGate>} />
+
+          {/* Role-specific dashboards */}
+          <Route path="/technician/dashboard" element={<AuthGate><Layout><TechnicianDashboard /></Layout></AuthGate>} />
+          <Route path="/technician/jobs/:id" element={<AuthGate><Layout><TechnicianJobDetail /></Layout></AuthGate>} />
+          <Route path="/owner/dashboard" element={<AuthGate><Layout><OwnerDashboard /></Layout></AuthGate>} />
+          <Route path="/tenant/dashboard" element={<AuthGate><Layout><TenantDashboard /></Layout></AuthGate>} />
+          
+          {/* Team Management (Property Manager only) */}
+          <Route path="/team" element={<AuthGate><Layout><TeamManagementPage /></Layout></AuthGate>} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

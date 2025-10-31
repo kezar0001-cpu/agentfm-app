@@ -1,14 +1,20 @@
-const DEFAULT_JWT_SECRET = 'your-secret-key';
+import jwt from 'jsonwebtoken';
+import getJwtSecret from './getJwtSecret.js';
 
-export function getJwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (typeof secret === 'string') {
-    const trimmed = secret.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
-  }
-  return DEFAULT_JWT_SECRET;
+const SECRET = getJwtSecret();
+
+export function signToken(payload, opts = {}) {
+  // default 7 days
+  const options = { expiresIn: '7d', ...opts };
+  return jwt.sign(payload, SECRET, options);
 }
 
-export default getJwtSecret;
+export function verifyToken(token) {
+  return jwt.verify(token, SECRET);
+}
+
+export function decodeToken(token) {
+  return jwt.decode(token);
+}
+
+export { getJwtSecret };

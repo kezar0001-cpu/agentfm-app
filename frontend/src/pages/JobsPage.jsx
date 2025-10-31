@@ -19,6 +19,7 @@ import {
   Badge,
   ToggleButtonGroup,
   ToggleButton,
+  Paper,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,7 +35,7 @@ import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import JobForm from '../components/JobForm';
@@ -44,6 +45,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import JobDetailModal from '../components/JobDetailModal';
+import { CircularProgress } from '@mui/material';
 
 const localizer = momentLocalizer(moment);
 
@@ -70,28 +72,43 @@ const JobsPage = () => {
   if (filters.propertyId) queryParams.append('propertyId', filters.propertyId);
   if (filters.filter) queryParams.append('filter', filters.filter);
 
-  // Fetch jobs
+  // Fetch jobs with infinite query
   const {
-    data: jobs = [],
+    data,
     isLoading,
     error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-  } = useQuery({
+  } = useInfiniteQuery({
     queryKey: ['jobs', filters],
+    queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams(queryParams);
+      params.append('limit', '50');
+      params.append('offset', pageParam.toString());
+      const response = await apiClient.get(`/jobs?${params.toString()}`);
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    },
+    initialPageParam: 0,
+  });
+
+  // Flatten all pages into a single array
+  const jobs = data?.pages?.flatMap(page => page.items) || [];
+
+  // Fetch properties for filter
+  const { data: propertiesData } = useQuery({
+    queryKey: ['properties-list'],
     queryFn: async () => {
-      const response = await apiClient.get(`/jobs?${queryParams.toString()}`);
-      return ensureArray(response.data, ['jobs', 'data', 'items', 'results']);
+      const response = await apiClient.get('/properties?limit=100&offset=0');
+      return response.data;
     },
   });
 
-  // Fetch properties for filter
-  const { data: properties = [] } = useQuery({
-    queryKey: ['properties-list'],
-    queryFn: async () => {
-      const response = await apiClient.get('/properties');
-      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
-    },
-  });
+  const properties = propertiesData?.items || [];
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -377,24 +394,25 @@ const JobsPage = () => {
       ) : (
         <>
           {view === 'card' && (
-            <Grid container spacing={{ xs: 2, md: 3 }}>
-              {filteredJobs.map((job) => (
-                <Grid item xs={12} md={6} lg={4} key={job.id}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      borderLeft: isOverdue(job) ? '4px solid' : 'none',
-                      borderLeftColor: 'error.main',
-                      borderRadius: 3,
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: 4,
-                      },
-                    }}
-                  >
+            <Stack spacing={3}>
+              <Grid container spacing={{ xs: 2, md: 3 }}>
+                {filteredJobs.map((job) => (
+                  <Grid item xs={12} md={6} lg={4} key={job.id}>
+                    <Card
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        borderLeft: isOverdue(job) ? '4px solid' : 'none',
+                        borderLeftColor: 'error.main',
+                        borderRadius: 3,
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: 4,
+                        },
+                      }}
+                    >
                     <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       <Box
                         sx={{
@@ -479,6 +497,22 @@ const JobsPage = () => {
                 </Grid>
               ))}
             </Grid>
+
+            {/* Load More Button */}
+            {hasNextPage && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
+                >
+                  {isFetchingNextPage ? 'Loading...' : 'Load More'}
+                </Button>
+              </Box>
+            )}
+          </Stack>
           )}
 
           {view === 'kanban' && (
@@ -565,22 +599,25 @@ const JobsPage = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
-        <JobForm
-          job={selectedJob}
-          onSuccess={handleSuccess}
-          onCancel={handleCloseDialog}
-        />
-      </Dialog>
+      {openDialog && (
+        <Dialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          maxWidth="md"
+          fullWidth
+        >
+          <JobForm
+            job={selectedJob}
+            onSuccess={handleSuccess}
+            onCancel={handleCloseDialog}
+          />
+        </Dialog>
+      )}
 
       {/* Job Detail Modal */}
       <JobDetailModal
         job={selectedJob}
+        open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
       />
     </Container>

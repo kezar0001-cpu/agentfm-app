@@ -27,11 +27,13 @@ model User {
   emailVerified           Boolean                 @default(false)
   assignedInspections     Inspection[]            @relation("AssignedTechnician")
   completedInspections    Inspection[]            @relation("CompletedBy")
-  InspectionAuditLog      InspectionAuditLog[]
-  InspectionReminder      InspectionReminder[]
+  inspectionAuditLogs     InspectionAuditLog[]
+  inspectionReminders     InspectionReminder[]
+  uploadedAttachments     InspectionAttachment[] @relation("InspectionAttachmentUploadedBy")
   sentInvites             Invite[]                @relation("InvitedBy")
   receivedInvite          Invite?                 @relation("InvitedUser")
   assignedJobs            Job[]                   @relation("AssignedTechnician")
+  jobComments             JobComment[]
   notifications           Notification[]
   OwnerProfile            OwnerProfile?
   managedProperties       Property[]              @relation("PropertyManager")
@@ -44,10 +46,26 @@ model User {
   TechnicianProfile       TechnicianProfile?
   TenantProfile           TenantProfile?
   tenantUnits             UnitTenant[]
+  reportRequests          ReportRequest[]         @relation("ReportRequestsCreated")
+  passwordResets          PasswordReset[]
   Org                     Org?                    @relation(fields: [orgId], references: [id])
 
   @@index([email])
   @@index([role])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  selector  String   @unique
+  verifier  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([selector])
 }
 
 model Invite {
@@ -118,6 +136,7 @@ model Property {
   plans           MaintenancePlan[]
   manager         User              @relation("PropertyManager", fields: [managerId], references: [id], onDelete: Cascade)
   owners          PropertyOwner[]
+  reportRequests  ReportRequest[]
   serviceRequests ServiceRequest[]
   units           Unit[]
 
@@ -160,6 +179,7 @@ model Unit {
   inspections     Inspection[]
   invites         Invite[]
   jobs            Job[]
+  reportRequests  ReportRequest[]
   serviceRequests ServiceRequest[]
   property        Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenants         UnitTenant[]
@@ -189,30 +209,31 @@ model UnitTenant {
 }
 
 model Inspection {
-  id                   String                 @id @default(cuid())
-  title                String
-  type                 InspectionType
-  scheduledDate        DateTime
-  completedDate        DateTime?
-  propertyId           String
-  unitId               String?
-  assignedToId         String?
-  completedById        String?
-  status               InspectionStatus       @default(SCHEDULED)
-  notes                String?
-  findings             String?
-  photos               String[]               @default([])
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  assignedTo           User?                  @relation("AssignedTechnician", fields: [assignedToId], references: [id])
-  completedBy          User?                  @relation("CompletedBy", fields: [completedById], references: [id])
-  property             Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unit                 Unit?                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  InspectionAttachment InspectionAttachment[]
-  InspectionAuditLog   InspectionAuditLog[]
-  InspectionReminder   InspectionReminder[]
-  Job                  Job[]
-  report               Report?
+  id              String            @id @default(cuid())
+  title           String
+  type            InspectionType
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  propertyId      String
+  unitId          String?
+  assignedToId    String?
+  completedById   String?
+  status          InspectionStatus  @default(SCHEDULED)
+  notes           String?
+  findings        String?
+  tags            String[]          @default([])
+  photos          String[]          @default([])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  assignedTo      User?             @relation("AssignedTechnician", fields: [assignedToId], references: [id])
+  completedBy     User?             @relation("CompletedBy", fields: [completedById], references: [id])
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  attachments     InspectionAttachment[]
+  auditLogs       InspectionAuditLog[]
+  reminders       InspectionReminder[]
+  jobs            Job[]
+  report          Report?
 
   @@index([propertyId])
   @@index([unitId])
@@ -247,6 +268,7 @@ model Job {
   property          Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   serviceRequest    ServiceRequest?  @relation(fields: [serviceRequestId], references: [id])
   unit              Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  comments          JobComment[]
 
   @@index([propertyId])
   @@index([unitId])
@@ -322,6 +344,28 @@ model Report {
   @@index([generatedDate])
 }
 
+model ReportRequest {
+  id              String   @id @default(cuid())
+  reportType      String
+  parameters      Json?
+  propertyId      String
+  unitId          String?
+  requestedById   String
+  status          String   @default("PENDING")
+  fileUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?    @relation(fields: [unitId], references: [id])
+  requestedBy     User     @relation("ReportRequestsCreated", fields: [requestedById], references: [id])
+  
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([requestedById])
+  @@index([status])
+}
+
 model Recommendation {
   id              String               @id @default(cuid())
   title           String
@@ -365,45 +409,51 @@ model Notification {
 }
 
 model InspectionAttachment {
-  id           String     @id
-  fileName     String
-  fileType     String
-  fileUrl      String
-  uploadedAt   DateTime   @default(now())
-  inspectionId String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  inspectionId  String
+  name          String      @map("fileName")
+  mimeType      String      @map("fileType")
+  url           String      @map("fileUrl")
+  size          Int?
+  annotations   Json?
+  uploadedById  String?
+  createdAt     DateTime    @default(now()) @map("uploadedAt")
+  inspection    Inspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  uploadedBy    User?       @relation("InspectionAttachmentUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([inspectionId])
 }
 
 model InspectionAuditLog {
-  id           String     @id
+  id           String     @id @default(cuid())
   action       String
   changes      Json?
-  timestamp    DateTime   @default(now())
+  createdAt    DateTime   @default(now()) @map("timestamp")
   inspectionId String
-  userId       String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String?
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
-  @@index([timestamp])
+  @@index([createdAt])
   @@index([userId])
 }
 
 model InspectionReminder {
-  id           String     @id
-  reminderDate DateTime
+  id           String     @id @default(cuid())
+  inspectionId String
+  remindAt     DateTime   @map("reminderDate")
   sentAt       DateTime?
   channel      String
-  inspectionId String
-  userId       String
-  Inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipients   String[]   @default([])
+  metadata     Json?
+  createdById  String     @map("userId")
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  createdBy    User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
-  @@index([reminderDate])
-  @@index([userId])
+  @@index([remindAt])
+  @@index([createdById])
 }
 
 model Org {
@@ -551,4 +601,20 @@ enum SubscriptionPlan {
   STARTER
   PROFESSIONAL
   ENTERPRISE
+}
+
+model JobComment {
+  id        String   @id @default(cuid())
+  jobId     String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@index([jobId])
+  @@index([userId])
+  @@index([createdAt])
 }

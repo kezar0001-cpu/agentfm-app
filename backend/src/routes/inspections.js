@@ -2,16 +2,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import prisma from '../config/prismaClient.js';
-import { requireRole, ROLES } from '../../middleware/roleAuth.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 
 const router = Router();
 
-const ROLE_ADMIN = ROLES.ADMIN || 'ADMIN';
-const ROLE_MANAGER = ROLES.PROPERTY_MANAGER || 'PROPERTY_MANAGER';
-const ROLE_OWNER = ROLES.OWNER || 'OWNER';
-const ROLE_TECHNICIAN = ROLES.TECHNICIAN || 'TECHNICIAN';
-const ROLE_TENANT = ROLES.TENANT || 'TENANT';
+// Roles from Prisma schema
+const ROLE_MANAGER = 'PROPERTY_MANAGER';
+const ROLE_OWNER = 'OWNER';
+const ROLE_TECHNICIAN = 'TECHNICIAN';
+const ROLE_TENANT = 'TENANT';
 
 const SORTABLE_FIELDS = {
   scheduledDate: 'scheduledDate',
@@ -134,7 +133,7 @@ function parseSort(sortBy, sortOrder) {
 }
 
 function isAdmin(user) {
-  return user?.role === ROLE_ADMIN;
+  return user?.role === ROLE_MANAGER;
 }
 
 function augmentUser(user) {
@@ -579,49 +578,34 @@ router.get('/calendar', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const where = buildInspectionWhere(req.query, req.user);
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 20, 1), 100);
-    const skip = (page - 1) * pageSize;
+
+    // Parse pagination parameters
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
     const orderBy = parseSort(req.query.sortBy, req.query.sortOrder);
 
-    const [items, total, statusBreakdown] = await Promise.all([
+    const [items, total] = await Promise.all([
       prisma.inspection.findMany({
         where,
         include: baseInspectionInclude,
         orderBy,
-        skip,
-        take: pageSize,
+        skip: offset,
+        take: limit,
       }),
       prisma.inspection.count({ where }),
-      prisma.inspection.groupBy({
-        where,
-        by: ['status'],
-        _count: { _all: true },
-      }),
     ]);
 
-    const summary = statusBreakdown.reduce(
-      (acc, item) => {
-        acc[item.status] = item._count._all;
-        return acc;
-      },
-      {},
-    );
+    // Calculate page number and hasMore
+    const page = Math.floor(offset / limit) + 1;
+    const hasMore = offset + limit < total;
 
+    // Return paginated response
     res.json({
-      data: {
-        items,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.max(Math.ceil(total / pageSize), 1),
-        },
-      },
-      summary,
-      meta: {
-        generatedAt: new Date().toISOString(),
-      },
+      items,
+      total,
+      page,
+      hasMore,
     });
   } catch (error) {
     console.error('Failed to fetch inspections', error);
@@ -629,7 +613,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', requireRole(ROLE_MANAGER, ROLE_ADMIN), async (req, res) => {
+// POST / - Create inspection (requires active subscription)
+router.post('/', requireAuth, requireRole(ROLE_MANAGER), requireActiveSubscription, async (req, res) => {
   try {
     const payload = inspectionCreateSchema.parse(req.body);
 
@@ -680,7 +665,7 @@ router.get('/:id', ensureInspectionAccess, async (req, res) => {
 
 router.patch(
   '/:id',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -710,7 +695,7 @@ router.patch(
   },
 );
 
-router.delete('/:id', requireRole(ROLE_MANAGER, ROLE_ADMIN), ensureInspectionAccess, async (req, res) => {
+router.delete('/:id', requireRole(ROLE_MANAGER, ROLE_MANAGER), ensureInspectionAccess, async (req, res) => {
   try {
     const inspection = await prisma.inspection.delete({ where: { id: req.params.id } });
     await logAudit(inspection.id, req.user.id, 'DELETED', { before: inspection });
@@ -723,7 +708,7 @@ router.delete('/:id', requireRole(ROLE_MANAGER, ROLE_ADMIN), ensureInspectionAcc
 
 router.post(
   '/:id/complete',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -765,7 +750,7 @@ router.post(
 
 router.post(
   '/:id/attachments',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -802,7 +787,7 @@ router.post(
 
 router.patch(
   '/:id/attachments/:attachmentId',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -836,7 +821,7 @@ router.patch(
 
 router.delete(
   '/:id/attachments/:attachmentId',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -852,7 +837,7 @@ router.delete(
 
 router.post(
   '/:id/reminders',
-  requireRole(ROLE_MANAGER, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -896,7 +881,7 @@ router.post(
 
 router.patch(
   '/:id/schedule',
-  requireRole(ROLE_MANAGER, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -933,7 +918,7 @@ router.patch(
 
 router.post(
   '/:id/jobs',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {
@@ -980,7 +965,7 @@ router.post(
 
 router.get(
   '/:id/audit',
-  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_ADMIN),
+  requireRole(ROLE_MANAGER, ROLE_TECHNICIAN, ROLE_MANAGER),
   ensureInspectionAccess,
   async (req, res) => {
   try {

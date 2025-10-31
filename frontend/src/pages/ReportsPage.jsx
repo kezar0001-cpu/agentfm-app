@@ -25,6 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { format } from 'date-fns';
+import ensureArray from '../utils/ensureArray';
 
 const reportSchema = z.object({
   reportType: z.string().min(1, 'forms.required'),
@@ -45,28 +46,29 @@ export default function ReportsPage() {
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
 
   // Data fetching
-  const { data: propertiesData, isLoading: isLoadingProperties } = useQuery({
+  const { data: propertiesData = [], isLoading: isLoadingProperties } = useQuery({
     queryKey: ['properties-list'],
     queryFn: async () => {
       const res = await apiClient.get('/properties');
-      return res.data.properties;
+      return ensureArray(res.data, ['items', 'data.items', 'properties']);
     },
   });
 
-  const { data: unitsData, isLoading: isLoadingUnits } = useQuery({
+  const { data: unitsData = [], isLoading: isLoadingUnits } = useQuery({
     queryKey: ['units-list', selectedPropertyId],
     queryFn: async () => {
-      const res = await apiClient.get(`/properties/${selectedPropertyId}/units`);
-      return res.data;
+      const res = await apiClient.get(`/units?propertyId=${selectedPropertyId}`);
+      return ensureArray(res.data, ['items', 'data.items', 'units']);
     },
     enabled: !!selectedPropertyId,
   });
 
-  const { data: reportsData, isLoading: isLoadingReports } = useQuery({
+  const { data: reportsData = [], isLoading: isLoadingReports } = useQuery({
     queryKey: ['reports'],
     queryFn: async () => {
       const res = await apiClient.get('/reports');
-      return res.data.reports;
+      // Backend returns array or object with reports
+      return Array.isArray(res.data) ? res.data : res.data?.reports || [];
     },
     refetchInterval: (query) => {
       const reports = query.state.data;
@@ -260,7 +262,13 @@ export default function ReportsPage() {
           Generated Reports
         </Typography>
         {isLoadingReports ? (
-          <CircularProgress />
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : reportsData.length === 0 ? (
+          <Alert severity="info">
+            No reports generated yet. Create your first report using the form above.
+          </Alert>
         ) : (
           <TableContainer>
             <Table>
@@ -275,26 +283,41 @@ export default function ReportsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {reportsData?.map((report) => (
+                {reportsData.map((report) => (
                   <TableRow key={report.id}>
                     <TableCell>{REPORT_TYPES[report.reportType] || report.reportType}</TableCell>
                     <TableCell>{report.property?.name || 'N/A'}</TableCell>
-                    <TableCell>{report.unit?.unitNumber || 'N/A'}</TableCell>
+                    <TableCell>{report.unit?.unitNumber || 'All Units'}</TableCell>
                     <TableCell>
-                      {format(new Date(report.parameters.fromDate), 'PP')} -{' '}
-                      {format(new Date(report.parameters.toDate), 'PP')}
+                      {report.parameters?.fromDate && report.parameters?.toDate ? (
+                        <>
+                          {format(new Date(report.parameters.fromDate), 'PP')} -{' '}
+                          {format(new Date(report.parameters.toDate), 'PP')}
+                        </>
+                      ) : (
+                        'N/A'
+                      )}
                     </TableCell>
                     <TableCell>{getStatusChip(report.status)}</TableCell>
                     <TableCell>
-                      {report.status === 'COMPLETED' && (
+                      {report.status === 'COMPLETED' && report.fileUrl && (
                         <Button
                           variant="outlined"
                           size="small"
-                          href={`${apiClient.defaults.baseURL}/reports/${report.id}/download`}
+                          href={report.fileUrl}
                           target="_blank"
+                          rel="noopener noreferrer"
                         >
                           Download
                         </Button>
+                      )}
+                      {report.status === 'PROCESSING' && (
+                        <CircularProgress size={20} />
+                      )}
+                      {report.status === 'FAILED' && (
+                        <Typography variant="caption" color="error">
+                          Failed
+                        </Typography>
                       )}
                     </TableCell>
                   </TableRow>

@@ -1,19 +1,60 @@
 import { Resend } from 'resend';
 
-// Lazy initialize Resend client only when needed
-let resend = null;
+let resendClient;
 
 function getResendClient() {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn('⚠️  RESEND_API_KEY not configured - email sending will be disabled');
+  if (resendClient) {
+    return resendClient;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
     return null;
   }
 
-  if (!resend) {
-    resend = new Resend(process.env.RESEND_API_KEY);
+  resendClient = new Resend(apiKey);
+  return resendClient;
+}
+
+function ensureResendClient() {
+  const client = getResendClient();
+
+  if (!client) {
+    throw new Error('Resend API key is not configured');
   }
 
-  return resend;
+  return client;
+}
+
+/**
+ * Send a generic email
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} html - Email HTML content
+ */
+export async function sendEmail(to, subject, html) {
+  try {
+    const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+
+    const resend = ensureResendClient();
+
+    const { data, error } = await resend.emails.send({
+      from: emailFrom,
+      to: to,
+      subject: subject,
+      html: html,
+    });
+
+    if (error) {
+      console.error('Error sending email:', error);
+      throw new Error('Failed to send email');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Email sending error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -23,22 +64,15 @@ function getResendClient() {
  * @param {string} firstName - User's first name
  */
 export async function sendPasswordResetEmail(to, resetUrl, firstName) {
-  const client = getResendClient();
-
-  if (!client) {
-    console.error('Cannot send password reset email - Resend API key not configured');
-    // Don't throw error to prevent breaking the forgot password flow
-    // The user will still get a success message (to prevent email enumeration)
-    return null;
-  }
-
   try {
     const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
 
-    const { data, error } = await client.emails.send({
+    const resend = ensureResendClient();
+
+    const { data, error } = await resend.emails.send({
       from: emailFrom,
       to: to,
-      subject: 'Reset Your Buildstate Password',
+      subject: 'Reset Your Password',
       html: generatePasswordResetEmailHTML(firstName, resetUrl),
     });
 
@@ -150,7 +184,7 @@ function generatePasswordResetEmailHTML(firstName, resetUrl) {
 
     <p>Hi ${firstName},</p>
 
-    <p>We received a request to reset your password for your Buildstate account. Click the button below to create a new password:</p>
+    <p>We received a request to reset your password for your account. Click the button below to create a new password:</p>
 
     <div class="button-container">
       <a href="${resetUrl}" class="button">Reset Password</a>
