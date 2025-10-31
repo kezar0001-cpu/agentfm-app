@@ -40,7 +40,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['properties-list'],
     queryFn: async () => {
       const response = await apiClient.get('/properties');
-      return ensureArray(response.data, ['items', 'data.items', 'properties']);
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
     },
   });
 
@@ -50,7 +50,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
-      return ensureArray(response.data, ['items', 'data.items', 'units']);
+      return ensureArray(response.data, ['units', 'data', 'items', 'results']);
     },
     enabled: !!formData.propertyId,
   });
@@ -60,8 +60,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      // Backend returns { success: true, users: [...] }
-      return response.data?.users || [];
+      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
     },
   });
 
