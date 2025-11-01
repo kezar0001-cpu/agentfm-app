@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -15,11 +15,14 @@ import {
   IconButton,
   Stack,
   Dialog,
-  Tooltip,
-  Badge,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
   ToggleButtonGroup,
   ToggleButton,
   Paper,
+  Checkbox,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,7 +38,7 @@ import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
 } from '@mui/icons-material';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import JobForm from '../components/JobForm';
@@ -47,6 +50,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import JobDetailModal from '../components/JobDetailModal';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
+import toast from 'react-hot-toast';
 
 const localizer = momentLocalizer(moment);
 
@@ -65,6 +69,9 @@ const JobsPage = () => {
   const [view, setView] = useState('card'); // 'card', 'kanban', 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState([]);
+  const [bulkTechnicianId, setBulkTechnicianId] = useState('');
+  const [isConfirmBulkAssignOpen, setIsConfirmBulkAssignOpen] = useState(false);
 
   // Build query params
   const queryParams = new URLSearchParams();
@@ -111,6 +118,14 @@ const JobsPage = () => {
 
   const properties = propertiesData?.items || [];
 
+  const { data: technicians = [] } = useQuery({
+    queryKey: queryKeys.technicians.all(),
+    queryFn: async () => {
+      const response = await apiClient.get('/users?role=TECHNICIAN');
+      return ensureArray(response.data, ['users', 'data', 'items', 'results']);
+    },
+  });
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -130,11 +145,73 @@ const JobsPage = () => {
     setDetailModalOpen(true);
   };
 
+  const handleToggleJobSelection = (jobId) => {
+    setSelectedJobIds((prev) => {
+      if (prev.includes(jobId)) {
+        return prev.filter((id) => id !== jobId);
+      }
+      return [...prev, jobId];
+    });
+  };
+
+  const handleToggleSelectAllVisible = (event) => {
+    const { checked } = event.target;
+    if (checked) {
+      setSelectedJobIds(filteredJobs.map((job) => job.id));
+    } else {
+      setSelectedJobIds([]);
+    }
+  };
+
+  const handleOpenBulkAssignConfirm = () => {
+    if (!bulkTechnicianId || selectedJobIds.length === 0) {
+      return;
+    }
+    setIsConfirmBulkAssignOpen(true);
+  };
+
+  const handleCloseBulkAssignConfirm = () => {
+    setIsConfirmBulkAssignOpen(false);
+  };
+
+  const selectedTechnician = useMemo(() => {
+    return technicians.find((tech) => tech.id === bulkTechnicianId) || null;
+  }, [technicians, bulkTechnicianId]);
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async ({ jobIds, technicianId }) => {
+      const response = await apiClient.post('/jobs/bulk-assign', { jobIds, technicianId });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Jobs assigned successfully');
+      setSelectedJobIds([]);
+      setBulkTechnicianId('');
+      setIsConfirmBulkAssignOpen(false);
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to assign jobs');
+    },
+  });
+
+  const handleConfirmBulkAssign = () => {
+    if (selectedJobIds.length === 0 || !bulkTechnicianId) {
+      return;
+    }
+
+    bulkAssignMutation.mutate({ jobIds: selectedJobIds, technicianId: bulkTechnicianId });
+  };
+
   const filteredJobs = jobs.filter(
     (job) =>
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (job.description && job.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const selectedCount = selectedJobIds.length;
+  const allVisibleSelected = filteredJobs.length > 0 && selectedCount === filteredJobs.length;
+  const isSelectionIndeterminate = selectedCount > 0 && !allVisibleSelected;
 
   const handleCreate = () => {
     setSelectedJob(null);
@@ -163,6 +240,26 @@ const JobsPage = () => {
       navigate(location.pathname, { replace: true });
     }
   }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    setSelectedJobIds((prev) => {
+      const visibleIds = new Set(filteredJobs.map((job) => job.id));
+      const next = prev.filter((id) => visibleIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredJobs]);
+
+  useEffect(() => {
+    if (view !== 'card' && selectedJobIds.length > 0) {
+      setSelectedJobIds([]);
+    }
+  }, [view, selectedJobIds.length]);
+
+  useEffect(() => {
+    if (selectedJobIds.length === 0) {
+      setIsConfirmBulkAssignOpen(false);
+    }
+  }, [selectedJobIds.length]);
 
   const getPriorityColor = (priority) => {
     const colors = {
@@ -377,6 +474,77 @@ const JobsPage = () => {
         </CardContent>
       </Card>
 
+      {view === 'card' && selectedCount > 0 && (
+        <Paper
+          elevation={2}
+          sx={{
+            mb: 3,
+            px: { xs: 2, md: 3 },
+            py: { xs: 2, md: 2.5 },
+            borderRadius: 3,
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={{ xs: 2, md: 3 }}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            justifyContent="space-between"
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Checkbox
+                color="primary"
+                checked={allVisibleSelected}
+                indeterminate={isSelectionIndeterminate}
+                onChange={handleToggleSelectAllVisible}
+                inputProps={{ 'aria-label': 'Select all visible jobs' }}
+              />
+              <Box>
+                <Typography variant="subtitle1">{selectedCount} selected</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Choose a technician to assign all selected jobs
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+              <TextField
+                select
+                label="Assign to technician"
+                size="small"
+                value={bulkTechnicianId}
+                onChange={(event) => setBulkTechnicianId(event.target.value)}
+                sx={{ minWidth: { xs: '100%', sm: 240 } }}
+                helperText={!bulkTechnicianId ? 'Select a technician' : ' '}
+              >
+                <MenuItem value="">
+                  Select technician
+                </MenuItem>
+                {technicians.map((tech) => (
+                  <MenuItem key={tech.id} value={tech.id}>
+                    {tech.firstName} {tech.lastName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleOpenBulkAssignConfirm}
+                disabled={!bulkTechnicianId || bulkAssignMutation.isPending}
+                startIcon={
+                  bulkAssignMutation.isPending ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <BuildIcon />
+                  )
+                }
+              >
+                {bulkAssignMutation.isPending ? 'Assigning...' : 'Assign Jobs'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      )}
+
       {/* Jobs List / Views */}
       {!filteredJobs || filteredJobs.length === 0 ? (
         <DataState
@@ -397,24 +565,36 @@ const JobsPage = () => {
           {view === 'card' && (
             <Stack spacing={3}>
               <Grid container spacing={{ xs: 2, md: 3 }}>
-                {filteredJobs.map((job) => (
-                  <Grid item xs={12} md={6} lg={4} key={job.id}>
-                    <Card
-                      sx={{
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        transition: 'transform 0.2s, box-shadow 0.2s',
-                        borderLeft: isOverdue(job) ? '4px solid' : 'none',
-                        borderLeftColor: 'error.main',
-                        borderRadius: 3,
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: 4,
-                        },
-                      }}
-                    >
-                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {filteredJobs.map((job) => {
+                  const isSelected = selectedJobIds.includes(job.id);
+                  return (
+                    <Grid item xs={12} md={6} lg={4} key={job.id}>
+                      <Card
+                        sx={{
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                          borderLeft: isOverdue(job) ? '4px solid' : 'none',
+                          borderLeftColor: 'error.main',
+                          borderRadius: 3,
+                          position: 'relative',
+                          outline: isSelected ? '2px solid' : 'none',
+                          outlineColor: 'primary.main',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: 4,
+                          },
+                        }}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => handleToggleJobSelection(job.id)}
+                          color="primary"
+                          sx={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}
+                          inputProps={{ 'aria-label': `Select job ${job.title}` }}
+                        />
+                        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 4 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -494,9 +674,10 @@ const JobsPage = () => {
                         </Box>
                       </Stack>
                     </CardContent>
-                  </Card>
-                </Grid>
-              ))}
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
 
             {/* Load More Button */}
@@ -598,6 +779,44 @@ const JobsPage = () => {
           )}
         </>
       )}
+
+      <Dialog
+        open={isConfirmBulkAssignOpen}
+        onClose={handleCloseBulkAssignConfirm}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Confirm bulk assignment</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to assign {selectedCount} job{selectedCount === 1 ? '' : 's'} to{' '}
+            {selectedTechnician
+              ? `${selectedTechnician.firstName} ${selectedTechnician.lastName}`
+              : 'the selected technician'}
+            ? This will replace any existing assignments for those jobs.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBulkAssignConfirm} disabled={bulkAssignMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmBulkAssign}
+            variant="contained"
+            color="primary"
+            disabled={bulkAssignMutation.isPending}
+            startIcon={
+              bulkAssignMutation.isPending ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <BuildIcon />
+              )
+            }
+          >
+            {bulkAssignMutation.isPending ? 'Assigning...' : 'Assign Jobs'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       {openDialog && (
