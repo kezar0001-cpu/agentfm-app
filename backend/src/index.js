@@ -12,6 +12,7 @@ import mongoSanitize from 'express-mongo-sanitize';
 import compression from 'compression';
 import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
 import logger from './utils/logger.js';
+import scheduleMaintenancePlanCron from './cron/maintenancePlans.js';
 
 // ---- Load env
 dotenv.config();
@@ -24,6 +25,9 @@ export { prismaInstance as prisma };
 // ---- App
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ---- Cron Jobs
+const maintenancePlanCronTask = scheduleMaintenancePlanCron();
 
 // Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);
@@ -268,6 +272,13 @@ async function startServer() {
           resolve();
         });
       });
+      if (maintenancePlanCronTask) {
+        try {
+          maintenancePlanCronTask.stop();
+        } catch (cronError) {
+          logger.error('Error stopping maintenance plan cron task:', cronError);
+        }
+      }
       try {
         await Promise.allSettled([closeServer, prisma.$disconnect()]);
         logger.info('Shutdown complete. Goodbye!');
