@@ -24,6 +24,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { format } from 'date-fns';
 import { queryKeys } from '../utils/queryKeys.js';
 
@@ -104,8 +105,51 @@ export default function TechnicianJobDetail() {
     return false;
   };
 
+  const jobDetailPath = `/technician/jobs/${id}`;
+  const propertyLink = job?.property?.id
+    ? `/properties/${job.property.id}`
+    : job?.propertyId
+      ? `/properties/${job.propertyId}`
+      : null;
+  const unitLink = job?.unit?.id
+    ? `/units/${job.unit.id}`
+    : job?.unitId
+      ? `/units/${job.unitId}`
+      : null;
+
+  const breadcrumbOverrides = {
+    '/dashboard': { label: 'Technician Dashboard', to: '/technician/dashboard' },
+    '/technician': { hidden: true },
+    '/technician/jobs': { label: 'Jobs', to: '/technician/dashboard' },
+    [jobDetailPath]: job?.title || 'Job Details',
+  };
+
+  const breadcrumbExtras = [];
+
+  if (propertyLink) {
+    breadcrumbExtras.push({
+      key: 'job-property',
+      label: job.property.name,
+      to: propertyLink,
+      after: '/technician/jobs',
+    });
+  }
+
+  if (unitLink) {
+    breadcrumbExtras.push({
+      key: 'job-unit',
+      label: job?.unit?.unitNumber ? `Unit ${job.unit.unitNumber}` : 'Unit Details',
+      to: unitLink,
+      after: propertyLink || '/technician/jobs',
+    });
+  }
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Breadcrumbs
+        labelOverrides={breadcrumbOverrides}
+        extraCrumbs={breadcrumbExtras}
+      />
       <Button
         startIcon={<ArrowBackIcon />}
         onClick={() => navigate('/technician/dashboard')}

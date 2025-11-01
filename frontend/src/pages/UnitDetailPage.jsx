@@ -50,6 +50,7 @@ import { formatDateTime } from '../utils/date';
 import toast from 'react-hot-toast';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 const getStatusColor = (status) => {
   const colors = {
@@ -134,6 +135,25 @@ export default function UnitDetailPage() {
   const jobs = jobsQuery.data || [];
   const inspections = inspectionsQuery.data || [];
 
+  const propertyPath = unit?.propertyId
+    ? `/properties/${unit.propertyId}`
+    : unit?.property?.id
+      ? `/properties/${unit.property.id}`
+      : null;
+  const breadcrumbOverrides = {
+    '/units': { label: 'Properties', to: '/properties' },
+    [`/units/${id}`]: unit?.unitNumber ? `Unit ${unit.unitNumber}` : 'Unit Details',
+  };
+  const breadcrumbExtras = unit?.property && propertyPath
+    ? [
+        {
+          label: unit.property.name,
+          to: propertyPath,
+          after: '/properties',
+        },
+      ]
+    : [];
+
   const handleBack = () => {
     if (unit?.propertyId) {
       navigate(`/properties/${unit.propertyId}`);
@@ -182,6 +202,10 @@ export default function UnitDetailPage() {
           <>
             {/* Header */}
             <Box sx={{ mb: 3 }}>
+              <Breadcrumbs
+                labelOverrides={breadcrumbOverrides}
+                extraCrumbs={breadcrumbExtras}
+              />
               <Button
                 startIcon={<ArrowBackIcon />}
                 onClick={handleBack}

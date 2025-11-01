@@ -38,6 +38,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import Breadcrumbs from '../components/Breadcrumbs';
 import InspectionAttachmentManager from '../components/InspectionAttachmentManager';
 import InspectionForm from '../components/InspectionForm';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
@@ -196,8 +197,26 @@ export default function InspectionDetailPage() {
 
   const canComplete = canManage && inspection.status !== 'COMPLETED' && inspection.status !== 'CANCELLED';
 
+  const propertyId = inspection.property?.id || inspection.propertyId || null;
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Breadcrumbs
+        labelOverrides={{
+          [`/inspections/${id}`]: inspection.title || 'Inspection Details',
+        }}
+        extraCrumbs={
+          propertyId
+            ? [
+                {
+                  label: inspection.property?.name || 'Property Details',
+                  to: `/properties/${propertyId}`,
+                  after: '/inspections',
+                },
+              ]
+            : []
+        }
+      />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
         <IconButton onClick={() => navigate('/inspections')}>
           <ArrowBackIcon />
