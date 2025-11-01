@@ -41,6 +41,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import apiClient from '../api/client';
 import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
+import PropertyOnboardingWizard from '../components/PropertyOnboardingWizard';
 import { normaliseArray } from '../utils/error';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 import { queryKeys } from '../utils/queryKeys.js';
@@ -421,9 +422,19 @@ export default function PropertiesPage() {
         </MenuItem>
       </Menu>
 
+      {/* Property Onboarding Wizard */}
+      <PropertyOnboardingWizard
+        open={dialogOpen && !editMode}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedProperty(null);
+          setEditMode(false);
+        }}
+      />
+
       {/* Property Form Dialog */}
       <PropertyForm
-        open={dialogOpen}
+        open={dialogOpen && editMode}
         onClose={() => {
           setDialogOpen(false);
           setSelectedProperty(null);
