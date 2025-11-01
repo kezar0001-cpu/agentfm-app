@@ -14,6 +14,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
@@ -37,7 +38,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch properties
   const { data: properties = [], isLoading: loadingProperties } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
@@ -46,7 +47,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch units for selected property
   const { data: units = [] } = useQuery({
-    queryKey: ['units', formData.propertyId],
+    queryKey: queryKeys.properties.units(formData.propertyId),
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
@@ -57,7 +58,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch technicians
   const { data: technicians = [] } = useQuery({
-    queryKey: ['technicians'],
+    queryKey: queryKeys.technicians.all(),
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
       return ensureArray(response.data, ['users', 'data', 'items', 'results']);

@@ -12,6 +12,7 @@ import {
   Box,
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const UNIT_STATUSES = [
   { value: 'AVAILABLE', label: 'Available' },
@@ -39,9 +40,9 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
 
   // Create/Update mutation
   const mutation = useApiMutation({
-    url: isEdit ? `/api/units/${unit?.id}` : '/api/units',
+    url: isEdit ? `/units/${unit?.id}` : '/units',
     method: isEdit ? 'patch' : 'post',
-    invalidateKeys: [['units', propertyId]],
+    invalidateKeys: [queryKeys.properties.units(propertyId)],
   });
 
   // Initialize form with unit data if editing

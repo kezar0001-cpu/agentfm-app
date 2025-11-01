@@ -15,6 +15,7 @@ import { ArrowBack, Home } from '@mui/icons-material';
 import PropertyForm from '../components/PropertyForm';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function EditPropertyPage() {
   const { id } = useParams();
@@ -28,12 +29,12 @@ export default function EditPropertyPage() {
     error,
     refetch,
   } = useApiQuery({
-    queryKey: ['property', id],
-    url: `/api/properties/${id}`,
+    queryKey: queryKeys.properties.detail(id),
+    url: `/properties/${id}`,
   });
 
   const { mutateAsync, isPending } = useApiMutation({
-    url: `/api/properties/${id}`,
+    url: `/properties/${id}`,
     method: 'patch',
   });
 

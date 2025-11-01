@@ -43,6 +43,7 @@ import DataState from '../components/DataState';
 import PropertyForm from '../components/PropertyForm';
 import { normaliseArray } from '../utils/error';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function PropertiesPage() {
   const { t } = useTranslation();
@@ -79,7 +80,7 @@ export default function PropertiesPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['properties'],
+    queryKey: queryKeys.properties.all(),
     queryFn: async ({ pageParam = 0 }) => {
       const response = await apiClient.get(`/properties?limit=50&offset=${pageParam}`);
       return response.data;
@@ -97,7 +98,7 @@ export default function PropertiesPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['properties']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.properties.all() });
     },
   });
 

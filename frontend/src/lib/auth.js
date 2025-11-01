@@ -1,5 +1,5 @@
 // frontend/src/lib/auth.js
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
@@ -101,17 +101,19 @@ export function saveTokenFromUrl(autoRedirect = true) {
         console.error('Failed to restore user from URL parameter:', error);
       }
     } else if (!localStorage.getItem('user')) {
-      const meUrl = API_BASE ? `${API_BASE}/api/auth/me` : '/api/auth/me';
-      fetch(meUrl, { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' })
-        .then(r => (r.ok ? r.text() : null))
-        .then(t => {
-          if (!t) return;
-          let payload; try { payload = JSON.parse(t); } catch { return; }
-          if (payload?.user) {
-            setCurrentUser(payload.user);
-            const target = portalPathForRole(payload.user.role);
-            const here = window.location.pathname;
-            if (autoRedirect && !here.startsWith(target)) window.location.replace(target);
+      apiClient
+        .get('/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        })
+        .then((response) => response?.data ?? response)
+        .then((payload) => {
+          if (!payload?.user) return;
+          setCurrentUser(payload.user);
+          const target = portalPathForRole(payload.user.role);
+          const here = window.location.pathname;
+          if (autoRedirect && !here.startsWith(target)) {
+            window.location.replace(target);
           }
         })
         .catch(() => {});
@@ -136,8 +138,7 @@ export function getCurrentUser() {
 }
 export async function logout() {
   try {
-    // Using the api helper function for consistency, though fetch works too
-    await api.post('/auth/logout', undefined, { credentials: 'include' });
+    await apiClient.post('/auth/logout', undefined, { withCredentials: true });
   } catch (e) { console.warn('Server logout failed (continuing):', e); }
   sessionStorage.clear();
   removeAuthToken();
@@ -156,8 +157,9 @@ export async function refreshCurrentUser() {
   }
 
   try {
-    const data = await api.get('/auth/me');
-    const user = data?.user ?? data ?? null;
+    const data = await apiClient.get('/auth/me');
+    const payload = data?.data ?? data ?? null;
+    const user = payload?.user ?? payload ?? null;
 
     if (user) {
       return setCurrentUser(user);

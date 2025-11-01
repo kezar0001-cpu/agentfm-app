@@ -16,6 +16,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const isEditing = Boolean(inspection);
@@ -36,7 +37,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   const { data: propertiesData, isLoading: loadingProperties } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return response.data;
@@ -46,7 +47,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const properties = ensureArray(propertiesData, ['properties', 'data', 'items', 'results']);
 
   const { data: unitsData } = useQuery({
-    queryKey: ['units', formData.propertyId],
+    queryKey: queryKeys.properties.units(formData.propertyId),
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get('/units', { params: { propertyId: formData.propertyId } });
@@ -58,7 +59,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const units = ensureArray(unitsData, ['units', 'data', 'items', 'results']);
 
   const { data: inspectorData = { inspectors: [] } } = useQuery({
-    queryKey: ['inspections', 'inspectors'],
+    queryKey: queryKeys.inspections.inspectors(),
     queryFn: async () => {
       const response = await apiClient.get('/inspections/inspectors');
       return response.data;
@@ -68,7 +69,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const inspectorOptions = useMemo(() => inspectorData.inspectors || [], [inspectorData.inspectors]);
 
   const { data: tagData = { tags: [] } } = useQuery({
-    queryKey: ['inspections', 'tags'],
+    queryKey: queryKeys.inspections.tags(),
     queryFn: async () => {
       const response = await apiClient.get('/inspections/tags');
       return response.data;

@@ -18,6 +18,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }) {
   const queryClient = useQueryClient();
@@ -35,7 +36,7 @@ export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }
 
   // Fetch available tenants (users with TENANT role)
   const { data: tenantsData, isLoading: tenantsLoading } = useQuery({
-    queryKey: ['tenants'],
+    queryKey: queryKeys.tenants.all(),
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TENANT');
       return response.data?.users || response.data || [];
@@ -82,9 +83,9 @@ export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['unit-tenants', unitId]);
-      queryClient.invalidateQueries(['unit', unitId]);
-      queryClient.invalidateQueries(['units']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.tenants(unitId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.detail(unitId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.root() });
       toast.success(isEditing ? 'Tenant assignment updated' : 'Tenant assigned successfully');
       onClose();
     },

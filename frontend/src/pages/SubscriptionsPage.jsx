@@ -22,6 +22,7 @@ import { normaliseArray } from '../utils/error.js';
 import { calculateDaysRemaining } from '../utils/date.js';
 import { useCurrentUser } from '../context/UserContext.jsx';
 import { redirectToBillingPortal } from '../utils/billing.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const normaliseStatus = (status) =>
   typeof status === 'string' ? status.toUpperCase() : '';
@@ -189,11 +190,11 @@ export default function SubscriptionsPage() {
   const { user: currentUser, refreshUser } = useCurrentUser();
 
   const query = useApiQuery({
-    queryKey: ['subscriptions'],
-    url: '/api/subscriptions',
+    queryKey: queryKeys.subscriptions.all(),
+    url: '/subscriptions',
   });
   const checkoutMutation = useApiMutation({
-    url: '/api/billing/checkout',
+    url: '/billing/checkout',
     method: 'post',
   });
 

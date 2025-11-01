@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const ServiceRequestForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -31,7 +32,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
   // Fetch properties
   const { data: properties, isLoading: loadingProperties } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return ensureArray(response.data, ['items', 'data.items', 'properties']);
@@ -40,7 +41,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
 
   // Fetch units for selected property
   const { data: units } = useQuery({
-    queryKey: ['units', formData.propertyId],
+    queryKey: queryKeys.properties.units(formData.propertyId),
     queryFn: async () => {
       if (!formData.propertyId) return [];
       const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);

@@ -30,6 +30,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
 import { CircularProgress } from '@mui/material';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -59,7 +60,7 @@ const InspectionsPage = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['inspections', filters],
+    queryKey: queryKeys.inspections.filtered(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams(queryParams);
       params.append('limit', '50');
@@ -78,7 +79,7 @@ const InspectionsPage = () => {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties?limit=100&offset=0');
       return response.data;

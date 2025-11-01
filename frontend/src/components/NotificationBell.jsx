@@ -19,6 +19,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { format } from 'date-fns';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const NOTIFICATION_TYPE_COLORS = {
   INSPECTION_SCHEDULED: 'info',
@@ -37,7 +38,7 @@ export default function NotificationBell() {
 
   // Fetch unread count
   const { data: countData } = useQuery({
-    queryKey: ['notification-count'],
+    queryKey: queryKeys.notifications.count(),
     queryFn: async () => {
       const response = await apiClient.get('/notifications/unread-count');
       return response.data;
@@ -47,7 +48,7 @@ export default function NotificationBell() {
 
   // Fetch notifications
   const { data: notifications, isLoading } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: queryKeys.notifications.list(),
     queryFn: async () => {
       const response = await apiClient.get('/notifications?limit=10');
       return response.data;
@@ -61,8 +62,8 @@ export default function NotificationBell() {
       await apiClient.patch(`/notifications/${id}/read`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
-      queryClient.invalidateQueries(['notification-count']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.count() });
     },
   });
 
@@ -72,8 +73,8 @@ export default function NotificationBell() {
       await apiClient.patch('/notifications/mark-all-read');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
-      queryClient.invalidateQueries(['notification-count']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.count() });
     },
   });
 
@@ -83,8 +84,8 @@ export default function NotificationBell() {
       await apiClient.delete(`/notifications/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
-      queryClient.invalidateQueries(['notification-count']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.count() });
     },
   });
 

@@ -29,6 +29,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const SERVICE_CATEGORIES = [
   'PLUMBING',
@@ -59,7 +60,7 @@ export default function TenantDashboard() {
 
   // Fetch tenant's unit information
   const { data: units, isLoading: unitsLoading } = useQuery({
-    queryKey: ['tenant-units'],
+    queryKey: queryKeys.dashboard.tenantUnits(),
     queryFn: async () => {
       // This would need a specific endpoint for tenant's units
       const response = await apiClient.get('/units');
@@ -69,7 +70,7 @@ export default function TenantDashboard() {
 
   // Fetch tenant's service requests
   const { data: serviceRequests, isLoading: requestsLoading, error: requestsError } = useQuery({
-    queryKey: ['tenant-service-requests'],
+    queryKey: queryKeys.serviceRequests.tenant(),
     queryFn: async () => {
       const response = await apiClient.get('/service-requests');
       return response.data;
@@ -83,7 +84,7 @@ export default function TenantDashboard() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['tenant-service-requests']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceRequests.tenant() });
       setDialogOpen(false);
       setFormData({
         title: '',

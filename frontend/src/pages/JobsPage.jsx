@@ -46,6 +46,7 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import JobDetailModal from '../components/JobDetailModal';
 import { CircularProgress } from '@mui/material';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const localizer = momentLocalizer(moment);
 
@@ -82,7 +83,7 @@ const JobsPage = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['jobs', filters],
+    queryKey: queryKeys.jobs.filtered(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams(queryParams);
       params.append('limit', '50');
@@ -101,7 +102,7 @@ const JobsPage = () => {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties?limit=100&offset=0');
       return response.data;

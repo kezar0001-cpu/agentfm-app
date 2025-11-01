@@ -23,6 +23,7 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const schema = z.object({
   name: z.string().min(1, 'forms.required'),
@@ -32,8 +33,8 @@ const schema = z.object({
 
 export default function PlansPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['plans'], url: '/api/plans' });
-  const mutation = useApiMutation({ url: '/api/plans', method: 'post', invalidateKeys: [['plans']] });
+  const query = useApiQuery({ queryKey: queryKeys.plans.all(), url: '/plans' });
+  const mutation = useApiMutation({ url: '/plans', method: 'post', invalidateKeys: [queryKeys.plans.all()] });
 
   const {
     register,
