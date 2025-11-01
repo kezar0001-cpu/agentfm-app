@@ -48,6 +48,7 @@ import apiClient from '../api/client';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
+import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
 import { normaliseArray } from '../utils/error';
@@ -258,6 +259,11 @@ export default function PropertyDetailPage() {
       >
         {property && (
           <Stack spacing={3}>
+            <Breadcrumbs
+              labelOverrides={{
+                [`/properties/${id}`]: property?.name || 'Property Details',
+              }}
+            />
             {/* Header with Back Button */}
             <Stack
               direction={{ xs: 'column', md: 'row' }}

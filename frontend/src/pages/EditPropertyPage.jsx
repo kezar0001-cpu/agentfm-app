@@ -8,14 +8,13 @@ import {
   Stack,
   CircularProgress,
   Alert,
-  Breadcrumbs,
-  Link,
 } from '@mui/material';
-import { ArrowBack, Home } from '@mui/icons-material';
+import { ArrowBack } from '@mui/icons-material';
 import PropertyForm from '../components/PropertyForm';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import { queryKeys } from '../utils/queryKeys.js';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function EditPropertyPage() {
   const { id } = useParams();
@@ -118,26 +117,12 @@ export default function EditPropertyPage() {
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
       <Stack spacing={3}>
         <Box>
-          <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-            <Link
-              underline="hover"
-              sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-              color="inherit"
-              onClick={() => navigate('/properties')}
-            >
-              <Home sx={{ mr: 0.5 }} fontSize="small" />
-              Properties
-            </Link>
-            <Link
-              underline="hover"
-              sx={{ cursor: 'pointer' }}
-              color="inherit"
-              onClick={() => navigate(`/properties/${id}`)}
-            >
-              {property.name}
-            </Link>
-            <Typography color="text.primary">Edit</Typography>
-          </Breadcrumbs>
+          <Breadcrumbs
+            labelOverrides={{
+              [`/properties/${id}`]: property.name,
+              [`/properties/${id}/edit`]: 'Edit',
+            }}
+          />
 
           <Stack
             direction={{ xs: 'column', md: 'row' }}
