@@ -43,6 +43,11 @@ const jobUpdateSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+const bulkAssignSchema = z.object({
+  jobIds: z.array(z.string().min(1)).min(1, 'Select at least one job'),
+  technicianId: z.string().min(1, 'Technician is required'),
+});
+
 // GET / - List jobs (role-based filtering)
 router.get('/', requireAuth, async (req, res) => {
   try {
@@ -235,6 +240,159 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
     res.status(500).json({ success: false, message: 'Failed to create job' });
   }
 });
+
+// POST /bulk-assign - Assign multiple jobs to a technician
+router.post(
+  '/bulk-assign',
+  requireAuth,
+  requireRole('PROPERTY_MANAGER'),
+  requireActiveSubscription,
+  validate(bulkAssignSchema),
+  async (req, res) => {
+    try {
+      const { jobIds, technicianId } = req.body;
+      const uniqueJobIds = [...new Set(jobIds)];
+
+      const technician = await prisma.user.findUnique({
+        where: { id: technicianId },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      });
+
+      if (!technician || technician.role !== 'TECHNICIAN') {
+        return res.status(404).json({ success: false, message: 'Technician not found' });
+      }
+
+      const jobs = await prisma.job.findMany({
+        where: { id: { in: uniqueJobIds } },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              managerId: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (jobs.length !== uniqueJobIds.length) {
+        return res.status(404).json({ success: false, message: 'One or more jobs not found' });
+      }
+
+      const jobMap = new Map(jobs.map((job) => [job.id, job]));
+
+      const unauthorizedJob = jobs.find((job) => job.property.managerId !== req.user.id);
+      if (unauthorizedJob) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only assign jobs for your properties',
+        });
+      }
+
+      const lockedJob = jobs.find((job) => ['COMPLETED', 'CANCELLED'].includes(job.status));
+      if (lockedJob) {
+        return res.status(400).json({
+          success: false,
+          message: 'Completed or cancelled jobs cannot be reassigned',
+        });
+      }
+
+      const updatedJobs = await prisma.$transaction(
+        uniqueJobIds.map((jobId) => {
+          const currentJob = jobMap.get(jobId);
+          const updateData = {
+            assignedToId: technicianId,
+          };
+
+          if (currentJob?.status === 'OPEN') {
+            updateData.status = 'ASSIGNED';
+          }
+
+          return prisma.job.update({
+            where: { id: jobId },
+            data: updateData,
+            include: {
+              property: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  managerId: true,
+                },
+              },
+              unit: {
+                select: {
+                  id: true,
+                  unitNumber: true,
+                },
+              },
+              assignedTo: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+        })
+      );
+
+      try {
+        await Promise.all(
+          updatedJobs.map(async (updatedJob) => {
+            const previousJob = jobMap.get(updatedJob.id);
+            if (!previousJob) return;
+
+            if (previousJob.assignedToId === technicianId) {
+              return;
+            }
+
+            if (previousJob.assignedToId) {
+              let previousTechnician = previousJob.assignedTo;
+
+              if (!previousTechnician) {
+                previousTechnician = await prisma.user.findUnique({
+                  where: { id: previousJob.assignedToId },
+                  select: { id: true, firstName: true, lastName: true, email: true },
+                });
+              }
+
+              if (previousTechnician && updatedJob.assignedTo) {
+                await notifyJobReassigned(updatedJob, previousTechnician, updatedJob.assignedTo, updatedJob.property);
+              }
+            } else if (updatedJob.assignedTo) {
+              await notifyJobAssigned(updatedJob, updatedJob.assignedTo, updatedJob.property);
+            }
+          })
+        );
+      } catch (notifError) {
+        console.error('Failed to send bulk assignment notifications:', notifError);
+      }
+
+      res.json({ success: true, jobs: updatedJobs });
+    } catch (error) {
+      console.error('Error bulk assigning jobs:', error);
+      res.status(500).json({ success: false, message: 'Failed to assign jobs' });
+    }
+  }
+);
 
 router.get('/:id', requireAuth, async (req, res) => {
   try {
