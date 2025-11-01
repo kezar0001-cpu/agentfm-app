@@ -23,6 +23,7 @@ import {
 } from '@mui/icons-material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import { queryKeys } from '../utils/queryKeys.js';
 
 function isImageAttachment(attachment) {
   return attachment.mimeType?.startsWith('image/');
@@ -134,7 +135,7 @@ const InspectionAttachmentManager = ({ inspectionId, attachments = [], canEdit =
     },
     onSuccess: () => {
       setPendingFiles([]);
-      queryClient.invalidateQueries(['inspection', inspectionId]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(inspectionId) });
     },
   });
 
@@ -145,7 +146,7 @@ const InspectionAttachmentManager = ({ inspectionId, attachments = [], canEdit =
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['inspection', inspectionId]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(inspectionId) });
     },
   });
 
@@ -154,7 +155,7 @@ const InspectionAttachmentManager = ({ inspectionId, attachments = [], canEdit =
       await apiClient.delete(`/inspections/${inspectionId}/attachments/${attachmentId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['inspection', inspectionId]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(inspectionId) });
     },
   });
 

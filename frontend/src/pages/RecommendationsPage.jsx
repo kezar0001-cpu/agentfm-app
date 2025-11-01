@@ -18,21 +18,22 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function RecommendationsPage() {
   const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: ['recommendations'], url: '/api/recommendations' });
+  const query = useApiQuery({ queryKey: queryKeys.recommendations.all(), url: '/recommendations' });
   const mutation = useApiMutation({
-    url: '/api/recommendations/:id/convert',
+    url: '/recommendations/:id/convert',
     method: 'post',
-    invalidateKeys: [['recommendations'], ['jobs']],
+    invalidateKeys: [queryKeys.recommendations.all(), queryKeys.jobs.all()],
   });
 
   const recommendations = normaliseArray(query.data);
 
   const handleConvert = async (recommendationId) => {
     try {
-      await mutation.mutateAsync({ url: `/api/recommendations/${recommendationId}/convert`, method: 'post' });
+      await mutation.mutateAsync({ url: `/recommendations/${recommendationId}/convert`, method: 'post' });
     } catch (error) {
       // Handled via mutation state.
     }

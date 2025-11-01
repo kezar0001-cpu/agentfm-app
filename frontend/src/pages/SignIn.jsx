@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
 import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -45,20 +45,24 @@ export default function SignIn() {
     setError('');
     try {
       // MINIMAL CHANGE: Add the 'role' to the submitted data
-      const res = await api.post(
-        '/api/auth/login',
+      const response = await apiClient.post(
+        '/auth/login',
         {
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
           role: formData.role,
         },
-        { credentials: 'include' }
+        { withCredentials: true }
       );
 
-      if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
+      const payload = response?.data ?? response;
 
-      localStorage.setItem('auth_token', res.token);
-      setCurrentUser(res.user);
+      if (!payload?.token || !payload?.user) {
+        throw new Error(payload?.message || 'Invalid response from server');
+      }
+
+      localStorage.setItem('auth_token', payload.token);
+      setCurrentUser(payload.user);
       navigate('/dashboard');
     } catch (err) {
       const msg =

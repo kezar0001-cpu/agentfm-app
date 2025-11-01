@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const TYPE_ICONS = {
   property: <HomeIcon fontSize="small" />,
@@ -71,7 +72,7 @@ export default function GlobalSearch({ open, onClose }) {
 
   // Search query
   const { data, isLoading } = useQuery({
-    queryKey: ['global-search', debouncedTerm],
+    queryKey: queryKeys.globalSearch.results(debouncedTerm),
     queryFn: async () => {
       if (!debouncedTerm.trim()) return { results: [] };
       const response = await apiClient.get(`/search?q=${encodeURIComponent(debouncedTerm)}&limit=20`);

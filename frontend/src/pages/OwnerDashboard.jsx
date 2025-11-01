@@ -31,6 +31,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -46,7 +47,7 @@ export default function OwnerDashboard() {
 
   // Fetch properties owned by user
   const { data: properties, isLoading: propertiesLoading, error: propertiesError } = useQuery({
-    queryKey: ['owner-properties'],
+    queryKey: queryKeys.dashboard.ownerProperties(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return ensureArray(response.data, ['items', 'data.items', 'properties']);
@@ -55,7 +56,7 @@ export default function OwnerDashboard() {
 
   // Fetch jobs for owned properties
   const { data: jobs, isLoading: jobsLoading } = useQuery({
-    queryKey: ['owner-jobs'],
+    queryKey: queryKeys.jobs.owner(),
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
       return ensureArray(response.data, ['items', 'data.items', 'jobs']);
@@ -64,7 +65,7 @@ export default function OwnerDashboard() {
 
   // Fetch inspections for owned properties
   const { data: inspections, isLoading: inspectionsLoading } = useQuery({
-    queryKey: ['owner-inspections'],
+    queryKey: queryKeys.inspections.owner(),
     queryFn: async () => {
       const response = await apiClient.get('/inspections');
       return ensureArray(response.data, ['items', 'data.items', 'inspections']);

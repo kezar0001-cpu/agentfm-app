@@ -37,6 +37,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { formatDistanceToNow } from 'date-fns';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const JobDetailModal = ({ job, open, onClose }) => {
   const queryClient = useQueryClient();
@@ -48,7 +49,7 @@ const JobDetailModal = ({ job, open, onClose }) => {
     isLoading: commentsLoading,
     error: commentsError,
   } = useQuery({
-    queryKey: ['jobComments', job?.id],
+    queryKey: queryKeys.jobs.comments(job?.id),
     queryFn: async () => {
       const response = await apiClient.get(`/jobs/${job.id}/comments`);
       return response.data;
@@ -65,7 +66,7 @@ const JobDetailModal = ({ job, open, onClose }) => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['jobComments', job.id]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.comments(job.id) });
       setCommentText('');
     },
   });

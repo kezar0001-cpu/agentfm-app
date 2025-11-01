@@ -44,6 +44,7 @@ import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 import { formatDateTime } from '../utils/date';
 import { STATUS_COLOR, TYPE_COLOR } from '../constants/inspections';
 import { useCurrentUser } from '../context/UserContext';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function InspectionDetailPage() {
   const { id } = useParams();
@@ -73,7 +74,7 @@ export default function InspectionDetailPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['inspection', id],
+    queryKey: queryKeys.inspections.detail(id),
     queryFn: async () => {
       const response = await apiClient.get(`/inspections/${id}`);
       return response.data;
@@ -81,7 +82,7 @@ export default function InspectionDetailPage() {
   });
 
   const { data: auditData } = useQuery({
-    queryKey: ['inspection', id, 'audit'],
+    queryKey: queryKeys.inspections.audit(id),
     queryFn: async () => {
       const response = await apiClient.get(`/inspections/${id}/audit`);
       return response.data?.logs || [];
@@ -90,7 +91,7 @@ export default function InspectionDetailPage() {
   });
 
   const { data: inspectorData = { inspectors: [] } } = useQuery({
-    queryKey: ['inspections', 'inspectors'],
+    queryKey: queryKeys.inspections.inspectors(),
     queryFn: async () => {
       const response = await apiClient.get('/inspections/inspectors');
       return response.data;
@@ -105,8 +106,8 @@ export default function InspectionDetailPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['inspection', id]);
-      queryClient.invalidateQueries(['inspections']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.all() });
       setCompleteDialogOpen(false);
     },
   });
@@ -128,7 +129,7 @@ export default function InspectionDetailPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['inspection', id]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(id) });
       setJobDialogOpen(false);
       setJobForm({ title: '', description: '', priority: 'MEDIUM', assignedToId: '', scheduledDate: '' });
     },

@@ -18,6 +18,10 @@ import {
   ListItemText,
   TextField,
   Divider,
+  Stepper,
+  Step,
+  StepLabel,
+  Alert,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -30,6 +34,7 @@ import { apiClient } from '../api/client';
 import DataState from './DataState';
 import { formatDateTime } from '../utils/date';
 import toast from 'react-hot-toast';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const getStatusColor = (status) => {
   const colors = {
@@ -66,7 +71,7 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
 
   // Fetch request details
   const { data, isLoading, error } = useQuery({
-    queryKey: ['service-request', requestId],
+    queryKey: queryKeys.serviceRequests.detail(requestId),
     queryFn: async () => {
       const response = await apiClient.get(`/service-requests/${requestId}`);
       return response.data?.request || response.data;
@@ -84,8 +89,8 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['service-requests']);
-      queryClient.invalidateQueries(['service-request', requestId]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceRequests.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceRequests.detail(requestId) });
       toast.success(reviewAction === 'approve' ? 'Request approved' : 'Request rejected');
       setShowReviewInput(false);
       setReviewNotes('');
@@ -104,9 +109,9 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['service-requests']);
-      queryClient.invalidateQueries(['service-request', requestId]);
-      queryClient.invalidateQueries(['jobs']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceRequests.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.serviceRequests.detail(requestId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all() });
       toast.success('Converted to job successfully');
       onClose();
     },
@@ -154,6 +159,20 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
     }
   };
 
+  const statusSteps = [
+    { key: 'SUBMITTED', label: 'Submitted' },
+    { key: 'UNDER_REVIEW', label: 'Under Review' },
+    { key: 'APPROVED', label: 'Approved' },
+    { key: 'CONVERTED_TO_JOB', label: 'Converted to Job' },
+    { key: 'COMPLETED', label: 'Completed' },
+  ];
+
+  const statusIndex = data ? statusSteps.findIndex((step) => step.key === data.status) : 0;
+  const activeStep = statusIndex >= 0 ? statusIndex : 0;
+  const isRejectedStatus = data?.status === 'REJECTED';
+  const linkedJobs = data?.jobs || [];
+  const linkedJob = linkedJobs[0];
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -193,6 +212,22 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
                     />
                   )}
                 </Stack>
+                <Box sx={{ mt: 2 }}>
+                  <Stepper activeStep={activeStep} alternativeLabel>
+                    {statusSteps.map((step, index) => (
+                      <Step key={step.key} completed={activeStep > index}>
+                        <StepLabel error={isRejectedStatus && step.key === 'UNDER_REVIEW'}>
+                          {step.label}
+                        </StepLabel>
+                      </Step>
+                    ))}
+                  </Stepper>
+                  {isRejectedStatus && (
+                    <Alert severity="error" sx={{ mt: 2 }}>
+                      This request was rejected. Review notes are available below.
+                    </Alert>
+                  )}
+                </Box>
               </Box>
 
               {/* Description */}

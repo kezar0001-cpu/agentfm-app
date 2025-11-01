@@ -56,6 +56,7 @@ import {
   formatPropertyLocality,
 } from '../utils/formatPropertyLocation';
 import { CircularProgress } from '@mui/material';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
@@ -81,13 +82,13 @@ export default function PropertyDetailPage() {
 
   // Fetch property details
   const propertyQuery = useApiQuery({
-    queryKey: ['property', id],
-    url: `/api/properties/${id}`,
+    queryKey: queryKeys.properties.detail(id),
+    url: `/properties/${id}`,
   });
 
   // Fetch units for this property with infinite query
   const unitsQuery = useInfiniteQuery({
-    queryKey: ['units', id],
+    queryKey: queryKeys.properties.units(id),
     queryFn: async ({ pageParam = 0 }) => {
       const response = await apiClient.get(`/units?propertyId=${id}&limit=50&offset=${pageParam}`);
       return response.data;
@@ -101,8 +102,8 @@ export default function PropertyDetailPage() {
   // Fetch activity for this property
   // Fix: Removed enabled condition to ensure activity loads on bookmarks and refreshes properly
   const activityQuery = useApiQuery({
-    queryKey: ['property-activity', id],
-    url: `/api/properties/${id}/activity?limit=20`,
+    queryKey: queryKeys.properties.activity(id),
+    url: `/properties/${id}/activity?limit=20`,
   });
 
   // Delete unit mutation
@@ -178,7 +179,7 @@ export default function PropertyDetailPage() {
 
     try {
       await deleteUnitMutation.mutateAsync({
-        url: `/api/units/${selectedUnit.id}`,
+        url: `/units/${selectedUnit.id}`,
       });
       // Only close dialog and clear state on success
       setDeleteUnitDialogOpen(false);

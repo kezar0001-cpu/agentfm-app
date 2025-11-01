@@ -13,7 +13,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Visibility, VisibilityOff, Lock, CheckCircle } from '@mui/icons-material';
-import api from '../api';
+import { apiClient } from '../api/client.js';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -47,15 +47,17 @@ export default function ResetPassword() {
       }
 
       try {
-        const response = await api.get('/auth/reset-password/validate', {
+        const response = await apiClient.get('/auth/reset-password/validate', {
           params: { selector, token },
         });
 
-        if (response.data.success) {
+        const payload = response?.data ?? response;
+
+        if (payload.success) {
           setTokenValid(true);
-          setUserEmail(response.data.email || '');
+          setUserEmail(payload.email || '');
         } else {
-          setError(response.data.message || 'Invalid or expired reset link.');
+          setError(payload.message || 'Invalid or expired reset link.');
         }
       } catch (err: any) {
         console.error('Token validation error:', err);
@@ -117,20 +119,22 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/reset-password', {
+      const response = await apiClient.post('/auth/reset-password', {
         selector,
         token,
         password,
       });
 
-      if (response.data.success) {
+      const payload = response?.data ?? response;
+
+      if (payload.success) {
         setSuccess(true);
         // Redirect to sign in after 3 seconds
         setTimeout(() => {
           navigate('/signin?reset=success');
         }, 3000);
       } else {
-        setError(response.data.message || 'Failed to reset password. Please try again.');
+        setError(payload.message || 'Failed to reset password. Please try again.');
       }
     } catch (err: any) {
       console.error('Reset password error:', err);

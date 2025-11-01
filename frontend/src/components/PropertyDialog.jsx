@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query'; // 👈 ADD THIS IMPORT
 import PropertyForm from './PropertyForm';
+import { queryKeys } from '../utils/queryKeys.js';
 
 function PropertyDialog({ open, onClose, property }) {
   const theme = useTheme();
@@ -17,7 +18,7 @@ function PropertyDialog({ open, onClose, property }) {
 
   const handleSuccess = () => {
     // 👇 TELL REACT QUERY TO REFETCH THE PROPERTIES LIST
-    queryClient.invalidateQueries({ queryKey: ['/properties'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.properties.all() });
     onClose(); // Close the dialog
   };
 

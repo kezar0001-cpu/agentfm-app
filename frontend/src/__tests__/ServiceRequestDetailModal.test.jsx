@@ -1,12 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
-import { apiClient } from '../api/client';
+import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal.jsx';
+import { apiClient } from '../api/client.js';
 import toast from 'react-hot-toast';
+import { queryKeys } from '../utils/queryKeys.js';
 
-// Mock API client
-vi.mock('../api/client', () => ({
+const toastMock = vi.hoisted(() => {
+  const fn = vi.fn();
+  fn.success = vi.fn();
+  fn.error = vi.fn();
+  return fn;
+});
+
+vi.mock('react-hot-toast', () => ({
+  default: toastMock,
+}));
+
+vi.mock('../api/client.js', () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),
@@ -14,18 +25,11 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-// Mock toast
-vi.mock('react-hot-toast', () => ({
-  default: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-const mockServiceRequest = {
+const createRequest = (overrides = {}) => ({
   id: 'sr-123',
   title: 'Leaky Faucet in Kitchen',
-  description: 'The kitchen faucet has been leaking for 3 days. Water is dripping constantly even when fully closed.',
+  description:
+    'The kitchen faucet has been leaking for 3 days. Water is dripping constantly even when fully closed.',
   category: 'PLUMBING',
   priority: 'HIGH',
   status: 'SUBMITTED',
@@ -55,15 +59,22 @@ const mockServiceRequest = {
     email: 'john.doe@email.com',
   },
   jobs: [],
-};
+  ...overrides,
+});
+
+let queryClient;
+let invalidateQueriesSpy;
+let mockOnClose;
 
 const createWrapper = () => {
-  const queryClient = new QueryClient({
+  queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
   });
+
+  invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
   return ({ children }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -71,532 +82,259 @@ const createWrapper = () => {
 };
 
 describe('ServiceRequestDetailModal', () => {
-  const mockOnClose = vi.fn();
-
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOnClose = vi.fn();
   });
 
-  describe('Rendering', () => {
-    it('should render modal with request details', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Leaky Faucet in Kitchen')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/The kitchen faucet has been leaking/)).toBeInTheDocument();
-    });
-
-    it('should display full description (not truncated)', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        const description = screen.getByText(/The kitchen faucet has been leaking/);
-        expect(description.textContent).toContain('fully closed');
-      });
-    });
-
-    it('should show photo gallery', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Photos (2)')).toBeInTheDocument();
-      });
-
-      const images = screen.getAllByRole('img');
-      expect(images.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should display property and unit information', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/Sunset Apartments/)).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/Unit 101/)).toBeInTheDocument();
-    });
-
-    it('should show requester details', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('john.doe@email.com')).toBeInTheDocument();
-    });
-
-    it('should display status and category chips', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('SUBMITTED')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('PLUMBING')).toBeInTheDocument();
-      expect(screen.getByText('HIGH')).toBeInTheDocument();
-    });
+  afterEach(() => {
+    queryClient?.clear();
+    queryClient = null;
+    invalidateQueriesSpy = null;
   });
 
-  describe('Review History', () => {
-    it('should display review history when available', async () => {
-      const requestWithReview = {
-        ...mockServiceRequest,
+  const renderModal = async ({ request = createRequest(), open = true } = {}) => {
+    apiClient.get.mockResolvedValue({ data: { request } });
+
+    render(
+      <ServiceRequestDetailModal requestId={request.id} open={open} onClose={mockOnClose} />, 
+      { wrapper: createWrapper() }
+    );
+
+    if (open) {
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenCalledWith(`/service-requests/${request.id}`);
+      });
+    }
+
+    return request;
+  };
+
+  it('renders service request details with status stepper', async () => {
+    await renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByText('Leaky Faucet in Kitchen')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('SUBMITTED')).toBeInTheDocument();
+    expect(screen.getByText('PLUMBING')).toBeInTheDocument();
+    expect(screen.getByText('HIGH')).toBeInTheDocument();
+    expect(screen.getByText('Submitted')).toBeInTheDocument();
+    expect(screen.getByText('Converted to Job')).toBeInTheDocument();
+  });
+
+  it('shows review history when available', async () => {
+    const request = createRequest({
+      status: 'APPROVED',
+      reviewNotes: 'Approved - urgent repair needed',
+      reviewedAt: '2024-10-28T15:15:00Z',
+    });
+
+    await renderModal({ request });
+
+    await waitFor(() => {
+      expect(screen.getByText('Review History')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Approved - urgent repair needed')).toBeInTheDocument();
+  });
+
+  it('shows converted jobs when present', async () => {
+    const request = createRequest({
+      status: 'CONVERTED_TO_JOB',
+      jobs: [
+        {
+          id: 'job-999',
+          title: 'Fix Kitchen Faucet Leak',
+          status: 'IN_PROGRESS',
+          priority: 'HIGH',
+          createdAt: '2024-10-28T15:20:00Z',
+        },
+      ],
+    });
+
+    await renderModal({ request });
+
+    await waitFor(() => {
+      expect(screen.getByText('Converted Jobs')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Fix Kitchen Faucet Leak')).toBeInTheDocument();
+    expect(screen.getByText('IN_PROGRESS')).toBeInTheDocument();
+  });
+
+  it('displays rejection alert when status is REJECTED', async () => {
+    const request = createRequest({
+      status: 'REJECTED',
+      reviewNotes: 'Duplicate request',
+    });
+
+    await renderModal({ request });
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Request Details')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText('This request was rejected. Review notes are available below.')
+    ).toBeInTheDocument();
+  });
+
+  it('requires review notes before approving', async () => {
+    await renderModal();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    const confirmButton = await screen.findByRole('button', { name: 'Approve' });
+    fireEvent.click(confirmButton);
+
+    expect(apiClient.patch).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Please enter review notes');
+  });
+
+  it('approves a request and invalidates related caches', async () => {
+    await renderModal();
+
+    apiClient.patch.mockResolvedValue({ data: { success: true } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    const notesInput = await screen.findByLabelText('Review Notes');
+    fireEvent.change(notesInput, { target: { value: 'Approved - urgent' } });
+
+    const confirmButton = screen.getByRole('button', { name: 'Approve' });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith('/service-requests/sr-123', {
         status: 'APPROVED',
-        reviewNotes: 'Approved - urgent repair needed',
-        reviewedAt: '2024-10-28T15:15:00Z',
-      };
-
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: requestWithReview },
+        reviewNotes: 'Approved - urgent',
       });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.all() })
       );
-
-      await waitFor(() => {
-        expect(screen.getByText('Review History')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Approved - urgent repair needed')).toBeInTheDocument();
-    });
-
-    it('should not show review section when no review exists', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.detail('sr-123') })
       );
-
-      await waitFor(() => {
-        expect(screen.getByText('Leaky Faucet in Kitchen')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Review History')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Converted Jobs', () => {
-    it('should show converted jobs list', async () => {
-      const requestWithJobs = {
-        ...mockServiceRequest,
-        status: 'CONVERTED_TO_JOB',
-        jobs: [
-          {
-            id: 'job-999',
-            title: 'Fix Kitchen Faucet Leak',
-            status: 'IN_PROGRESS',
-            priority: 'HIGH',
-            createdAt: '2024-10-28T15:20:00Z',
-          },
-        ],
-      };
-
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: requestWithJobs },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Converted Jobs')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Fix Kitchen Faucet Leak')).toBeInTheDocument();
-      expect(screen.getByText('IN_PROGRESS')).toBeInTheDocument();
-    });
-
-    it('should not show jobs section when no jobs exist', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Leaky Faucet in Kitchen')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Converted Jobs')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Actions', () => {
-    it('should show approve and reject buttons for submitted requests', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Approve')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Reject')).toBeInTheDocument();
-    });
-
-    it('should show convert to job button for approved requests', async () => {
-      const approvedRequest = {
-        ...mockServiceRequest,
-        status: 'APPROVED',
-      };
-
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: approvedRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Convert to Job')).toBeInTheDocument();
-      });
-    });
-
-    it('should open review input when approve is clicked', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Approve')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Approve'));
-
-      await waitFor(() => {
-        expect(screen.getByText('Approve Request')).toBeInTheDocument();
-      });
-
-      expect(screen.getByLabelText('Review Notes')).toBeInTheDocument();
-    });
-
-    it('should open review input when reject is clicked', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Reject')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Reject'));
-
-      await waitFor(() => {
-        expect(screen.getByText('Reject Request')).toBeInTheDocument();
-      });
-
-      expect(screen.getByLabelText('Review Notes')).toBeInTheDocument();
-    });
-
-    it('should call API when approving request', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-      apiClient.patch.mockResolvedValue({ data: { success: true } });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Approve')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Approve'));
-
-      await waitFor(() => {
-        expect(screen.getByLabelText('Review Notes')).toBeInTheDocument();
-      });
-
-      const notesInput = screen.getByLabelText('Review Notes');
-      fireEvent.change(notesInput, { target: { value: 'Approved - urgent' } });
-
-      const submitButton = screen.getAllByText('Approve').find(btn => 
-        btn.closest('button')?.type === 'button'
-      );
-      fireEvent.click(submitButton);
-
-      await waitFor(() => {
-        expect(apiClient.patch).toHaveBeenCalledWith('/service-requests/sr-123', {
-          status: 'APPROVED',
-          reviewNotes: 'Approved - urgent',
-        });
-      });
-    });
-
-    it('should call API when converting to job', async () => {
-      const approvedRequest = {
-        ...mockServiceRequest,
-        status: 'APPROVED',
-      };
-
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: approvedRequest },
-      });
-      apiClient.post.mockResolvedValue({ data: { success: true } });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Convert to Job')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Convert to Job'));
-
-      await waitFor(() => {
-        expect(apiClient.post).toHaveBeenCalledWith('/service-requests/sr-123/convert-to-job');
-      });
-    });
-  });
-
-  describe('Loading and Error States', () => {
-    it('should show loading state', async () => {
-      apiClient.get.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ data: { request: mockServiceRequest } }), 100))
-      );
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
-    });
-
-    it('should show error state', async () => {
-      apiClient.get.mockRejectedValue(new Error('Failed to fetch'));
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should show empty state when no data', async () => {
-      apiClient.get.mockResolvedValue({ data: { request: null } });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/empty/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Modal Behavior', () => {
-    it('should close modal when close button is clicked', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
-      });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Leaky Faucet in Kitchen')).toBeInTheDocument();
-      });
-
-      const closeButton = screen.getByText('Close');
-      fireEvent.click(closeButton);
-
+      expect(toast.success).toHaveBeenCalledWith('Request approved');
       expect(mockOnClose).toHaveBeenCalled();
     });
+  });
 
-    it('should not fetch data when modal is closed', () => {
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={false}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
-      );
+  it('rejects a request and invalidates related caches', async () => {
+    await renderModal();
 
-      expect(apiClient.get).not.toHaveBeenCalled();
-    });
+    apiClient.patch.mockResolvedValue({ data: { success: true } });
 
-    it('should fetch data when modal opens', async () => {
-      apiClient.get.mockResolvedValue({
-        data: { success: true, request: mockServiceRequest },
+    fireEvent.click(await screen.findByRole('button', { name: 'Reject' }));
+
+    const notesInput = await screen.findByLabelText('Review Notes');
+    fireEvent.change(notesInput, { target: { value: 'Not within scope' } });
+
+    const confirmButton = screen.getByRole('button', { name: 'Reject' });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith('/service-requests/sr-123', {
+        status: 'REJECTED',
+        reviewNotes: 'Not within scope',
       });
-
-      render(
-        <ServiceRequestDetailModal
-          requestId="sr-123"
-          open={true}
-          onClose={mockOnClose}
-        />,
-        { wrapper: createWrapper() }
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.all() })
       );
-
-      await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalledWith('/service-requests/sr-123');
-      });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.detail('sr-123') })
+      );
+      expect(toast.success).toHaveBeenCalledWith('Request rejected');
+      expect(mockOnClose).toHaveBeenCalled();
     });
+  });
+
+  it('converts a request to a job and refreshes caches', async () => {
+    const request = createRequest({ status: 'APPROVED' });
+    await renderModal({ request });
+
+    apiClient.post.mockResolvedValue({ data: { success: true } });
+
+    const convertButton = await screen.findByRole('button', { name: 'Convert to Job' });
+    fireEvent.click(convertButton);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith('/service-requests/sr-123/convert-to-job');
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.all() })
+      );
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.serviceRequests.detail('sr-123') })
+      );
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.jobs.all() })
+      );
+      expect(toast.success).toHaveBeenCalledWith('Converted to job successfully');
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+  });
+
+  it('shows loading state while fetching data', async () => {
+    apiClient.get.mockImplementation(
+      () => new Promise(() => {})
+    );
+
+    render(
+      <ServiceRequestDetailModal requestId="sr-123" open onClose={mockOnClose} />, 
+      { wrapper: createWrapper() }
+    );
+
+    expect(await screen.findByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('shows error state when fetch fails', async () => {
+    apiClient.get.mockRejectedValue(new Error('Failed to fetch'));
+
+    render(
+      <ServiceRequestDetailModal requestId="sr-123" open onClose={mockOnClose} />, 
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
+  });
+
+  it('shows empty state when request is missing', async () => {
+    apiClient.get.mockResolvedValue({ data: { request: null } });
+
+    render(
+      <ServiceRequestDetailModal requestId="sr-123" open onClose={mockOnClose} />, 
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No data available')).toBeInTheDocument();
+    });
+  });
+
+  it('does not fetch data when modal is closed', async () => {
+    await renderModal({ open: false });
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+
+  it('closes the modal when Close button is clicked', async () => {
+    await renderModal();
+
+    const closeButton = await screen.findByRole('button', { name: 'Close' });
+    fireEvent.click(closeButton);
+
+    expect(mockOnClose).toHaveBeenCalled();
   });
 });

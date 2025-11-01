@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
 import { COUNTRIES } from '../lib/countries';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const COUNTRY_ALIASES = {
   USA: 'United States',
@@ -78,9 +79,9 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
 
   // Create/Update mutation
   const mutation = useApiMutation({
-    url: isEdit ? `/api/properties/${property?.id}` : '/api/properties',
+    url: isEdit ? `/properties/${property?.id}` : '/properties',
     method: isEdit ? 'patch' : 'post',
-    invalidateKeys: [['properties']],
+    invalidateKeys: [queryKeys.properties.all()],
   });
 
   // Initialize form with property data if editing

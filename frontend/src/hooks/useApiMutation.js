@@ -1,6 +1,6 @@
 // frontend/src/hooks/useApiMutation.js
 import { useState } from 'react';
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 export default function useApiMutation({ url, method = 'post', invalidateKeys = [], onSuccess }) {
   const [isPending, setIsPending] = useState(false);
@@ -13,12 +13,14 @@ export default function useApiMutation({ url, method = 'post', invalidateKeys = 
     setError(null);
 
     try {
-      const resp = await api.request({
+      const resolvedMethod = variables.method || method || 'post';
+      const resp = await apiClient.request({
         url: variables.url || url,
-        method: String(variables.method || method).toUpperCase(),
+        method: resolvedMethod,
         data: variables.data,
         headers: variables.headers,
         params: variables.params,
+        withCredentials: variables.withCredentials,
       });
 
       if (onSuccess) onSuccess(resp, variables);

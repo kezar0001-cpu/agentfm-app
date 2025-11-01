@@ -25,6 +25,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const STATUS_OPTIONS = [
   { value: 'IN_PROGRESS', label: 'Start Job', color: 'warning' },
@@ -43,7 +44,7 @@ export default function TechnicianJobDetail() {
 
   // Fetch job details
   const { data: job, isLoading, error } = useQuery({
-    queryKey: ['job', id],
+    queryKey: queryKeys.jobs.detail(id),
     queryFn: async () => {
       const response = await apiClient.get(`/jobs/${id}`);
       return response.data;
@@ -57,8 +58,8 @@ export default function TechnicianJobDetail() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['job', id]);
-      queryClient.invalidateQueries(['technician-jobs']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.technician() });
       setUpdateSuccess('Job updated successfully');
       setUpdateError('');
       setTimeout(() => setUpdateSuccess(''), 3000);

@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prismaClient.js';
+import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import unitsRouter from './units.js';
 
@@ -446,120 +447,153 @@ router.get('/:id/activity', async (req, res) => {
     }
 
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const cacheKey = `property:${req.params.id}:activity:${limit}`;
 
-    // Fetch recent activity for this property
-    const [jobs, inspections, serviceRequests, units] = await Promise.all([
-      prisma.job.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          updatedAt: true,
-          assignedTo: {
-            select: { firstName: true, lastName: true },
-          },
-        },
-      }),
-      prisma.inspection.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          scheduledDate: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.serviceRequest.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          updatedAt: true,
-          requestedBy: {
-            select: { firstName: true, lastName: true },
-          },
-        },
-      }),
-      prisma.unit.findMany({
-        where: { propertyId: req.params.id },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-        select: {
-          id: true,
-          unitNumber: true,
-          status: true,
-          updatedAt: true,
-        },
-      }),
-    ]);
+    const cached = await redisGet(cacheKey);
+    if (cached) {
+      try {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        if (parsed?.activities) {
+          return res.json(parsed);
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'test') {
+          console.warn('[PropertyActivity] Failed to parse cached payload:', error.message);
+        }
+      }
+    }
 
-    const activities = [];
+    const propertyId = req.params.id;
 
-    jobs.forEach((job) => {
-      activities.push({
-        type: 'job',
-        id: job.id,
-        title: job.title,
-        description: job.assignedTo
-          ? `Assigned to ${job.assignedTo.firstName} ${job.assignedTo.lastName}`
-          : 'Job update',
-        status: job.status,
-        priority: job.priority,
-        date: job.updatedAt,
-      });
-    });
+    const rows = await prisma.$queryRaw`
+      SELECT *
+      FROM (
+        SELECT
+          'job'::text AS type,
+          j."id"::text AS id,
+          j."title" AS title,
+          j."status"::text AS status,
+          j."priority"::text AS priority,
+          j."updatedAt" AS date,
+          assign."firstName" AS assigned_first_name,
+          assign."lastName" AS assigned_last_name,
+          NULL::text AS requested_first_name,
+          NULL::text AS requested_last_name,
+          NULL::text AS unit_number
+        FROM "Job" j
+        LEFT JOIN "User" assign ON assign."id" = j."assignedToId"
+        WHERE j."propertyId" = ${propertyId}
 
-    inspections.forEach((inspection) => {
-      activities.push({
-        type: 'inspection',
-        id: inspection.id,
-        title: inspection.title,
-        description: `Inspection ${inspection.status.toLowerCase()}`,
-        status: inspection.status,
-        date: inspection.updatedAt,
-      });
-    });
+        UNION ALL
 
-    serviceRequests.forEach((sr) => {
-      activities.push({
-        type: 'service_request',
-        id: sr.id,
-        title: sr.title,
-        description: sr.requestedBy
-          ? `Requested by ${sr.requestedBy.firstName} ${sr.requestedBy.lastName}`
-          : 'Service request update',
-        status: sr.status,
-        priority: sr.priority,
-        date: sr.updatedAt,
-      });
-    });
+        SELECT
+          'inspection'::text AS type,
+          i."id"::text AS id,
+          i."title" AS title,
+          i."status"::text AS status,
+          NULL::text AS priority,
+          i."updatedAt" AS date,
+          NULL::text AS assigned_first_name,
+          NULL::text AS assigned_last_name,
+          NULL::text AS requested_first_name,
+          NULL::text AS requested_last_name,
+          NULL::text AS unit_number
+        FROM "Inspection" i
+        WHERE i."propertyId" = ${propertyId}
 
-    units.forEach((unit) => {
-      activities.push({
-        type: 'unit',
-        id: unit.id,
-        title: `Unit ${unit.unitNumber}`,
-        description: `Status: ${unit.status}`,
-        status: unit.status,
-        date: unit.updatedAt,
-      });
-    });
+        UNION ALL
 
-    // Sort by date descending
-    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+        SELECT
+          'service_request'::text AS type,
+          sr."id"::text AS id,
+          sr."title" AS title,
+          sr."status"::text AS status,
+          sr."priority"::text AS priority,
+          sr."updatedAt" AS date,
+          NULL::text AS assigned_first_name,
+          NULL::text AS assigned_last_name,
+          requester."firstName" AS requested_first_name,
+          requester."lastName" AS requested_last_name,
+          NULL::text AS unit_number
+        FROM "ServiceRequest" sr
+        LEFT JOIN "User" requester ON requester."id" = sr."requestedById"
+        WHERE sr."propertyId" = ${propertyId}
 
-    res.json({ success: true, activities: activities.slice(0, limit) });
+        UNION ALL
+
+        SELECT
+          'unit'::text AS type,
+          u."id"::text AS id,
+          u."unitNumber" AS title,
+          u."status"::text AS status,
+          NULL::text AS priority,
+          u."updatedAt" AS date,
+          NULL::text AS assigned_first_name,
+          NULL::text AS assigned_last_name,
+          NULL::text AS requested_first_name,
+          NULL::text AS requested_last_name,
+          u."unitNumber" AS unit_number
+        FROM "Unit" u
+        WHERE u."propertyId" = ${propertyId}
+      ) AS combined
+      ORDER BY date DESC
+      LIMIT ${limit};
+    `;
+
+    const activities = rows.map((row) => {
+      switch (row.type) {
+        case 'job':
+          return {
+            type: 'job',
+            id: row.id,
+            title: row.title,
+            description: row.assigned_first_name
+              ? `Assigned to ${row.assigned_first_name} ${row.assigned_last_name}`
+              : 'Job update',
+            status: row.status,
+            priority: row.priority,
+            date: row.date,
+          };
+        case 'inspection':
+          return {
+            type: 'inspection',
+            id: row.id,
+            title: row.title,
+            description: row.status ? `Inspection ${row.status.toLowerCase()}` : 'Inspection update',
+            status: row.status,
+            date: row.date,
+          };
+        case 'service_request':
+          return {
+            type: 'service_request',
+            id: row.id,
+            title: row.title,
+            description: row.requested_first_name
+              ? `Requested by ${row.requested_first_name} ${row.requested_last_name}`
+              : 'Service request update',
+            status: row.status,
+            priority: row.priority,
+            date: row.date,
+          };
+        case 'unit':
+          return {
+            type: 'unit',
+            id: row.id,
+            title: row.unit_number ? `Unit ${row.unit_number}` : 'Unit update',
+            description: `Status: ${row.status}`,
+            status: row.status,
+            date: row.date,
+          };
+        default:
+          return null;
+      }
+    }).filter(Boolean);
+
+    const payload = { success: true, activities };
+
+    await redisSet(cacheKey, payload, 300);
+
+    res.json(payload);
   } catch (error) {
     console.error('Get property activity error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch property activity' });

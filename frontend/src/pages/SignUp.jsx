@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
 import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -37,7 +37,8 @@ export default function SignUp() {
 
       setInviteLoading(true);
       try {
-        const res = await api.get(`/api/invites/${inviteToken}`);
+        const response = await apiClient.get(`/invites/${inviteToken}`);
+        const res = response?.data ?? response;
         setInviteData(res);
         // Pre-fill email and role from invite
         setFormData(prev => ({
@@ -106,7 +107,9 @@ export default function SignUp() {
         payload.inviteToken = inviteToken;
       }
 
-      const res = await api.post('/api/auth/register', payload, { credentials: 'include' });
+      const response = await apiClient.post('/auth/register', payload, { withCredentials: true });
+
+      const res = response?.data ?? response;
 
       if (!res?.token || !res?.user) throw new Error(res?.message || 'Invalid response from server');
 

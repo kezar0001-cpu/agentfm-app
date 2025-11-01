@@ -35,6 +35,7 @@ import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function TeamManagementPage() {
   const queryClient = useQueryClient();
@@ -49,7 +50,7 @@ export default function TeamManagementPage() {
 
   // Fetch all users
   const { data: users, isLoading: usersLoading } = useQuery({
-    queryKey: ['team-users'],
+    queryKey: queryKeys.teams.users(),
     queryFn: async () => {
       const roles = ['OWNER', 'TECHNICIAN', 'TENANT'];
       const promises = roles.map(role =>
@@ -62,7 +63,7 @@ export default function TeamManagementPage() {
 
   // Fetch pending invites
   const { data: invites, isLoading: invitesLoading } = useQuery({
-    queryKey: ['team-invites'],
+    queryKey: queryKeys.teams.invites(),
     queryFn: async () => {
       const response = await apiClient.get('/invites');
       return response.data.invites || [];
@@ -71,7 +72,7 @@ export default function TeamManagementPage() {
 
   // Fetch properties for invite form
   const { data: properties } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return ensureArray(response.data, ['items', 'data.items', 'properties']);
@@ -85,7 +86,7 @@ export default function TeamManagementPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['team-invites']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.invites() });
       toast.success('Invite sent successfully!');
       setInviteDialogOpen(false);
       setInviteForm({ email: '', role: 'TECHNICIAN', propertyId: '', unitId: '' });
@@ -101,7 +102,7 @@ export default function TeamManagementPage() {
       await apiClient.delete(`/invites/${inviteId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['team-invites']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.invites() });
       toast.success('Invite cancelled');
     },
     onError: (error) => {
@@ -263,8 +264,8 @@ export default function TeamManagementPage() {
             variant="outlined"
             startIcon={<RefreshIcon />}
             onClick={() => {
-              queryClient.invalidateQueries(['team-users']);
-              queryClient.invalidateQueries(['team-invites']);
+              queryClient.invalidateQueries({ queryKey: queryKeys.teams.users() });
+              queryClient.invalidateQueries({ queryKey: queryKeys.teams.invites() });
             }}
           >
             Refresh

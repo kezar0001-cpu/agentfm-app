@@ -16,6 +16,8 @@ import { Person, Lock, Save, Edit } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useCurrentUser } from '../context/UserContext';
+import { apiClient } from '../api/client.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 export default function ProfilePage() {
   const { user: currentUser } = useCurrentUser();
@@ -25,15 +27,10 @@ export default function ProfilePage() {
 
   // Fetch user profile
   const { data: profile, isLoading } = useQuery({
-    queryKey: ['profile', currentUser?.id],
+    queryKey: queryKeys.auth.profile(currentUser?.id),
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error('Failed to fetch profile');
-      const data = await response.json();
-      return data.data;
+      const response = await apiClient.get('/users/me');
+      return response.data?.data ?? response.data;
     },
     enabled: !!currentUser?.id,
   });
@@ -68,20 +65,11 @@ export default function ProfilePage() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/users/${currentUser.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to update profile');
-      return response.json();
+      const response = await apiClient.patch(`/users/${currentUser.id}`, data);
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['profile']);
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.profile(currentUser?.id) });
       toast.success('Profile updated successfully');
       setEditingProfile(false);
     },
@@ -93,23 +81,11 @@ export default function ProfilePage() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/users/${currentUser.id}/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword,
-        }),
+      const response = await apiClient.post(`/users/${currentUser.id}/change-password`, {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to change password');
-      }
-      return response.json();
+      return response.data;
     },
     onSuccess: () => {
       toast.success('Password changed successfully');

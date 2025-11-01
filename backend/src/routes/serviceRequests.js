@@ -3,6 +3,7 @@ import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole, isSubscriptionActive } from '../middleware/auth.js';
+import { redisDel } from '../config/redisClient.js';
 
 const router = express.Router();
 
@@ -482,55 +483,79 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
     const jobStatus = assignedToId ? 'ASSIGNED' : 'OPEN';
     
     // Create job from service request
-    const job = await prisma.job.create({
-      data: {
-        title: serviceRequest.title,
-        description: serviceRequest.description,
-        status: jobStatus,
-        priority: serviceRequest.priority,
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-        propertyId: serviceRequest.propertyId,
-        unitId: serviceRequest.unitId,
-        assignedToId: assignedToId || null,
-        estimatedCost: estimatedCost || null,
-        notes: notes || `Converted from service request #${serviceRequest.id}`,
-      },
-      include: {
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
+    const [job, updatedRequest] = await prisma.$transaction(async (tx) => {
+      const createdJob = await tx.job.create({
+        data: {
+          title: serviceRequest.title,
+          description: serviceRequest.description,
+          status: jobStatus,
+          priority: serviceRequest.priority,
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          propertyId: serviceRequest.propertyId,
+          unitId: serviceRequest.unitId,
+          assignedToId: assignedToId || null,
+          estimatedCost: estimatedCost || null,
+          notes: notes || `Converted from service request #${serviceRequest.id}`,
+          serviceRequestId: serviceRequest.id,
+        },
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+            },
+          },
+          unit: {
+            select: {
+              id: true,
+              unitNumber: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
           },
         },
-        unit: {
-          select: {
-            id: true,
-            unitNumber: true,
+      });
+
+      const updatedServiceRequest = await tx.serviceRequest.update({
+        where: { id },
+        data: {
+          status: 'CONVERTED_TO_JOB',
+          reviewNotes: `Converted to job #${createdJob.id}`,
+          reviewedAt: new Date(),
+        },
+        include: {
+          jobs: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              priority: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
           },
         },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
+      });
+
+      return [createdJob, updatedServiceRequest];
     });
-    
-    // Update service request status to converted
-    await prisma.serviceRequest.update({
-      where: { id },
-      data: {
-        status: 'COMPLETED',
-        reviewNotes: `Converted to job #${job.id}`,
-        reviewedAt: new Date(),
-      },
-    });
-    
-    res.json({ success: true, job });
+
+    // Invalidate cached property activity snapshots (best-effort)
+    if (serviceRequest.propertyId) {
+      await Promise.all([
+        redisDel(`property:${serviceRequest.propertyId}:activity:20`),
+        redisDel(`property:${serviceRequest.propertyId}:activity:50`),
+      ]);
+    }
+
+    res.json({ success: true, job, serviceRequest: updatedRequest });
   } catch (error) {
     console.error('Error converting service request to job:', error);
     res.status(500).json({ success: false, message: 'Failed to convert service request to job' });

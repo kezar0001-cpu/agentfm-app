@@ -11,7 +11,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { ArrowBack, Email } from '@mui/icons-material';
-import api from '../api';
+import { apiClient } from '../api/client.js';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -45,13 +45,14 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/forgot-password', { email });
+      const response = await apiClient.post('/auth/forgot-password', { email });
+      const payload = response?.data ?? response;
 
-      if (response.data.success) {
+      if (payload.success) {
         setSuccess(true);
         setEmail(''); // Clear the form
       } else {
-        setError(response.data.message || 'An error occurred. Please try again.');
+        setError(payload.message || 'An error occurred. Please try again.');
       }
     } catch (err: any) {
       console.error('Forgot password error:', err);

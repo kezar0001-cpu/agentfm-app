@@ -49,6 +49,7 @@ import TenantAssignmentDialog from '../components/TenantAssignmentDialog';
 import { formatDateTime } from '../utils/date';
 import toast from 'react-hot-toast';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const getStatusColor = (status) => {
   const colors = {
@@ -73,7 +74,7 @@ export default function UnitDetailPage() {
 
   // Fetch unit details
   const unitQuery = useQuery({
-    queryKey: ['unit', id],
+    queryKey: queryKeys.units.detail(id),
     queryFn: async () => {
       const response = await apiClient.get(`/units/${id}`);
       return response.data?.unit || response.data;
@@ -82,7 +83,7 @@ export default function UnitDetailPage() {
 
   // Fetch unit tenants
   const tenantsQuery = useQuery({
-    queryKey: ['unit-tenants', id],
+    queryKey: queryKeys.units.tenants(id),
     queryFn: async () => {
       const response = await apiClient.get(`/units/${id}/tenants`);
       return response.data?.tenants || [];
@@ -91,7 +92,7 @@ export default function UnitDetailPage() {
 
   // Fetch unit jobs
   const jobsQuery = useQuery({
-    queryKey: ['unit-jobs', id],
+    queryKey: queryKeys.units.jobs(id),
     queryFn: async () => {
       const response = await apiClient.get(`/jobs?unitId=${id}`);
       return ensureArray(response.data, ['items', 'data.items', 'jobs']);
@@ -101,7 +102,7 @@ export default function UnitDetailPage() {
 
   // Fetch unit inspections
   const inspectionsQuery = useQuery({
-    queryKey: ['unit-inspections', id],
+    queryKey: queryKeys.units.inspections(id),
     queryFn: async () => {
       const response = await apiClient.get(`/inspections?unitId=${id}`);
       return ensureArray(response.data, ['items', 'data.items', 'inspections']);
@@ -116,8 +117,8 @@ export default function UnitDetailPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['unit-tenants', id]);
-      queryClient.invalidateQueries(['unit', id]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.tenants(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.detail(id) });
       toast.success('Tenant removed successfully');
       setConfirmRemoveOpen(false);
       setSelectedTenant(null);

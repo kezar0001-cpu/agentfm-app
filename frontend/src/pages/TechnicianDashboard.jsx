@@ -29,6 +29,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const STATUS_COLORS = {
   OPEN: 'default',
@@ -52,7 +53,7 @@ export default function TechnicianDashboard() {
 
   // Fetch jobs assigned to technician
   const { data: jobs, isLoading, error, refetch } = useQuery({
-    queryKey: ['technician-jobs'],
+    queryKey: queryKeys.jobs.technician(),
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
       return ensureArray(response.data, ['items', 'data.items', 'jobs']);

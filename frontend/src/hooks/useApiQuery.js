@@ -1,6 +1,6 @@
 // frontend/src/hooks/useApiQuery.js
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 const useApiQuery = ({ queryKey, url, enabled = true }) => {
   const [data, setData] = useState(null);
@@ -20,8 +20,8 @@ const useApiQuery = ({ queryKey, url, enabled = true }) => {
     setError(null);
 
     try {
-      const result = await api.get(url);
-      const responseData = (result && result.data) || result;
+      const result = await apiClient.get(url);
+      const responseData = result?.data ?? result;
       setData(responseData);
     } catch (err) {
       console.error('useApiQuery error:', err);

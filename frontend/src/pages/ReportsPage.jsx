@@ -26,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { format } from 'date-fns';
 import ensureArray from '../utils/ensureArray';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const reportSchema = z.object({
   reportType: z.string().min(1, 'forms.required'),
@@ -47,7 +48,7 @@ export default function ReportsPage() {
 
   // Data fetching
   const { data: propertiesData = [], isLoading: isLoadingProperties } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const res = await apiClient.get('/properties');
       return ensureArray(res.data, ['items', 'data.items', 'properties']);
@@ -55,7 +56,7 @@ export default function ReportsPage() {
   });
 
   const { data: unitsData = [], isLoading: isLoadingUnits } = useQuery({
-    queryKey: ['units-list', selectedPropertyId],
+    queryKey: queryKeys.units.listByProperty(selectedPropertyId),
     queryFn: async () => {
       const res = await apiClient.get(`/units?propertyId=${selectedPropertyId}`);
       return ensureArray(res.data, ['items', 'data.items', 'units']);
@@ -64,7 +65,7 @@ export default function ReportsPage() {
   });
 
   const { data: reportsData = [], isLoading: isLoadingReports } = useQuery({
-    queryKey: ['reports'],
+    queryKey: queryKeys.reports.all(),
     queryFn: async () => {
       const res = await apiClient.get('/reports');
       // Backend returns array or object with reports
@@ -82,7 +83,7 @@ export default function ReportsPage() {
   const mutation = useMutation({
     mutationFn: (newReport) => apiClient.post('/reports', newReport),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all() });
       reset();
       setSelectedPropertyId('');
     },

@@ -33,6 +33,7 @@ import DataState from '../components/DataState';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining } from '../utils/date.js';
 import { redirectToBillingPortal } from '../utils/billing.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ const DashboardPage = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['dashboard-summary'],
+    queryKey: queryKeys.dashboard.summary(),
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/summary');
       // Backend returns { success: true, summary: {...} }
@@ -68,7 +69,7 @@ const DashboardPage = () => {
 
   // Fetch recent activity
   const { data: activity } = useQuery({
-    queryKey: ['dashboard-activity'],
+    queryKey: queryKeys.dashboard.activity(),
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/activity?limit=10');
       // Backend returns { success: true, items: [...] }

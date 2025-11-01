@@ -31,6 +31,7 @@ import DataState from '../components/DataState';
 import ServiceRequestForm from '../components/ServiceRequestForm';
 import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 import { CircularProgress } from '@mui/material';
+import { queryKeys } from '../utils/queryKeys.js';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ const ServiceRequestsPage = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['service-requests', filters],
+    queryKey: queryKeys.serviceRequests.filtered(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams(queryParams);
       params.append('limit', '50');
@@ -83,7 +84,7 @@ const ServiceRequestsPage = () => {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: ['properties-list'],
+    queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties?limit=100&offset=0');
       return response.data;

@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getAuthToken, setCurrentUser } from '../lib/auth.js';
-import { api } from '../api.js';
+import { apiClient } from '../api/client.js';
 
 const PUBLIC_PATHS = new Set(['/signin', '/signup']);
 const SUBS_PATH = '/subscriptions';
@@ -19,9 +19,11 @@ export default function GlobalGuard() {
 
     inFlight.current = true;
 
-    api.get('/api/auth/me')
+    apiClient
+      .get('/auth/me')
+      .then((response) => response?.data ?? response)
       .then((data) => {
-        const user = data?.user;
+        const user = data?.user ?? data;
         if (!user) return;
 
         setCurrentUser(user);
