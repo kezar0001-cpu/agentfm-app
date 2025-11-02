@@ -10,6 +10,8 @@ import {
   DialogActions,
   Alert,
   CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
@@ -18,7 +20,9 @@ import { queryKeys } from '../utils/queryKeys.js';
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
-  
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [formData, setFormData] = useState({
     title: job?.title || '',
     description: job?.description || '',
@@ -357,8 +361,20 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
         </Grid>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onCancel} disabled={isLoading}>
+      <DialogActions
+        sx={{
+          px: { xs: 2, md: 3 },
+          pb: { xs: 2, md: 2 },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}
+      >
+        <Button
+          onClick={onCancel}
+          disabled={isLoading}
+          fullWidth={isMobile}
+          sx={{ minHeight: { xs: 48, md: 36 } }}
+        >
           Cancel
         </Button>
         <Button
@@ -366,6 +382,8 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           variant="contained"
           disabled={isLoading}
           startIcon={isLoading && <CircularProgress size={16} />}
+          fullWidth={isMobile}
+          sx={{ minHeight: { xs: 48, md: 36 } }}
         >
           {isEditing ? 'Update' : 'Create'} Job
         </Button>

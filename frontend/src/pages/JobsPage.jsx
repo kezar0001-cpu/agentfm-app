@@ -23,6 +23,8 @@ import {
   ToggleButton,
   Paper,
   Checkbox,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -58,6 +60,8 @@ const localizer = momentLocalizer(moment);
 const JobsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
@@ -335,10 +339,10 @@ const JobsPage = () => {
         sx={{ mb: 3 }}
       >
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
             Jobs
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
             Manage and track maintenance jobs
           </Typography>
         </Box>
@@ -347,7 +351,10 @@ const JobsPage = () => {
           startIcon={<AddIcon />}
           onClick={handleCreate}
           fullWidth
-          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+          sx={{
+            maxWidth: { xs: '100%', md: 'auto' },
+            minHeight: { xs: 48, md: 36 }
+          }}
         >
           Create Job
         </Button>
@@ -380,7 +387,13 @@ const JobsPage = () => {
           onChange={handleViewChange}
           aria-label="view toggle"
           size="small"
-          sx={{ flexWrap: 'wrap' }}
+          sx={{
+            flexWrap: 'wrap',
+            '& .MuiToggleButton-root': {
+              minWidth: { xs: 48, md: 'auto' },
+              minHeight: { xs: 48, md: 'auto' }
+            }
+          }}
         >
           <ToggleButton value="card" aria-label="card view">
             <ViewModuleIcon />
@@ -605,7 +618,18 @@ const JobsPage = () => {
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="h6" gutterBottom>
+                          <Typography
+                            variant="h6"
+                            gutterBottom
+                            sx={{
+                              fontSize: { xs: '1rem', md: '1.25rem' },
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}
+                          >
                             {job.title}
                           </Typography>
                           <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
@@ -668,7 +692,14 @@ const JobsPage = () => {
                           <Typography variant="caption" color="text.secondary">
                             Property
                           </Typography>
-                          <Typography variant="body2">
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
                             {job.property?.name || 'N/A'}
                           </Typography>
                         </Box>
@@ -757,24 +788,29 @@ const JobsPage = () => {
           )}
 
           {view === 'calendar' && (
-            <Paper sx={{ p: { xs: 2, md: 3 } }}>
-              <Calendar
-                localizer={localizer}
-                events={filteredJobs
-                  .filter((job) => job.scheduledDate)
-                  .map((job) => ({
-                    id: job.id,
-                    title: job.title,
-                    start: new Date(job.scheduledDate),
-                    end: new Date(job.scheduledDate),
-                    allDay: true,
-                    resource: job,
-                  }))}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: 600 }}
-                onSelectEvent={(event) => handleOpenDetailModal(event.resource)}
-              />
+            <Paper sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Calendar
+                  localizer={localizer}
+                  events={filteredJobs
+                    .filter((job) => job.scheduledDate)
+                    .map((job) => ({
+                      id: job.id,
+                      title: job.title,
+                      start: new Date(job.scheduledDate),
+                      end: new Date(job.scheduledDate),
+                      allDay: true,
+                      resource: job,
+                    }))}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{
+                    height: 600,
+                    minWidth: 600
+                  }}
+                  onSelectEvent={(event) => handleOpenDetailModal(event.resource)}
+                />
+              </Box>
             </Paper>
           )}
         </>
@@ -825,6 +861,7 @@ const JobsPage = () => {
           onClose={handleCloseDialog}
           maxWidth="md"
           fullWidth
+          fullScreen={isMobile}
         >
           <JobForm
             job={selectedJob}

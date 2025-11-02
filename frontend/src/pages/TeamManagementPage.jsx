@@ -23,6 +23,8 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
@@ -39,6 +41,8 @@ import { queryKeys } from '../utils/queryKeys.js';
 
 export default function TeamManagementPage() {
   const queryClient = useQueryClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [tabValue, setTabValue] = useState(0);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({
@@ -157,8 +161,8 @@ export default function TeamManagementPage() {
   const tenants = users?.filter(u => u.role === 'TENANT') || [];
 
   const renderUsersTable = (usersList, roleLabel) => (
-    <TableContainer>
-      <Table>
+    <Box sx={{ overflowX: 'auto' }}>
+      <Table sx={{ minWidth: { xs: 600, md: 'auto' } }}>
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
@@ -180,17 +184,23 @@ export default function TeamManagementPage() {
             usersList.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
-                  {user.firstName} {user.lastName}
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    {user.firstName} {user.lastName}
+                  </Typography>
                 </TableCell>
-                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    {user.email}
+                  </Typography>
+                </TableCell>
                 <TableCell>
                   <Chip label={user.role} color={getRoleColor(user.role)} size="small" />
                 </TableCell>
                 <TableCell>
-                  <Chip 
-                    label={user.isActive ? 'Active' : 'Inactive'} 
-                    color={user.isActive ? 'success' : 'default'} 
-                    size="small" 
+                  <Chip
+                    label={user.isActive ? 'Active' : 'Inactive'}
+                    color={user.isActive ? 'success' : 'default'}
+                    size="small"
                   />
                 </TableCell>
               </TableRow>
@@ -198,12 +208,12 @@ export default function TeamManagementPage() {
           )}
         </TableBody>
       </Table>
-    </TableContainer>
+    </Box>
   );
 
   const renderInvitesTable = () => (
-    <TableContainer>
-      <Table>
+    <Box sx={{ overflowX: 'auto' }}>
+      <Table sx={{ minWidth: { xs: 650, md: 'auto' } }}>
         <TableHead>
           <TableRow>
             <TableCell>Email</TableCell>
@@ -225,7 +235,11 @@ export default function TeamManagementPage() {
           ) : (
             invites?.map((invite) => (
               <TableRow key={invite.id}>
-                <TableCell>{invite.email}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    {invite.email}
+                  </Typography>
+                </TableCell>
                 <TableCell>
                   <Chip label={invite.role} color={getRoleColor(invite.role)} size="small" />
                 </TableCell>
@@ -233,7 +247,9 @@ export default function TeamManagementPage() {
                   <Chip label={invite.status} color={getStatusColor(invite.status)} size="small" />
                 </TableCell>
                 <TableCell>
-                  {new Date(invite.expiresAt).toLocaleDateString()}
+                  <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                    {new Date(invite.expiresAt).toLocaleDateString()}
+                  </Typography>
                 </TableCell>
                 <TableCell align="right">
                   <IconButton
@@ -241,6 +257,7 @@ export default function TeamManagementPage() {
                     color="error"
                     onClick={() => deleteInviteMutation.mutate(invite.id)}
                     disabled={deleteInviteMutation.isPending}
+                    aria-label="Delete invite"
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>
@@ -250,16 +267,23 @@ export default function TeamManagementPage() {
           )}
         </TableBody>
       </Table>
-    </TableContainer>
+    </Box>
   );
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={600}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between',
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        gap: { xs: 2, sm: 0 },
+        mb: 3
+      }}>
+        <Typography variant="h4" fontWeight={600} sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
           Team Management
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' }, flexDirection: { xs: 'column', sm: 'row' } }}>
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -267,6 +291,8 @@ export default function TeamManagementPage() {
               queryClient.invalidateQueries({ queryKey: queryKeys.teams.users() });
               queryClient.invalidateQueries({ queryKey: queryKeys.teams.invites() });
             }}
+            fullWidth
+            sx={{ display: { xs: 'flex', sm: 'inline-flex' } }}
           >
             Refresh
           </Button>
@@ -274,6 +300,8 @@ export default function TeamManagementPage() {
             variant="contained"
             startIcon={<PersonAddIcon />}
             onClick={() => setInviteDialogOpen(true)}
+            fullWidth
+            sx={{ display: { xs: 'flex', sm: 'inline-flex' } }}
           >
             Invite User
           </Button>
@@ -281,7 +309,13 @@ export default function TeamManagementPage() {
       </Box>
 
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
+        <Tabs
+          value={tabValue}
+          onChange={(e, v) => setTabValue(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+        >
           <Tab label={`Owners (${owners.length})`} />
           <Tab label={`Technicians (${technicians.length})`} />
           <Tab label={`Tenants (${tenants.length})`} />
@@ -299,7 +333,13 @@ export default function TeamManagementPage() {
       </Paper>
 
       {/* Invite Dialog */}
-      <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        fullScreen={isMobile}
+      >
         <DialogTitle>Invite Team Member</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
