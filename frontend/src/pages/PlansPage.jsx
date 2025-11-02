@@ -58,18 +58,18 @@ export default function PlansPage() {
   });
 
   return (
-    <Stack spacing={4}>
+    <Stack spacing={4} sx={{ px: { xs: 2, sm: 3, md: 0 }, py: { xs: 2, md: 0 } }}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
           Maintenance Plans
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
+        <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: '0.875rem', md: '1rem' } }}>
           Create and manage recurring maintenance schedules for your properties
         </Typography>
       </Box>
 
       <Paper sx={{ p: { xs: 2, md: 3 } }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.125rem', md: '1.25rem' } }}>
           {t('actions.create')} {t('plans.title')}
         </Typography>
         <form onSubmit={onSubmit} noValidate>
@@ -130,8 +130,8 @@ export default function PlansPage() {
           isEmpty={!query.isLoading && !query.isError && plans.length === 0}
           onRetry={query.refetch}
         >
-          <TableContainer>
-            <Table>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table sx={{ minWidth: { xs: 500, md: 'auto' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>{t('plans.name')}</TableCell>
@@ -143,20 +143,29 @@ export default function PlansPage() {
                 {plans.map((plan) => (
                   <TableRow key={plan.id || plan.name}>
                     <TableCell>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {plan.name}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip 
-                        label={plan.frequency} 
-                        size="small" 
-                        color="primary" 
+                      <Chip
+                        label={plan.frequency}
+                        size="small"
+                        color="primary"
                         variant="outlined"
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          maxWidth: { xs: 200, md: 'none' },
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: { xs: 'nowrap', md: 'normal' }
+                        }}
+                      >
                         {plan.description || 'No description'}
                       </Typography>
                     </TableCell>
@@ -164,7 +173,7 @@ export default function PlansPage() {
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </Box>
         </DataState>
       </Paper>
     </Stack>

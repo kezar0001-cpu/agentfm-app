@@ -134,17 +134,18 @@ export default function ReportsPage() {
   };
 
   return (
-    <Stack spacing={4}>
+    <Stack spacing={4} sx={{ px: { xs: 2, sm: 3, md: 0 }, py: { xs: 2, md: 0 } }}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
           {t('reports.title')}
         </Typography>
-        <Typography color="text.secondary">{t('reports.description')}
+        <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
+          {t('reports.description')}
         </Typography>
       </Box>
 
-      <Paper sx={{ p: { xs: 2, md: 3 }, maxWidth: 700 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 }, maxWidth: { xs: '100%', md: 700 } }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.125rem', md: '1.25rem' } }}>
           Generate New Report
         </Typography>
         <form onSubmit={onSubmit} noValidate>
@@ -259,7 +260,7 @@ export default function ReportsPage() {
       </Paper>
 
       <Paper sx={{ p: { xs: 2, md: 3 } }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.125rem', md: '1.25rem' } }}>
           Generated Reports
         </Typography>
         {isLoadingReports ? (
@@ -271,8 +272,8 @@ export default function ReportsPage() {
             No reports generated yet. Create your first report using the form above.
           </Alert>
         ) : (
-          <TableContainer>
-            <Table>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table sx={{ minWidth: { xs: 800, md: 'auto' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Report Type</TableCell>
@@ -286,18 +287,32 @@ export default function ReportsPage() {
               <TableBody>
                 {reportsData.map((report) => (
                   <TableRow key={report.id}>
-                    <TableCell>{REPORT_TYPES[report.reportType] || report.reportType}</TableCell>
-                    <TableCell>{report.property?.name || 'N/A'}</TableCell>
-                    <TableCell>{report.unit?.unitNumber || 'All Units'}</TableCell>
                     <TableCell>
-                      {report.parameters?.fromDate && report.parameters?.toDate ? (
-                        <>
-                          {format(new Date(report.parameters.fromDate), 'PP')} -{' '}
-                          {format(new Date(report.parameters.toDate), 'PP')}
-                        </>
-                      ) : (
-                        'N/A'
-                      )}
+                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                        {REPORT_TYPES[report.reportType] || report.reportType}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                        {report.property?.name || 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                        {report.unit?.unitNumber || 'All Units'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                        {report.parameters?.fromDate && report.parameters?.toDate ? (
+                          <>
+                            {format(new Date(report.parameters.fromDate), 'PP')} -{' '}
+                            {format(new Date(report.parameters.toDate), 'PP')}
+                          </>
+                        ) : (
+                          'N/A'
+                        )}
+                      </Typography>
                     </TableCell>
                     <TableCell>{getStatusChip(report.status)}</TableCell>
                     <TableCell>
@@ -325,7 +340,7 @@ export default function ReportsPage() {
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </Box>
         )}
       </Paper>
     </Stack>

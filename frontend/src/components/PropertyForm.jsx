@@ -10,6 +10,8 @@ import {
   MenuItem,
   Alert,
   Box,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
 import { COUNTRIES } from '../lib/countries';
@@ -58,6 +60,8 @@ const PROPERTY_STATUSES = [
 
 export default function PropertyForm({ open, onClose, property, onSuccess }) {
   const isEdit = !!property;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [formData, setFormData] = useState({
     name: '',
@@ -193,7 +197,13 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobile}
+    >
       <DialogTitle>
         {isEdit ? 'Edit Property' : 'Add New Property'}
       </DialogTitle>
@@ -405,14 +415,28 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={mutation.isPending}>
+      <DialogActions
+        sx={{
+          px: { xs: 2, md: 3 },
+          pb: { xs: 2, md: 2 },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}
+      >
+        <Button
+          onClick={onClose}
+          disabled={mutation.isPending}
+          fullWidth={isMobile}
+          sx={{ minHeight: { xs: 48, md: 36 } }}
+        >
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={handleSubmit}
           disabled={mutation.isPending}
+          fullWidth={isMobile}
+          sx={{ minHeight: { xs: 48, md: 36 } }}
         >
           {mutation.isPending
             ? 'Saving...'

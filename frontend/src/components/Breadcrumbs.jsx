@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import { Breadcrumbs as MUIBreadcrumbs, Link as MuiLink, Typography } from '@mui/material';
+import { Breadcrumbs as MUIBreadcrumbs, Link as MuiLink, Typography, useMediaQuery, useTheme } from '@mui/material';
 
 const DEFAULT_LABELS = {
   '': 'Dashboard',
@@ -98,6 +98,9 @@ export default function Breadcrumbs({
   ...props
 }) {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
 
   const crumbs = useMemo(() => {
     const pathnames = location.pathname.split('/').filter(Boolean);
@@ -159,11 +162,32 @@ export default function Breadcrumbs({
     return null;
   }
 
+  const getMaxItems = () => {
+    if (props.maxItems !== undefined) return props.maxItems;
+    if (isMobile) return 2;
+    if (isTablet) return 3;
+    return undefined;
+  };
+
   return (
     <MUIBreadcrumbs
       aria-label="breadcrumb"
       separator={separator}
-      sx={{ mb: 2, ...sx }}
+      maxItems={getMaxItems()}
+      sx={{
+        mb: 2,
+        '& .MuiBreadcrumbs-ol': {
+          flexWrap: { xs: 'nowrap', md: 'wrap' }
+        },
+        '& .MuiTypography-root, & .MuiLink-root': {
+          fontSize: { xs: '0.875rem', md: '1rem' },
+          maxWidth: { xs: 150, sm: 200, md: 'none' },
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        },
+        ...sx
+      }}
       {...props}
     >
       {crumbs.map((crumb, index) => {

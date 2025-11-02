@@ -662,8 +662,8 @@ export default function PropertyDetailPage() {
                 </Box>
 
                 {property.owners && property.owners.length > 0 ? (
-                  <TableContainer>
-                    <Table>
+                  <Box sx={{ overflowX: 'auto' }}>
+                    <Table sx={{ minWidth: { xs: 500, md: 'auto' } }}>
                       <TableHead>
                         <TableRow>
                           <TableCell>Name</TableCell>
@@ -676,18 +676,30 @@ export default function PropertyDetailPage() {
                         {property.owners.map((po) => (
                           <TableRow key={po.id}>
                             <TableCell>
-                              {po.owner.firstName} {po.owner.lastName}
+                              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                {po.owner.firstName} {po.owner.lastName}
+                              </Typography>
                             </TableCell>
-                            <TableCell>{po.owner.email}</TableCell>
-                            <TableCell>{po.ownershipPercentage}%</TableCell>
                             <TableCell>
-                              {new Date(po.startDate).toLocaleDateString()}
+                              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                {po.owner.email}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {po.ownershipPercentage}%
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                {new Date(po.startDate).toLocaleDateString()}
+                              </Typography>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  </TableContainer>
+                  </Box>
                 ) : (
                   <Typography color="text.secondary">
                     No owners assigned yet
