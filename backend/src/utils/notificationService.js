@@ -280,6 +280,40 @@ export async function sendWelcomeEmail(user) {
 }
 
 /**
+ * Send notification when an inspection is completed
+ */
+export async function notifyInspectionCompleted(inspection, technician, property, manager, followUpJobs = []) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return sendNotification(
+    manager.id,
+    'INSPECTION_COMPLETED',
+    'Inspection Completed',
+    `${technician.firstName} ${technician.lastName} completed inspection: ${inspection.title}`,
+    {
+      entityType: 'inspection',
+      entityId: inspection.id,
+      emailData: {
+        managerName: `${manager.firstName} ${manager.lastName}`,
+        inspectionTitle: inspection.title,
+        propertyName: property.name,
+        inspectionType: inspection.type,
+        technicianName: `${technician.firstName} ${technician.lastName}`,
+        completedDate: new Date(inspection.completedDate).toLocaleDateString(),
+        findings: inspection.findings,
+        notes: inspection.notes,
+        followUpJobs: followUpJobs.map(job => ({
+          title: job.title,
+          description: job.description,
+          priority: job.priority,
+        })),
+        inspectionUrl: `${frontendUrl}/inspections/${inspection.id}`,
+      },
+    }
+  );
+}
+
+/**
  * Map notification type to email template key
  */
 function getTemplateKeyFromType(type) {
@@ -287,6 +321,7 @@ function getTemplateKeyFromType(type) {
     JOB_ASSIGNED: 'jobAssigned',
     JOB_COMPLETED: 'jobCompleted',
     INSPECTION_REMINDER: 'inspectionReminder',
+    INSPECTION_COMPLETED: 'inspectionCompleted',
     SERVICE_REQUEST_UPDATE: 'serviceRequestUpdate',
     SUBSCRIPTION_EXPIRING: 'trialExpiring',
   };
@@ -298,6 +333,7 @@ export default {
   notifyJobAssigned,
   notifyJobCompleted,
   notifyInspectionReminder,
+  notifyInspectionCompleted,
   notifyServiceRequestUpdate,
   notifyTrialExpiring,
   sendWelcomeEmail,

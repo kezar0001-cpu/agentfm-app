@@ -58,7 +58,9 @@ export default function InspectionDetailPage() {
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
 
-  const [completeData, setCompleteData] = useState({ findings: '', notes: '', tags: [] });
+  const [completeData, setCompleteData] = useState({ findings: '', notes: '', tags: [], autoCreateJobs: true });
+  const [previewJobs, setPreviewJobs] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
   const [reminderForm, setReminderForm] = useState({ remindAt: '', recipients: [], note: '', channel: 'IN_APP' });
   const [jobForm, setJobForm] = useState({
     title: '',
@@ -101,6 +103,17 @@ export default function InspectionDetailPage() {
 
   const inspectorOptions = inspectorData.inspectors || [];
 
+  const previewMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await apiClient.post(`/inspections/${id}/complete`, { ...payload, previewOnly: true });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setPreviewJobs(data.followUpJobs || []);
+      setShowPreview(true);
+    },
+  });
+
   const completeMutation = useMutation({
     mutationFn: async (payload) => {
       const response = await apiClient.post(`/inspections/${id}/complete`, payload);
@@ -110,6 +123,8 @@ export default function InspectionDetailPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.inspections.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.inspections.all() });
       setCompleteDialogOpen(false);
+      setPreviewJobs([]);
+      setShowPreview(false);
     },
   });
 
@@ -136,11 +151,20 @@ export default function InspectionDetailPage() {
     },
   });
 
+  const handlePreviewJobs = () => {
+    previewMutation.mutate({
+      findings: completeData.findings,
+      notes: completeData.notes,
+      tags: completeData.tags,
+    });
+  };
+
   const handleCompleteSubmit = () => {
     completeMutation.mutate({
       findings: completeData.findings,
       notes: completeData.notes,
       tags: completeData.tags,
+      autoCreateJobs: completeData.autoCreateJobs,
     });
   };
 
@@ -456,7 +480,7 @@ export default function InspectionDetailPage() {
         />
       </Dialog>
 
-      <Dialog open={completeDialogOpen} onClose={() => setCompleteDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={completeDialogOpen} onClose={() => setCompleteDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Complete inspection</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
@@ -466,6 +490,7 @@ export default function InspectionDetailPage() {
               minRows={3}
               value={completeData.findings}
               onChange={(event) => setCompleteData((prev) => ({ ...prev, findings: event.target.value }))}
+              helperText="Tip: Use 'HIGH:' or 'URGENT:' prefix for high-priority items that need follow-up jobs"
             />
             <TextField
               label="Additional notes"
@@ -488,10 +513,72 @@ export default function InspectionDetailPage() {
                 }))
               }
             />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <input
+                type="checkbox"
+                id="autoCreateJobs"
+                checked={completeData.autoCreateJobs}
+                onChange={(e) => setCompleteData((prev) => ({ ...prev, autoCreateJobs: e.target.checked }))}
+                style={{ cursor: 'pointer' }}
+              />
+              <label htmlFor="autoCreateJobs" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                Automatically create follow-up jobs for HIGH/URGENT findings
+              </label>
+            </Box>
+
+            {completeData.autoCreateJobs && completeData.findings && (
+              <Button
+                variant="outlined"
+                onClick={handlePreviewJobs}
+                disabled={previewMutation.isPending || !completeData.findings.trim()}
+                size="small"
+              >
+                {previewMutation.isPending ? 'Loading preview...' : 'Preview follow-up jobs'}
+              </Button>
+            )}
+
+            {showPreview && previewJobs.length > 0 && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Follow-up jobs that will be created ({previewJobs.length}):
+                </Typography>
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {previewJobs.map((job, index) => (
+                    <Paper key={index} sx={{ p: 1.5, bgcolor: 'background.paper' }}>
+                      <Typography variant="body2" fontWeight="bold">
+                        {job.title}
+                      </Typography>
+                      <Chip
+                        label={job.priority}
+                        size="small"
+                        color={job.priority === 'URGENT' ? 'error' : 'warning'}
+                        sx={{ mt: 0.5 }}
+                      />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {job.description}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {showPreview && previewJobs.length === 0 && (
+              <Alert severity="info">
+                No high-priority findings detected. Jobs will not be auto-created.
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCompleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setCompleteDialogOpen(false);
+            setShowPreview(false);
+            setPreviewJobs([]);
+          }}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             color="success"
@@ -499,7 +586,7 @@ export default function InspectionDetailPage() {
             startIcon={<CheckCircleIcon />}
             disabled={completeMutation.isPending}
           >
-            Complete inspection
+            {completeMutation.isPending ? 'Completing...' : 'Complete inspection'}
           </Button>
         </DialogActions>
       </Dialog>

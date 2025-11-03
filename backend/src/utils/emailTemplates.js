@@ -251,6 +251,76 @@ export const emailTemplates = {
       </html>
     `,
   }),
+
+  inspectionCompleted: (data) => ({
+    subject: `Inspection Completed: ${data.inspectionTitle}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #7c3aed; color: white; padding: 20px; text-align: center; }
+          .content { background-color: #f9fafb; padding: 20px; }
+          .findings-box { background-color: white; padding: 15px; border-left: 4px solid #7c3aed; margin: 15px 0; }
+          .job-item { background-color: white; padding: 12px; margin: 8px 0; border-radius: 4px; border-left: 4px solid #dc2626; }
+          .priority-high { color: #dc2626; font-weight: bold; }
+          .priority-urgent { color: #991b1b; font-weight: bold; }
+          .button { display: inline-block; padding: 12px 24px; background-color: #7c3aed; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Inspection Completed</h1>
+          </div>
+          <div class="content">
+            <p>Hello ${data.managerName},</p>
+            <p>An inspection has been completed and requires your attention:</p>
+            <h2>${data.inspectionTitle}</h2>
+            <p><strong>Property:</strong> ${data.propertyName}</p>
+            <p><strong>Type:</strong> ${data.inspectionType}</p>
+            <p><strong>Completed By:</strong> ${data.technicianName}</p>
+            <p><strong>Completed Date:</strong> ${data.completedDate}</p>
+
+            ${data.findings ? `
+              <div class="findings-box">
+                <h3 style="margin-top: 0;">Findings Summary</h3>
+                <p>${data.findings}</p>
+              </div>
+            ` : ''}
+
+            ${data.notes ? `
+              <p><strong>Additional Notes:</strong></p>
+              <p>${data.notes}</p>
+            ` : ''}
+
+            ${data.followUpJobs && data.followUpJobs.length > 0 ? `
+              <h3>Follow-Up Jobs Created</h3>
+              <p>${data.followUpJobs.length} high-priority job(s) have been automatically created:</p>
+              ${data.followUpJobs.map(job => `
+                <div class="job-item">
+                  <strong>${job.title}</strong>
+                  <br/>
+                  <span class="priority-${job.priority.toLowerCase()}">${job.priority}</span>
+                  ${job.description ? `<br/>${job.description}` : ''}
+                </div>
+              `).join('')}
+            ` : ''}
+
+            <a href="${data.inspectionUrl}" class="button">View Inspection Report</a>
+          </div>
+          <div class="footer">
+            <p>AgentFM - Facilities Management Platform</p>
+            <p>This is an automated message, please do not reply.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  }),
 };
 
 export default emailTemplates;
