@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  TextField,
   Grid,
-  MenuItem,
   Alert,
   Box,
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
 import { queryKeys } from '../utils/queryKeys.js';
+import { unitSchema, unitDefaultValues } from '../schemas/unitSchema';
+import { FormTextField, FormSelect } from './form';
 
 const UNIT_STATUSES = [
   { value: 'AVAILABLE', label: 'Available' },
@@ -24,19 +26,17 @@ const UNIT_STATUSES = [
 export default function UnitForm({ open, onClose, propertyId, unit, onSuccess }) {
   const isEdit = !!unit;
 
-  const [formData, setFormData] = useState({
-    unitNumber: '',
-    floor: '',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
-    rentAmount: '',
-    status: 'AVAILABLE',
-    description: '',
-    imageUrl: '',
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setFocus,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(unitSchema),
+    defaultValues: unitDefaultValues,
+    mode: 'onBlur',
   });
-
-  const [errors, setErrors] = useState({});
 
   // Create/Update mutation
   const mutation = useApiMutation({
@@ -48,7 +48,7 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
   // Initialize form with unit data if editing
   useEffect(() => {
     if (unit) {
-      setFormData({
+      reset({
         unitNumber: unit.unitNumber || '',
         floor: unit.floor?.toString() || '',
         bedrooms: unit.bedrooms?.toString() || '',
@@ -60,83 +60,38 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
         imageUrl: unit.imageUrl || '',
       });
     } else {
-      // Reset form for new unit
-      setFormData({
-        unitNumber: '',
-        floor: '',
-        bedrooms: '',
-        bathrooms: '',
-        area: '',
-        rentAmount: '',
-        status: 'AVAILABLE',
-        description: '',
-        imageUrl: '',
-      });
+      reset(unitDefaultValues);
     }
-    setErrors({});
-  }, [unit, open]);
+  }, [unit, open, reset]);
 
-  const handleChange = (field) => (event) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: null }));
+  // Auto-focus on first error field
+  useEffect(() => {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      setFocus(firstErrorField);
     }
-  };
+  }, [errors, setFocus]);
 
-  const validate = () => {
-    const newErrors = {};
-
-    if (!formData.unitNumber.trim()) {
-      newErrors.unitNumber = 'Unit number is required';
-    }
-
-    // Validate numbers if provided
-    if (formData.floor && isNaN(parseInt(formData.floor))) {
-      newErrors.floor = 'Must be a valid number';
-    }
-    if (formData.bedrooms && isNaN(parseInt(formData.bedrooms))) {
-      newErrors.bedrooms = 'Must be a valid number';
-    }
-    if (formData.bathrooms && isNaN(parseFloat(formData.bathrooms))) {
-      newErrors.bathrooms = 'Must be a valid number';
-    }
-    if (formData.area && isNaN(parseFloat(formData.area))) {
-      newErrors.area = 'Must be a valid number';
-    }
-    if (formData.rentAmount && isNaN(parseFloat(formData.rentAmount))) {
-      newErrors.rentAmount = 'Must be a valid number';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-
-    const data = {
-      unitNumber: formData.unitNumber.trim(),
-      floor: formData.floor ? parseInt(formData.floor) : null,
-      bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
-      bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : null,
-      area: formData.area ? parseFloat(formData.area) : null,
-      rentAmount: formData.rentAmount ? parseFloat(formData.rentAmount) : null,
-      status: formData.status,
-      description: formData.description.trim() || null,
-      imageUrl: formData.imageUrl.trim() || null,
+  const onSubmit = async (data) => {
+    const payload = {
+      unitNumber: data.unitNumber,
+      floor: data.floor,
+      bedrooms: data.bedrooms,
+      bathrooms: data.bathrooms,
+      area: data.area,
+      rentAmount: data.rentAmount,
+      status: data.status,
+      description: data.description || null,
+      imageUrl: data.imageUrl || null,
     };
 
     // Add propertyId only for creation
     if (!isEdit) {
-      data.propertyId = propertyId;
+      payload.propertyId = propertyId;
     }
 
     try {
-      await mutation.mutateAsync({ data });
+      await mutation.mutateAsync({ data: payload });
       onSuccess();
     } catch (error) {
       // Error is shown via mutation.error
@@ -150,9 +105,9 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
       </DialogTitle>
 
       <DialogContent>
-        <Box sx={{ mt: 2 }}>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 2 }}>
           {mutation.isError && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }} role="alert">
               {mutation.error?.message || 'Failed to save unit'}
             </Alert>
           )}
@@ -160,138 +115,94 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
           <Grid container spacing={2}>
             {/* Unit Number */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                required
-                id="unit-form-unit-number"
+              <FormTextField
                 name="unitNumber"
+                control={control}
                 label="Unit Number"
-                value={formData.unitNumber}
-                onChange={handleChange('unitNumber')}
-                error={!!errors.unitNumber}
-                helperText={errors.unitNumber || 'e.g., 101, A1, Suite 205'}
+                required
+                helperText="e.g., 101, A1, Suite 205"
               />
             </Grid>
 
             {/* Status */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                id="unit-form-status"
+              <FormSelect
                 name="status"
-                select
+                control={control}
                 label="Status"
-                value={formData.status}
-                onChange={handleChange('status')}
-              >
-                {UNIT_STATUSES.map((status) => (
-                  <MenuItem key={status.value} value={status.value}>
-                    {status.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+                options={UNIT_STATUSES}
+              />
             </Grid>
 
             {/* Floor */}
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="unit-form-floor"
+              <FormTextField
                 name="floor"
+                control={control}
                 label="Floor"
                 type="number"
-                value={formData.floor}
-                onChange={handleChange('floor')}
-                error={!!errors.floor}
-                helperText={errors.floor}
               />
             </Grid>
 
             {/* Bedrooms */}
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="unit-form-bedrooms"
+              <FormTextField
                 name="bedrooms"
+                control={control}
                 label="Bedrooms"
                 type="number"
-                value={formData.bedrooms}
-                onChange={handleChange('bedrooms')}
-                error={!!errors.bedrooms}
-                helperText={errors.bedrooms}
               />
             </Grid>
 
             {/* Bathrooms */}
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="unit-form-bathrooms"
+              <FormTextField
                 name="bathrooms"
+                control={control}
                 label="Bathrooms"
                 type="number"
                 inputProps={{ step: 0.5 }}
-                value={formData.bathrooms}
-                onChange={handleChange('bathrooms')}
-                error={!!errors.bathrooms}
-                helperText={errors.bathrooms}
               />
             </Grid>
 
             {/* Area */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                id="unit-form-area"
+              <FormTextField
                 name="area"
+                control={control}
                 label="Area (sq ft)"
                 type="number"
-                value={formData.area}
-                onChange={handleChange('area')}
-                error={!!errors.area}
-                helperText={errors.area}
               />
             </Grid>
 
             {/* Rent Amount */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                id="unit-form-rent-amount"
+              <FormTextField
                 name="rentAmount"
+                control={control}
                 label="Monthly Rent ($)"
                 type="number"
-                value={formData.rentAmount}
-                onChange={handleChange('rentAmount')}
-                error={!!errors.rentAmount}
-                helperText={errors.rentAmount}
               />
             </Grid>
 
             {/* Description */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
+              <FormTextField
+                name="description"
+                control={control}
+                label="Description"
                 multiline
                 rows={3}
-                id="unit-form-description"
-                name="description"
-                label="Description"
-                value={formData.description}
-                onChange={handleChange('description')}
                 helperText="Additional details about the unit"
               />
             </Grid>
 
             {/* Image URL */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                id="unit-form-image-url"
+              <FormTextField
                 name="imageUrl"
+                control={control}
                 label="Image URL (optional)"
-                value={formData.imageUrl}
-                onChange={handleChange('imageUrl')}
                 helperText="Enter a URL to an image of the unit"
               />
             </Grid>
@@ -300,13 +211,13 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={mutation.isPending}>
+        <Button onClick={onClose} disabled={isSubmitting || mutation.isPending}>
           Cancel
         </Button>
         <Button
           variant="contained"
-          onClick={handleSubmit}
-          disabled={mutation.isPending}
+          onClick={handleSubmit(onSubmit)}
+          disabled={isSubmitting || mutation.isPending}
         >
           {mutation.isPending
             ? 'Saving...'
