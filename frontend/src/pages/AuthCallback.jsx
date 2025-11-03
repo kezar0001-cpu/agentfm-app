@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import { saveAuthToken, setCurrentUser } from '../lib/auth.js';
+import { apiClient } from '../api/client.js';
 
 /**
  * OAuth Callback Handler
@@ -23,19 +25,35 @@ export default function AuthCallback() {
       return;
     }
 
-    // Handle success case
-    if (token) {
-      // Store the token in localStorage
-      localStorage.setItem('token', token);
+    const completeSignIn = async () => {
+      // Handle success case
+      if (token) {
+        // Store the token in localStorage
+        saveAuthToken(token);
 
-      // Redirect to the next page or dashboard
-      const redirectPath = next || '/dashboard';
-      navigate(redirectPath, { replace: true });
-    } else {
-      // No token provided
-      console.error('No token received from OAuth');
-      navigate('/signin?error=no_token');
-    }
+        // Attempt to hydrate the SPA with the latest user context
+        try {
+          const response = await apiClient.get('/auth/me');
+          const payload = response?.data ?? response;
+          const user = payload?.user ?? payload;
+          if (user) {
+            setCurrentUser(user);
+          }
+        } catch (fetchError) {
+          console.error('Failed to fetch current user after OAuth callback:', fetchError);
+        }
+
+        // Redirect to the next page or dashboard
+        const redirectPath = next || '/dashboard';
+        navigate(redirectPath, { replace: true });
+      } else {
+        // No token provided
+        console.error('No token received from OAuth');
+        navigate('/signin?error=no_token');
+      }
+    };
+
+    completeSignIn();
   }, [searchParams, navigate]);
 
   return (
