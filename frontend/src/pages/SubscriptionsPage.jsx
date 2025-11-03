@@ -489,7 +489,7 @@ export default function SubscriptionsPage() {
           {/* Header */}
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-              {hasActiveSubscription ? 'Your Subscription' : 'Get Started with AgentFM'}
+              {hasActiveSubscription ? 'Your Subscription' : 'Get Started with BuildState FM'}
             </Typography>
             <Typography variant="body1" color="text.secondary">
               {hasActiveSubscription
@@ -501,7 +501,7 @@ export default function SubscriptionsPage() {
           {/* Banners */}
           {showSuccess && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              <strong>Payment successful!</strong> Your subscription is now active. Welcome to AgentFM!
+              <strong>Payment successful!</strong> Your subscription is now active. Welcome to BuildState FM!
             </Alert>
           )}
           {showCanceled && (
@@ -1019,7 +1019,7 @@ export default function SubscriptionsPage() {
           {!userHasActiveSubscription && (
             <Paper sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 3 }}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                Why subscribe to AgentFM?
+                Why subscribe to BuildState FM?
               </Typography>
               <Stack spacing={2}>
                 <Box>

@@ -141,16 +141,16 @@ export default function SignUp() {
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography variant="h3" component="h1" sx={{
               fontWeight: 700,
-              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              background: 'linear-gradient(45deg, #dc2626 30%, #f97316 90%)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               mb: 1
             }}>
-              AgentFM
+              BuildState FM
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>Create Account</Typography>
-            <Typography variant="body2" color="text.secondary">Join AgentFM to streamline your property management</Typography>
+            <Typography variant="body2" color="text.secondary">Join BuildState FM to streamline your property management</Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}

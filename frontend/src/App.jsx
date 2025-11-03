@@ -18,13 +18,13 @@ function RouteFallback() {
 
 function NotFound() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff5f5' }}>
       <div style={{ textAlign: 'center' }}>
         <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#1f2937' }}>404</h1>
         <p style={{ marginTop: '0.5rem', color: '#6b7280' }}>The page you are looking for could not be found.</p>
         <button
           onClick={() => (window.location.href = '/signin')}
-          style={{ marginTop: '1rem', color: '#2563eb', textDecoration: 'underline', border: 'none', background: 'none', cursor: 'pointer' }}
+          style={{ marginTop: '1rem', color: '#b91c1c', textDecoration: 'underline', border: 'none', background: 'none', cursor: 'pointer' }}
         >
           Go to Sign In
         </button>

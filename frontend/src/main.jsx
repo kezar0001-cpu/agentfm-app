@@ -29,46 +29,46 @@ let theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#2563eb', // Modern vibrant blue
-      light: '#60a5fa',
-      dark: '#1e40af',
+      main: '#b91c1c', // Bold crimson red
+      light: '#f87171',
+      dark: '#7f1d1d',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#10b981', // Modern emerald green
-      light: '#34d399',
-      dark: '#059669',
-      contrastText: '#ffffff',
+      main: '#f97316', // Warm amber accent
+      light: '#fb923c',
+      dark: '#c2410c',
+      contrastText: '#0f172a',
     },
     error: {
-      main: '#ef4444',
-      light: '#f87171',
-      dark: '#dc2626',
+      main: '#dc2626',
+      light: '#fca5a5',
+      dark: '#991b1b',
     },
     warning: {
-      main: '#f59e0b',
-      light: '#fbbf24',
-      dark: '#d97706',
+      main: '#ea580c',
+      light: '#f97316',
+      dark: '#c2410c',
     },
     info: {
-      main: '#3b82f6',
-      light: '#60a5fa',
-      dark: '#2563eb',
+      main: '#ef4444',
+      light: '#fca5a5',
+      dark: '#b91c1c',
     },
     success: {
-      main: '#10b981',
-      light: '#34d399',
-      dark: '#059669',
+      main: '#16a34a',
+      light: '#4ade80',
+      dark: '#166534',
     },
     background: {
-      default: '#f8fafc', // Softer, cleaner background
+      default: '#fff5f5', // Soft blush background
       paper: '#ffffff',
     },
     text: {
-      primary: '#0f172a',
-      secondary: '#475569',
+      primary: '#1f2937',
+      secondary: '#4b5563',
     },
-    divider: '#e2e8f0',
+    divider: '#fecaca',
   },
   shape: {
     borderRadius: 16, // More modern rounded corners
