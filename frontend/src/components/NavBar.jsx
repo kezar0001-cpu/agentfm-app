@@ -104,12 +104,14 @@ function NavBar() {
       elevation={0}
       sx={{
         top: 0,
-        bgcolor: 'background.paper',
+        bgcolor: 'rgba(255, 255, 255, 0.85)',
         color: 'text.primary',
         borderBottom: '1px solid',
         borderColor: 'divider',
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        backdropFilter: 'blur(6px)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)',
       }}
     >
       <Toolbar
@@ -134,9 +136,16 @@ function NavBar() {
             variant="h6"
             onClick={() => navigate('/dashboard')}
             sx={{
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: 'pointer',
-              letterSpacing: 0.4,
+              letterSpacing: '-0.02em',
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                transform: 'scale(1.02)',
+              },
             }}
           >
             AgentFM
@@ -173,13 +182,31 @@ function NavBar() {
               onClick={() => handleNavigation(item.href)}
               sx={{
                 textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: isActive(item.href) ? 700 : 500,
-                borderBottom: isActive(item.href) ? '2px solid' : '2px solid transparent',
-                borderColor: isActive(item.href) ? 'primary.main' : 'transparent',
-                borderRadius: 999,
+                fontSize: '0.9rem',
+                fontWeight: isActive(item.href) ? 600 : 500,
+                color: isActive(item.href) ? 'primary.main' : 'text.primary',
+                borderRadius: 2,
                 px: 2,
-                py: 0.5,
+                py: 1,
+                position: 'relative',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: 4,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: isActive(item.href) ? '60%' : '0%',
+                  height: '2px',
+                  bgcolor: 'primary.main',
+                  borderRadius: 1,
+                  transition: 'width 0.3s ease-in-out',
+                },
+                '&:hover': {
+                  bgcolor: 'rgba(37, 99, 235, 0.08)',
+                  '&::after': {
+                    width: '60%',
+                  },
+                },
               }}
             >
               {item.name}
@@ -207,12 +234,19 @@ function NavBar() {
               sx={{ ml: 1 }}
               aria-label="account menu"
             >
-              <Avatar 
-                sx={{ 
-                  width: 32, 
-                  height: 32, 
-                  bgcolor: 'primary.main',
-                  fontSize: '0.875rem'
+              <Avatar
+                sx={{
+                  width: 36,
+                  height: 36,
+                  background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 8px 0 rgb(37 99 235 / 0.3)',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 4px 12px 0 rgb(37 99 235 / 0.4)',
+                  },
                 }}
               >
                 {getUserInitials()}

@@ -157,20 +157,34 @@ const DashboardPage = () => {
   const activityItems = Array.isArray(activity) ? activity : [];
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
       {/* Header */}
       <Stack
         direction={{ xs: 'column', md: 'row' }}
         spacing={{ xs: 2, md: 0 }}
         alignItems={{ xs: 'flex-start', md: 'center' }}
         justifyContent="space-between"
-        sx={{ mb: { xs: 3, md: 4 }, gap: { xs: 2, md: 0 } }}
+        sx={{
+          mb: { xs: 3, md: 4 },
+          gap: { xs: 2, md: 0 },
+          animation: 'fade-in-down 0.5s ease-out',
+        }}
       >
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={{
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+            }}
+          >
             Dashboard
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem' }}>
             Welcome back! Here's what's happening with your properties.
           </Typography>
         </Box>
@@ -186,6 +200,12 @@ const DashboardPage = () => {
               border: '1px solid',
               borderColor: 'divider',
               borderRadius: 2,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                borderColor: 'primary.main',
+                bgcolor: 'rgba(37, 99, 235, 0.08)',
+                transform: 'rotate(180deg)',
+              },
             }}
           >
             <RefreshIcon />
@@ -195,7 +215,15 @@ const DashboardPage = () => {
             startIcon={<AddIcon />}
             onClick={() => navigate('/properties', { state: { openCreateDialog: true } })}
             fullWidth
-            sx={{ maxWidth: { xs: '100%', md: 'none' } }}
+            sx={{
+              maxWidth: { xs: '100%', md: 'none' },
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              boxShadow: '0 4px 14px 0 rgb(37 99 235 / 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                boxShadow: '0 6px 20px 0 rgb(37 99 235 / 0.4)',
+              },
+            }}
           >
             Add Property
           </Button>
@@ -254,7 +282,7 @@ const DashboardPage = () => {
       )}
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={3} sx={{ mb: 4, animation: 'fade-in-up 0.6s ease-out' }}>
         {/* Properties Card */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
@@ -317,14 +345,26 @@ const DashboardPage = () => {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
         {/* Recent Activity */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper
+            sx={{
+              p: { xs: 2.5, md: 3.5 },
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+              transition: 'all 0.3s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 4px 12px 0 rgb(0 0 0 / 0.1)',
+              },
+            }}
+          >
+            <Typography variant="h6" gutterBottom fontWeight={700}>
               Recent Activity
             </Typography>
-            <Divider sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2.5 }} />
             
             {activityItems.length === 0 ? (
               <DataState
@@ -344,8 +384,21 @@ const DashboardPage = () => {
 
         {/* Quick Actions */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper
+            sx={{
+              p: { xs: 2.5, md: 3.5 },
+              mb: 3,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+              transition: 'all 0.3s ease-in-out',
+              '&:hover': {
+                boxShadow: '0 4px 12px 0 rgb(0 0 0 / 0.1)',
+              },
+            }}
+          >
+            <Typography variant="h6" gutterBottom fontWeight={700}>
               Quick Actions
             </Typography>
             <Divider sx={{ mb: 2 }} />

@@ -15,68 +15,136 @@ export default function StatCard({
   alert,
   onClick,
 }) {
+  // Define gradient backgrounds based on color
+  const gradients = {
+    primary: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    secondary: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+    success: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+    error: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
+    warning: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+    info: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+  };
+
   return (
     <Card
       sx={{
         height: '100%',
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.3s',
-        '&:hover': onClick
-          ? {
-              transform: 'translateY(-4px)',
-              boxShadow: 4,
-            }
-          : {},
+        position: 'relative',
+        overflow: 'visible',
+        background: 'linear-gradient(135deg, #ffffff 0%, #fafbff 100%)',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: gradients[color] || gradients.primary,
+          borderRadius: '16px 16px 0 0',
+        },
       }}
       onClick={onClick}
     >
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
+      <CardContent sx={{ pt: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2.5}>
+          <Box flex={1}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              gutterBottom
+              fontWeight={500}
+              sx={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}
+            >
               {title}
             </Typography>
-            <Typography variant="h3" component="div" color={`${color}.main`}>
+            <Typography
+              variant="h3"
+              component="div"
+              sx={{
+                fontWeight: 700,
+                background: gradients[color] || gradients.primary,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.02em',
+              }}
+            >
               {value}
             </Typography>
           </Box>
           <Box
             sx={{
-              bgcolor: `${color}.light`,
-              borderRadius: 2,
-              p: 1,
+              background: gradients[color] || gradients.primary,
+              borderRadius: 3,
+              p: 1.5,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: `0 4px 14px 0 ${color === 'primary' ? 'rgb(37 99 235 / 0.25)' : color === 'secondary' ? 'rgb(16 185 129 / 0.25)' : 'rgb(0 0 0 / 0.1)'}`,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'rotate(10deg) scale(1.1)',
+                boxShadow: `0 8px 20px 0 ${color === 'primary' ? 'rgb(37 99 235 / 0.35)' : color === 'secondary' ? 'rgb(16 185 129 / 0.35)' : 'rgb(0 0 0 / 0.15)'}`,
+              },
             }}
           >
-            <Icon sx={{ color: `${color}.main`, fontSize: 32 }}>{icon}</Icon>
+            <Icon sx={{ color: '#ffffff', fontSize: 28 }}>{icon}</Icon>
           </Box>
         </Box>
 
         {subtitle && (
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Typography variant="body2" color="text.secondary">
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={1}
+            sx={{
+              p: 1,
+              borderRadius: 2,
+              bgcolor: trend === 'up' ? 'rgba(16, 185, 129, 0.08)' : trend === 'down' ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+            }}
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              fontWeight={500}
+              fontSize="0.875rem"
+            >
               {subtitle}
             </Typography>
             {trend === 'up' && (
-              <TrendingUpIcon fontSize="small" color="success" />
+              <TrendingUpIcon
+                fontSize="small"
+                sx={{
+                  color: 'success.main',
+                  animation: 'bounce-subtle 1s ease-in-out infinite',
+                }}
+              />
             )}
             {trend === 'down' && (
-              <TrendingDownIcon fontSize="small" color="error" />
+              <TrendingDownIcon
+                fontSize="small"
+                sx={{
+                  color: 'error.main',
+                  animation: 'bounce-subtle 1s ease-in-out infinite',
+                }}
+              />
             )}
           </Box>
         )}
 
         {alert && (
           <Box
-            mt={1}
-            p={0.5}
-            px={1}
-            bgcolor="error.light"
-            borderRadius={1}
+            mt={1.5}
+            p={1}
+            px={1.5}
+            sx={{
+              bgcolor: 'rgba(239, 68, 68, 0.1)',
+              borderRadius: 2,
+              borderLeft: '3px solid',
+              borderColor: 'error.main',
+            }}
           >
-            <Typography variant="caption" color="error.dark">
+            <Typography variant="caption" color="error.main" fontWeight={600}>
               {alert}
             </Typography>
           </Box>

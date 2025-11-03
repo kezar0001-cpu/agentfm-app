@@ -179,7 +179,7 @@ export default function PropertiesPage() {
   };
 
   return (
-    <Box sx={{ py: { xs: 2, md: 4 } }}>
+    <Box sx={{ py: { xs: 3, md: 5 } }}>
       <Stack spacing={3}>
         {/* Header */}
         <Stack
@@ -187,12 +187,22 @@ export default function PropertiesPage() {
           spacing={{ xs: 2, md: 0 }}
           alignItems={{ xs: 'flex-start', md: 'center' }}
           justifyContent="space-between"
+          sx={{ animation: 'fade-in-down 0.5s ease-out' }}
         >
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.02em',
+              }}
+            >
               Properties
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem' }}>
               Manage your property portfolio
             </Typography>
           </Box>
@@ -202,14 +212,31 @@ export default function PropertiesPage() {
             onClick={handleCreate}
             size="large"
             fullWidth
-            sx={{ maxWidth: { xs: '100%', md: 'none' } }}
+            sx={{
+              maxWidth: { xs: '100%', md: 'none' },
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              boxShadow: '0 4px 14px 0 rgb(37 99 235 / 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                boxShadow: '0 6px 20px 0 rgb(37 99 235 / 0.4)',
+              },
+            }}
           >
             Add Property
           </Button>
         </Stack>
 
         {/* Search and Filter */}
-        <Paper sx={{ p: { xs: 2, md: 3 } }}>
+        <Paper
+          sx={{
+            p: { xs: 2.5, md: 3.5 },
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+            animation: 'fade-in-up 0.6s ease-out',
+          }}
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} md={8}>
               <TextField
@@ -265,7 +292,7 @@ export default function PropertiesPage() {
             ? 'No properties match your filters'
             : 'No properties yet. Add your first property to get started!'}
         >
-          <Stack spacing={3}>
+          <Stack spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
             <Grid container spacing={3}>
               {filteredProperties.map((property) => (
                 <Grid item xs={12} sm={6} md={4} key={property.id}>
@@ -275,12 +302,26 @@ export default function PropertiesPage() {
                       display: 'flex',
                       flexDirection: 'column',
                       cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: 4,
-                      },
                       borderRadius: 3,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        opacity: 0,
+                        transition: 'opacity 0.3s ease-in-out',
+                      },
+                      '&:hover::before': {
+                        opacity: 1,
+                      },
                     }}
                     onClick={() => handleCardClick(property.id)}
                   >
