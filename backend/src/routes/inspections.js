@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import prisma from '../config/prismaClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
+import { notifyInspectionCompleted } from '../utils/notificationService.js';
 
 const router = Router();
 
@@ -130,6 +131,55 @@ function parseSort(sortBy, sortOrder) {
   if (!field) return DEFAULT_SORT;
   const direction = sortOrder === 'desc' ? 'desc' : 'asc';
   return { [field]: direction };
+}
+
+/**
+ * Parse inspection findings and extract high-priority issues
+ * Looks for patterns like:
+ * - "HIGH: description" or "[HIGH] description"
+ * - "URGENT: description" or "[URGENT] description"
+ * - Lines containing keywords like "critical", "immediate", "safety hazard"
+ */
+function parseHighPriorityFindings(findingsText) {
+  if (!findingsText || typeof findingsText !== 'string') {
+    return [];
+  }
+
+  const findings = [];
+  const lines = findingsText.split('\n').filter(line => line.trim());
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    // Check for explicit priority markers
+    const urgentMatch = trimmedLine.match(/^(?:\[?URGENT\]?:?\s*)(.*)/i);
+    const highMatch = trimmedLine.match(/^(?:\[?HIGH\]?:?\s*)(.*)/i);
+
+    if (urgentMatch) {
+      findings.push({
+        priority: 'URGENT',
+        description: urgentMatch[1].trim() || trimmedLine,
+      });
+    } else if (highMatch) {
+      findings.push({
+        priority: 'HIGH',
+        description: highMatch[1].trim() || trimmedLine,
+      });
+    } else {
+      // Check for implicit high-priority keywords
+      const lowerLine = trimmedLine.toLowerCase();
+      const criticalKeywords = ['critical', 'urgent', 'immediate', 'safety hazard', 'emergency', 'severe', 'dangerous'];
+
+      if (criticalKeywords.some(keyword => lowerLine.includes(keyword))) {
+        findings.push({
+          priority: 'HIGH',
+          description: trimmedLine,
+        });
+      }
+    }
+  }
+
+  return findings;
 }
 
 function isAdmin(user) {
@@ -717,11 +767,77 @@ router.post(
         findings: z.string().optional().nullable(),
         notes: z.string().optional().nullable(),
         tags: z.array(z.string()).optional(),
+        autoCreateJobs: z.boolean().optional().default(true),
+        previewOnly: z.boolean().optional().default(false),
       })
       .parse(req.body);
 
-    const before = await prisma.inspection.findUnique({ where: { id: req.params.id } });
+    const before = await prisma.inspection.findUnique({
+      where: { id: req.params.id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+            manager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        completedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
 
+    if (!before) {
+      return res.status(404).json({ success: false, message: 'Inspection not found' });
+    }
+
+    // Parse findings to identify high-priority issues
+    const findingsText = payload.findings ?? before.findings ?? '';
+    const highPriorityFindings = parseHighPriorityFindings(findingsText);
+
+    // If preview mode, return the jobs that would be created without actually creating them
+    if (payload.previewOnly) {
+      const previewJobs = highPriorityFindings.map((finding, index) => ({
+        title: `${before.title} - Follow-Up ${index + 1}`,
+        description: finding.description,
+        priority: finding.priority,
+        propertyId: before.propertyId,
+        unitId: before.unitId,
+        inspectionId: before.id,
+      }));
+
+      return res.json({
+        preview: true,
+        followUpJobs: previewJobs,
+        totalJobsToCreate: previewJobs.length,
+      });
+    }
+
+    // Complete the inspection
     const inspection = await prisma.inspection.update({
       where: { id: req.params.id },
       data: {
@@ -737,7 +853,61 @@ router.post(
 
     await logAudit(inspection.id, req.user.id, 'COMPLETED', { before, after: inspection });
 
-    res.json(inspection);
+    // Auto-create follow-up jobs for high-priority findings
+    const createdJobs = [];
+    if (payload.autoCreateJobs && highPriorityFindings.length > 0) {
+      for (const [index, finding] of highPriorityFindings.entries()) {
+        try {
+          const job = await prisma.job.create({
+            data: {
+              title: `${inspection.title} - Follow-Up ${index + 1}`,
+              description: finding.description,
+              priority: finding.priority,
+              propertyId: inspection.propertyId,
+              unitId: inspection.unitId,
+              inspectionId: inspection.id,
+              status: 'OPEN',
+            },
+          });
+
+          createdJobs.push(job);
+          await logAudit(inspection.id, req.user.id, 'JOB_CREATED', { jobId: job.id, priority: finding.priority });
+        } catch (jobError) {
+          console.error('Failed to create follow-up job', jobError);
+          // Continue creating other jobs even if one fails
+        }
+      }
+    }
+
+    // Send email notification to property manager
+    try {
+      const propertyManager = before.property?.manager;
+      const completedByUser = req.user.id === before.completedById
+        ? before.completedBy
+        : await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+
+      if (propertyManager && completedByUser) {
+        await notifyInspectionCompleted(
+          inspection,
+          completedByUser,
+          before.property,
+          propertyManager,
+          createdJobs
+        );
+      }
+    } catch (notificationError) {
+      console.error('Failed to send notification', notificationError);
+      // Don't fail the request if notification fails
+    }
+
+    res.json({
+      ...inspection,
+      followUpJobsCreated: createdJobs.length,
+      followUpJobs: createdJobs,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
