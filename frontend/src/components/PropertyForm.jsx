@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  TextField,
   Grid,
-  MenuItem,
   Alert,
   Box,
   useMediaQuery,
@@ -16,6 +16,8 @@ import {
 import useApiMutation from '../hooks/useApiMutation';
 import { COUNTRIES } from '../lib/countries';
 import { queryKeys } from '../utils/queryKeys.js';
+import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
+import { FormTextField, FormSelect } from './form';
 
 const COUNTRY_ALIASES = {
   USA: 'United States',
@@ -63,23 +65,17 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: '',
-    propertyType: '',
-    yearBuilt: '',
-    totalUnits: '0',
-    totalArea: '',
-    status: 'ACTIVE',
-    description: '',
-    imageUrl: '',
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setFocus,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(propertySchema),
+    defaultValues: propertyDefaultValues,
+    mode: 'onBlur',
   });
-
-  const [errors, setErrors] = useState({});
 
   // Create/Update mutation
   const mutation = useApiMutation({
@@ -91,7 +87,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   // Initialize form with property data if editing
   useEffect(() => {
     if (property) {
-      setFormData({
+      reset({
         name: property.name || '',
         address: property.address || '',
         city: property.city || '',
@@ -107,86 +103,35 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         imageUrl: property.imageUrl || '',
       });
     } else {
-      // Reset form for new property
-      setFormData({
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        country: normaliseCountryValue(''),
-        propertyType: '',
-        yearBuilt: '',
-        totalUnits: '0',
-        totalArea: '',
-        status: 'ACTIVE',
-        description: '',
-        imageUrl: '',
-      });
+      reset(propertyDefaultValues);
     }
-    setErrors({});
-  }, [property, open]);
+  }, [property, open, reset]);
 
-  const handleChange = (field) => (event) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: null }));
+  // Auto-focus on first error field
+  useEffect(() => {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      setFocus(firstErrorField);
     }
-  };
+  }, [errors, setFocus]);
 
-  const validate = () => {
-    const newErrors = {};
-
-    if (!formData.name.trim()) newErrors.name = 'Property name is required';
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.city.trim()) newErrors.city = 'City / locality is required';
-    if (!formData.country) newErrors.country = 'Country is required';
-    if (!formData.propertyType) newErrors.propertyType = 'Property type is required';
-
-    // Validate year built if provided
-    if (formData.yearBuilt) {
-      const year = parseInt(formData.yearBuilt);
-      const currentYear = new Date().getFullYear();
-      if (isNaN(year) || year < 1800 || year > currentYear) {
-        newErrors.yearBuilt = `Year must be between 1800 and ${currentYear}`;
-      }
-    }
-
-    // Validate numbers
-    if (formData.totalUnits && isNaN(parseInt(formData.totalUnits))) {
-      newErrors.totalUnits = 'Must be a valid number';
-    }
-    if (formData.totalArea && isNaN(parseFloat(formData.totalArea))) {
-      newErrors.totalArea = 'Must be a valid number';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-
+  const onSubmit = async (data) => {
     try {
       await mutation.mutateAsync({
         data: {
-          name: formData.name.trim(),
-          address: formData.address.trim(),
-          city: formData.city.trim(),
-          state: formData.state.trim() || null,
-          zipCode: formData.zipCode.trim() || null,
-          country: formData.country,
-          propertyType: formData.propertyType,
-          yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt, 10) : null,
-          totalUnits: parseInt(formData.totalUnits, 10) || 0,
-          totalArea: formData.totalArea ? parseFloat(formData.totalArea) : null,
-          status: formData.status,
-          description: formData.description.trim() || null,
-          imageUrl: formData.imageUrl.trim() || null,
+          name: data.name,
+          address: data.address,
+          city: data.city,
+          state: data.state || null,
+          zipCode: data.zipCode || null,
+          country: data.country,
+          propertyType: data.propertyType,
+          yearBuilt: data.yearBuilt,
+          totalUnits: data.totalUnits,
+          totalArea: data.totalArea,
+          status: data.status,
+          description: data.description || null,
+          imageUrl: data.imageUrl || null,
         },
       });
 
@@ -195,6 +140,11 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       // Error is shown via mutation.error
     }
   };
+
+  const countryOptions = COUNTRIES.map((country) => ({
+    value: country.name,
+    label: country.name,
+  }));
 
   return (
     <Dialog
@@ -209,9 +159,9 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       </DialogTitle>
 
       <DialogContent>
-        <Box sx={{ mt: 2 }}>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 2 }}>
           {mutation.isError && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }} role="alert">
               {mutation.error?.message || 'Failed to save property'}
             </Alert>
           )}
@@ -219,195 +169,119 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           <Grid container spacing={2}>
             {/* Property Name */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                id="property-form-name"
+              <FormTextField
                 name="name"
+                control={control}
                 label="Property Name"
-                value={formData.name}
-                onChange={handleChange('name')}
-                error={!!errors.name}
-                helperText={errors.name}
+                required
               />
             </Grid>
 
             {/* Address */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                id="property-form-address"
+              <FormTextField
                 name="address"
+                control={control}
                 label="Street Address"
-                value={formData.address}
-                onChange={handleChange('address')}
-                error={!!errors.address}
-                helperText={errors.address}
+                required
               />
             </Grid>
 
             {/* City, Region, Postal Code, Country */}
             <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                required
-                id="property-form-city"
+              <FormTextField
                 name="city"
+                control={control}
                 label="City"
-                value={formData.city}
-                onChange={handleChange('city')}
-                error={!!errors.city}
-                helperText={errors.city}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                id="property-form-state"
-                name="state"
-                label="State / Province / Region"
-                value={formData.state}
-                onChange={handleChange('state')}
-                helperText={errors.state}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                id="property-form-zip-code"
-                name="zipCode"
-                label="Postal Code"
-                value={formData.zipCode}
-                onChange={handleChange('zipCode')}
-                error={!!errors.zipCode}
-                helperText={errors.zipCode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
                 required
-                id="property-form-country"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormTextField
+                name="state"
+                control={control}
+                label="State / Province / Region"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormTextField
+                name="zipCode"
+                control={control}
+                label="Postal Code"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormSelect
                 name="country"
-                select
+                control={control}
                 label="Country"
-                value={formData.country}
-                onChange={handleChange('country')}
-                error={!!errors.country}
-                helperText={errors.country}
-              >
-                {COUNTRIES.map((country) => (
-                  <MenuItem key={country.code} value={country.name}>
-                    {country.name}
-                  </MenuItem>
-                ))}
-              </TextField>
+                options={countryOptions}
+                required
+              />
             </Grid>
 
             {/* Property Type & Status */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                required
-                id="property-form-type"
+              <FormSelect
                 name="propertyType"
-                select
+                control={control}
                 label="Property Type"
-                value={formData.propertyType}
-                onChange={handleChange('propertyType')}
-                error={!!errors.propertyType}
-                helperText={errors.propertyType}
-              >
-                {PROPERTY_TYPES.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type}
-                  </MenuItem>
-                ))}
-              </TextField>
+                options={PROPERTY_TYPES}
+                required
+              />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                id="property-form-status"
+              <FormSelect
                 name="status"
-                select
+                control={control}
                 label="Status"
-                value={formData.status}
-                onChange={handleChange('status')}
-              >
-                {PROPERTY_STATUSES.map((status) => (
-                  <MenuItem key={status.value} value={status.value}>
-                    {status.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+                options={PROPERTY_STATUSES}
+              />
             </Grid>
 
             {/* Year Built & Total Units */}
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="property-form-year-built"
+              <FormTextField
                 name="yearBuilt"
+                control={control}
                 label="Year Built"
                 type="number"
-                value={formData.yearBuilt}
-                onChange={handleChange('yearBuilt')}
-                error={!!errors.yearBuilt}
-                helperText={errors.yearBuilt}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="property-form-total-units"
+              <FormTextField
                 name="totalUnits"
+                control={control}
                 label="Total Units"
                 type="number"
-                value={formData.totalUnits}
-                onChange={handleChange('totalUnits')}
-                error={!!errors.totalUnits}
-                helperText={errors.totalUnits}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                id="property-form-total-area"
+              <FormTextField
                 name="totalArea"
+                control={control}
                 label="Total Area"
                 type="number"
-                value={formData.totalArea}
-                onChange={handleChange('totalArea')}
-                error={!!errors.totalArea}
-                helperText={errors.totalArea}
               />
             </Grid>
 
             {/* Description */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
+              <FormTextField
+                name="description"
+                control={control}
+                label="Description"
                 multiline
                 rows={3}
-                id="property-form-description"
-                name="description"
-                label="Description"
-                value={formData.description}
-                onChange={handleChange('description')}
               />
             </Grid>
 
             {/* Image URL */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                id="property-form-image-url"
+              <FormTextField
                 name="imageUrl"
+                control={control}
                 label="Image URL (optional)"
-                value={formData.imageUrl}
-                onChange={handleChange('imageUrl')}
                 helperText="Enter a URL to an image of the property"
               />
             </Grid>
@@ -425,7 +299,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       >
         <Button
           onClick={onClose}
-          disabled={mutation.isPending}
+          disabled={isSubmitting || mutation.isPending}
           fullWidth={isMobile}
           sx={{ minHeight: { xs: 48, md: 36 } }}
         >
@@ -433,8 +307,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         </Button>
         <Button
           variant="contained"
-          onClick={handleSubmit}
-          disabled={mutation.isPending}
+          onClick={handleSubmit(onSubmit)}
+          disabled={isSubmitting || mutation.isPending}
           fullWidth={isMobile}
           sx={{ minHeight: { xs: 48, md: 36 } }}
         >

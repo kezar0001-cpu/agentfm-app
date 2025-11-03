@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Box,
   Button,
@@ -17,28 +19,44 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import { jobSchema, jobDefaultValues } from '../schemas/jobSchema';
+import { FormTextField, FormSelect } from './form';
+
+const PRIORITY_OPTIONS = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'URGENT', label: 'Urgent' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'OPEN', label: 'Open' },
+  { value: 'ASSIGNED', label: 'Assigned' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
 
 const JobForm = ({ job, onSuccess, onCancel }) => {
   const isEditing = !!job;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const [formData, setFormData] = useState({
-    title: job?.title || '',
-    description: job?.description || '',
-    priority: job?.priority || 'MEDIUM',
-    status: job?.status || 'OPEN',
-    propertyId: job?.propertyId || '',
-    unitId: job?.unitId || '',
-    assignedToId: job?.assignedToId || '',
-    scheduledDate: job?.scheduledDate
-      ? new Date(job.scheduledDate).toISOString().slice(0, 16)
-      : '',
-    estimatedCost: job?.estimatedCost || '',
-    notes: job?.notes || '',
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    setFocus,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(jobSchema),
+    defaultValues: jobDefaultValues,
+    mode: 'onBlur',
   });
 
-  const [errors, setErrors] = useState({});
+  const propertyId = watch('propertyId');
 
   // Fetch properties
   const { data: properties = [], isLoading: loadingProperties } = useQuery({
@@ -51,13 +69,13 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
 
   // Fetch units for selected property
   const { data: units = [] } = useQuery({
-    queryKey: queryKeys.properties.units(formData.propertyId),
+    queryKey: queryKeys.properties.units(propertyId),
     queryFn: async () => {
-      if (!formData.propertyId) return [];
-      const response = await apiClient.get(`/units?propertyId=${formData.propertyId}`);
+      if (!propertyId) return [];
+      const response = await apiClient.get(`/units?propertyId=${propertyId}`);
       return ensureArray(response.data, ['units', 'data', 'items', 'results']);
     },
-    enabled: !!formData.propertyId,
+    enabled: !!propertyId,
   });
 
   // Fetch technicians
@@ -69,6 +87,41 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     },
   });
 
+  // Reset unitId when propertyId changes
+  useEffect(() => {
+    setValue('unitId', '');
+  }, [propertyId, setValue]);
+
+  // Initialize form with job data if editing
+  useEffect(() => {
+    if (job) {
+      reset({
+        title: job.title || '',
+        description: job.description || '',
+        priority: job.priority || 'MEDIUM',
+        status: job.status || 'OPEN',
+        propertyId: job.propertyId || '',
+        unitId: job.unitId || '',
+        assignedToId: job.assignedToId || '',
+        scheduledDate: job.scheduledDate
+          ? new Date(job.scheduledDate).toISOString().slice(0, 16)
+          : '',
+        estimatedCost: job.estimatedCost || '',
+        notes: job.notes || '',
+      });
+    } else {
+      reset(jobDefaultValues);
+    }
+  }, [job, reset]);
+
+  // Auto-focus on first error field
+  useEffect(() => {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      setFocus(firstErrorField);
+    }
+  }, [errors, setFocus]);
+
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data) => {
@@ -77,9 +130,6 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     },
     onSuccess: () => {
       onSuccess();
-    },
-    onError: (error) => {
-      setErrors({ submit: error.response?.data?.error || 'Failed to create job' });
     },
   });
 
@@ -92,70 +142,24 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
     onSuccess: () => {
       onSuccess();
     },
-    onError: (error) => {
-      setErrors({ submit: error.response?.data?.error || 'Failed to update job' });
-    },
   });
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    
-    // Clear unit if property changes
-    if (field === 'propertyId') {
-      setFormData((prev) => ({ ...prev, unitId: '' }));
-    }
-    
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const validate = () => {
-    const newErrors = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-
-    if (!formData.propertyId) {
-      newErrors.propertyId = 'Property is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (!validate()) {
-      return;
-    }
-
+  const onSubmit = async (data) => {
     const payload = {
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-      priority: formData.priority,
-      propertyId: formData.propertyId,
-      unitId: formData.unitId || undefined,
-      assignedToId: formData.assignedToId || undefined,
-      scheduledDate: formData.scheduledDate ? new Date(formData.scheduledDate).toISOString() : undefined,
-      estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
-      notes: formData.notes.trim() || undefined,
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      propertyId: data.propertyId,
+      unitId: data.unitId || undefined,
+      assignedToId: data.assignedToId || undefined,
+      scheduledDate: data.scheduledDate ? new Date(data.scheduledDate).toISOString() : undefined,
+      estimatedCost: data.estimatedCost,
+      notes: data.notes || undefined,
     };
 
     // Only send status if editing
     if (isEditing) {
-      payload.status = formData.status;
+      payload.status = data.status;
     }
 
     if (isEditing) {
@@ -166,178 +170,150 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
+  const submitError = createMutation.error || updateMutation.error;
+
+  const propertyOptions = properties.map((property) => ({
+    value: property.id,
+    label: property.name,
+  }));
+
+  const unitOptions = [
+    { value: '', label: 'No specific unit' },
+    ...units.map((unit) => ({
+      value: unit.id,
+      label: `Unit ${unit.unitNumber}`,
+    })),
+  ];
+
+  const technicianOptions = [
+    { value: '', label: 'Unassigned' },
+    ...technicians.map((tech) => ({
+      value: tech.id,
+      label: `${tech.firstName} ${tech.lastName} (${tech.email})`,
+    })),
+  ];
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box component="form" onSubmit={handleSubmit(onSubmit)}>
       <DialogTitle>
         {isEditing ? 'Edit Job' : 'Create Job'}
       </DialogTitle>
 
       <DialogContent dividers>
-        {errors.submit && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {errors.submit}
+        {submitError && (
+          <Alert severity="error" sx={{ mb: 2 }} role="alert">
+            {submitError?.response?.data?.error || 'Failed to save job'}
           </Alert>
         )}
 
         <Grid container spacing={2}>
           <Grid item xs={12}>
-            <TextField
-              fullWidth
-              id="job-form-title"
+            <FormTextField
               name="title"
+              control={control}
               label="Title"
-              value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
-              error={!!errors.title}
-              helperText={errors.title}
               required
-              placeholder="e.g., Fix HVAC System"
+              inputProps={{ placeholder: 'e.g., Fix HVAC System' }}
             />
           </Grid>
 
           <Grid item xs={12}>
-            <TextField
-              fullWidth
-              id="job-form-description"
+            <FormTextField
               name="description"
+              control={control}
               label="Description"
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              error={!!errors.description}
-              helperText={errors.description}
               required
               multiline
               rows={3}
-              placeholder="Describe the job in detail..."
+              inputProps={{ placeholder: 'Describe the job in detail...' }}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
-              id="job-form-priority"
+            <FormSelect
               name="priority"
+              control={control}
               label="Priority"
-              value={formData.priority}
-              onChange={(e) => handleChange('priority', e.target.value)}
+              options={PRIORITY_OPTIONS}
               required
-            >
-              <MenuItem value="LOW">Low</MenuItem>
-              <MenuItem value="MEDIUM">Medium</MenuItem>
-              <MenuItem value="HIGH">High</MenuItem>
-              <MenuItem value="URGENT">Urgent</MenuItem>
-            </TextField>
+            />
           </Grid>
 
           {isEditing && (
             <Grid item xs={12} sm={6}>
-              <TextField
-                select
-                fullWidth
-                id="job-form-status"
+              <FormSelect
                 name="status"
+                control={control}
                 label="Status"
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
+                options={STATUS_OPTIONS}
                 required
-              >
-                <MenuItem value="OPEN">Open</MenuItem>
-                <MenuItem value="ASSIGNED">Assigned</MenuItem>
-                <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                <MenuItem value="COMPLETED">Completed</MenuItem>
-                <MenuItem value="CANCELLED">Cancelled</MenuItem>
-              </TextField>
+              />
             </Grid>
           )}
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
-              id="job-form-property"
+            <FormSelect
               name="propertyId"
+              control={control}
               label="Property"
-              value={formData.propertyId}
-              onChange={(e) => handleChange('propertyId', e.target.value)}
-              error={!!errors.propertyId}
-              helperText={errors.propertyId}
+              options={propertyOptions}
               required
               disabled={loadingProperties}
-            >
-              {properties?.map((property) => (
-                <MenuItem key={property.id} value={property.id}>
-                  {property.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              fullWidth
-              id="job-form-unit"
-              name="unitId"
-              label="Unit (Optional)"
-              value={formData.unitId}
-              onChange={(e) => handleChange('unitId', e.target.value)}
-              disabled={!formData.propertyId || !units?.length}
-            >
-              <MenuItem value="">No specific unit</MenuItem>
-              {units?.map((unit) => (
-                <MenuItem key={unit.id} value={unit.id}>
-                  Unit {unit.unitNumber}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              select
-              fullWidth
-              id="job-form-assigned-to"
-              name="assignedToId"
-              label="Assign to Technician (Optional)"
-              value={formData.assignedToId}
-              onChange={(e) => handleChange('assignedToId', e.target.value)}
-            >
-              <MenuItem value="">Unassigned</MenuItem>
-              {technicians?.map((tech) => (
-                <MenuItem key={tech.id} value={tech.id}>
-                  {tech.firstName} {tech.lastName} ({tech.email})
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              id="job-form-scheduled-date"
-              name="scheduledDate"
-              label="Scheduled Date (Optional)"
-              type="datetime-local"
-              value={formData.scheduledDate}
-              onChange={(e) => handleChange('scheduledDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              id="job-form-estimated-cost"
+            <FormSelect
+              name="unitId"
+              control={control}
+              label="Unit (Optional)"
+              options={unitOptions}
+              disabled={!propertyId || !units?.length}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <FormSelect
+              name="assignedToId"
+              control={control}
+              label="Assign to Technician (Optional)"
+              options={technicianOptions}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Controller
+              name="scheduledDate"
+              control={control}
+              render={({ field, fieldState: { error } }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  type="datetime-local"
+                  label="Scheduled Date (Optional)"
+                  error={!!error}
+                  helperText={error?.message}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{
+                    'aria-invalid': !!error,
+                    'aria-describedby': error ? 'scheduledDate-error' : undefined,
+                  }}
+                  FormHelperTextProps={{
+                    id: error ? 'scheduledDate-error' : undefined,
+                    role: error ? 'alert' : undefined,
+                    'aria-live': error ? 'polite' : undefined,
+                  }}
+                />
+              )}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <FormTextField
               name="estimatedCost"
+              control={control}
               label="Estimated Cost (Optional)"
               type="number"
-              value={formData.estimatedCost}
-              onChange={(e) => handleChange('estimatedCost', e.target.value)}
-              InputProps={{
-                startAdornment: '$',
-              }}
               inputProps={{
                 min: 0,
                 step: 0.01,
@@ -346,16 +322,13 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
           </Grid>
 
           <Grid item xs={12}>
-            <TextField
-              fullWidth
-              id="job-form-notes"
+            <FormTextField
               name="notes"
+              control={control}
               label="Notes (Optional)"
-              value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
               multiline
               rows={2}
-              placeholder="Add any additional notes..."
+              inputProps={{ placeholder: 'Add any additional notes...' }}
             />
           </Grid>
         </Grid>
@@ -371,7 +344,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
       >
         <Button
           onClick={onCancel}
-          disabled={isLoading}
+          disabled={isLoading || isSubmitting}
           fullWidth={isMobile}
           sx={{ minHeight: { xs: 48, md: 36 } }}
         >
@@ -380,7 +353,7 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
         <Button
           type="submit"
           variant="contained"
-          disabled={isLoading}
+          disabled={isLoading || isSubmitting}
           startIcon={isLoading && <CircularProgress size={16} />}
           fullWidth={isMobile}
           sx={{ minHeight: { xs: 48, md: 36 } }}
