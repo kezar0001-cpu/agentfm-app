@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Typography, Paper, Stack, Button, Card, CardContent, Divider, Chip,
   List, ListItem, ListItemIcon, ListItemText, Container, Grid,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  CircularProgress, Link,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
@@ -15,6 +18,10 @@ import BusinessIcon from '@mui/icons-material/Business';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import UpdateIcon from '@mui/icons-material/Update';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CancelIcon from '@mui/icons-material/Cancel';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import DownloadIcon from '@mui/icons-material/Download';
 import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
@@ -189,6 +196,10 @@ export default function SubscriptionsPage() {
   const navigate = useNavigate();
   const { user: currentUser, refreshUser } = useCurrentUser();
 
+  // Determine if user has active subscription first
+  const subscriptionStatus = currentUser?.subscriptionStatus;
+  const hasActiveSubscription = subscriptionStatus === 'ACTIVE';
+
   const query = useApiQuery({
     queryKey: queryKeys.subscriptions.all(),
     url: '/subscriptions',
@@ -197,6 +208,33 @@ export default function SubscriptionsPage() {
     url: '/billing/checkout',
     method: 'post',
   });
+
+  // Invoices query
+  const invoicesQuery = useApiQuery({
+    queryKey: ['billing', 'invoices'],
+    url: '/billing/invoices',
+    enabled: hasActiveSubscription,
+  });
+
+  // Cancel subscription mutation
+  const cancelMutation = useApiMutation({
+    url: '/billing/cancel',
+    method: 'post',
+    onSuccess: () => {
+      query.refetch();
+      refreshUser();
+    },
+  });
+
+  // Update payment method mutation
+  const updatePaymentMutation = useApiMutation({
+    url: '/billing/payment-method',
+    method: 'post',
+  });
+
+  // State for cancel dialog
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelImmediate, setCancelImmediate] = useState(false);
 
   const params = new URLSearchParams(location.search);
   const showSuccess = params.get('success') === '1';
@@ -221,18 +259,15 @@ export default function SubscriptionsPage() {
     };
   }, [showSuccess, refreshUser, navigate, location.pathname]);
 
-  // CORRECT: Define variables based on the currentUser state
+  // Define variables based on the currentUser state
   const subscriptionPlan = currentUser?.subscriptionPlan;
-  const subscriptionStatus = currentUser?.subscriptionStatus;
   const isTrialActive = subscriptionStatus === 'TRIAL';
-  const userHasActiveSubscription = subscriptionStatus === 'ACTIVE';
+  const userHasActiveSubscription = hasActiveSubscription; // Keep for consistency with existing code
   const trialDaysRemaining = calculateDaysRemaining(currentUser?.trialEndDate);
   const planForCheckout = subscriptionPlan || 'STARTER'; // Default to STARTER if no plan
 
   // Existing data fetching and processing logic
   const subscriptions = normaliseArray(query.data);
-  // Use the userHasActiveSubscription variable derived from currentUser
-  const hasActiveSubscription = userHasActiveSubscription;
 
   const startCheckout = async (plan = 'STARTER') => {
     try {
@@ -256,6 +291,38 @@ export default function SubscriptionsPage() {
 
   const handleManageBilling = () => {
     redirectToBillingPortal();
+  };
+
+  const handleUpdatePaymentMethod = async () => {
+    try {
+      const res = await updatePaymentMutation.mutateAsync({});
+      if (res?.url) {
+        window.location.href = res.url; // Redirect to Stripe billing portal
+      }
+    } catch (err) {
+      console.error('Update payment method failed:', err);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      await cancelMutation.mutateAsync({
+        data: { immediate: cancelImmediate },
+      });
+      setCancelDialogOpen(false);
+    } catch (err) {
+      console.error('Cancel subscription failed:', err);
+    }
+  };
+
+  const openCancelDialog = (immediate = false) => {
+    setCancelImmediate(immediate);
+    setCancelDialogOpen(true);
+  };
+
+  const closeCancelDialog = () => {
+    setCancelDialogOpen(false);
+    setCancelImmediate(false);
   };
 
   const formatEnumValue = (value, fallback = 'Not available') => {
@@ -750,8 +817,203 @@ export default function SubscriptionsPage() {
                   </Stack>
                 </Paper>
               )}
+
+              {/* Invoice History Section */}
+              <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 1 }}>
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+                      Invoice History
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View and download your billing invoices
+                    </Typography>
+                  </Box>
+                  <DataState
+                    isLoading={invoicesQuery.isLoading}
+                    isError={invoicesQuery.isError}
+                    error={invoicesQuery.error}
+                    isEmpty={!invoicesQuery.isLoading && !invoicesQuery.isError && (!invoicesQuery.data?.invoices || invoicesQuery.data.invoices.length === 0)}
+                    emptyMessage="No invoices found"
+                    onRetry={invoicesQuery.refetch}
+                  >
+                    {invoicesQuery.data?.invoices && invoicesQuery.data.invoices.length > 0 && (
+                      <TableContainer>
+                        <Table>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell><strong>Invoice #</strong></TableCell>
+                              <TableCell><strong>Date</strong></TableCell>
+                              <TableCell><strong>Description</strong></TableCell>
+                              <TableCell align="right"><strong>Amount</strong></TableCell>
+                              <TableCell><strong>Status</strong></TableCell>
+                              <TableCell align="center"><strong>Actions</strong></TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {invoicesQuery.data.invoices.map((invoice) => (
+                              <TableRow key={invoice.id} hover>
+                                <TableCell>{invoice.number || invoice.id.slice(-8)}</TableCell>
+                                <TableCell>
+                                  {new Date(invoice.created * 1000).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>{invoice.description}</TableCell>
+                                <TableCell align="right">
+                                  {formatCurrency(invoice.amount, invoice.currency)}
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={invoice.status.toUpperCase()}
+                                    color={invoice.status === 'paid' ? 'success' : invoice.status === 'open' ? 'warning' : 'default'}
+                                    size="small"
+                                  />
+                                </TableCell>
+                                <TableCell align="center">
+                                  {invoice.invoicePdf && (
+                                    <Link
+                                      href={invoice.invoicePdf}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+                                    >
+                                      <DownloadIcon fontSize="small" />
+                                      PDF
+                                    </Link>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    )}
+                  </DataState>
+                </Stack>
+              </Paper>
+
+              {/* Billing Management Actions */}
+              <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 1 }}>
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+                      Billing Management
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Update your payment method or cancel your subscription
+                    </Typography>
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <CreditCardIcon color="primary" sx={{ fontSize: 40 }} />
+                            <Box>
+                              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Update Payment Method
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Change your credit card or payment information
+                              </Typography>
+                            </Box>
+                            <Button
+                              variant="outlined"
+                              startIcon={<CreditCardIcon />}
+                              onClick={handleUpdatePaymentMethod}
+                              disabled={updatePaymentMutation.isPending}
+                              fullWidth
+                            >
+                              {updatePaymentMutation.isPending ? 'Processing...' : 'Update Payment'}
+                            </Button>
+                            {updatePaymentMutation.isError && (
+                              <Alert severity="error" sx={{ mt: 1 }}>
+                                {updatePaymentMutation.error?.body?.message || 'Failed to update payment method'}
+                              </Alert>
+                            )}
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Card variant="outlined" sx={{ height: '100%', borderColor: 'error.light' }}>
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <CancelIcon color="error" sx={{ fontSize: 40 }} />
+                            <Box>
+                              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Cancel Subscription
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Cancel your subscription at the end of the billing period
+                              </Typography>
+                            </Box>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              startIcon={<CancelIcon />}
+                              onClick={() => openCancelDialog(false)}
+                              disabled={cancelMutation.isPending || isCancellationScheduled}
+                              fullWidth
+                            >
+                              {isCancellationScheduled ? 'Already Scheduled' : 'Cancel Subscription'}
+                            </Button>
+                            {cancelMutation.isError && (
+                              <Alert severity="error" sx={{ mt: 1 }}>
+                                {cancelMutation.error?.body?.message || 'Failed to cancel subscription'}
+                              </Alert>
+                            )}
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </Paper>
             </Stack>
           )}
+
+          {/* Cancellation Confirmation Dialog */}
+          <Dialog
+            open={cancelDialogOpen}
+            onClose={closeCancelDialog}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>
+              {cancelImmediate ? 'Cancel Subscription Immediately?' : 'Cancel Subscription?'}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                {cancelImmediate ? (
+                  <>
+                    Your subscription will be cancelled immediately and you will lose access to all features right away.
+                    <br /><br />
+                    <strong>This action cannot be undone.</strong>
+                  </>
+                ) : (
+                  <>
+                    Your subscription will be cancelled at the end of the current billing period. You'll continue to have access until {nextBillingLabel}.
+                    <br /><br />
+                    You can resubscribe at any time.
+                  </>
+                )}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeCancelDialog} disabled={cancelMutation.isPending}>
+                Keep Subscription
+              </Button>
+              <Button
+                onClick={handleCancelSubscription}
+                color="error"
+                variant="contained"
+                disabled={cancelMutation.isPending}
+                startIcon={cancelMutation.isPending ? <CircularProgress size={16} /> : <CancelIcon />}
+              >
+                {cancelMutation.isPending ? 'Cancelling...' : cancelImmediate ? 'Cancel Now' : 'Cancel at Period End'}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           {/* FAQ or Additional Info Section */}
           {!userHasActiveSubscription && (
