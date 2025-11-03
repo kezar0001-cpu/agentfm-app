@@ -5,6 +5,7 @@ import prisma from '../config/prismaClient.js';
 import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import unitsRouter from './units.js';
+import { cacheMiddleware, invalidate } from '../utils/cache.js';
 
 const router = Router();
 
@@ -118,6 +119,16 @@ const unitSchema = z.object({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+// Helper to invalidate property-related caches
+const invalidatePropertyCaches = async (userId) => {
+  const cacheKeys = [
+    `cache:/api/properties:user:${userId}`,
+    `cache:/api/dashboard/summary:user:${userId}`,
+  ];
+
+  await Promise.all(cacheKeys.map(key => invalidate(key)));
+};
+
 const applyLegacyAliases = (input = {}) => {
   const data = { ...input };
   if (!data.zipCode && data.postcode) {
@@ -173,7 +184,8 @@ const ensurePropertyAccess = (property, user, options = {}) => {
 // Routes
 // ---------------------------------------------------------------------------
 // GET / - List properties (PROPERTY_MANAGER sees their properties, OWNER sees owned properties)
-router.get('/', async (req, res) => {
+// Cached for 5 minutes
+router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
   try {
     let where = {};
 
@@ -285,6 +297,9 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       data: propertyData,
     });
 
+    // Invalidate property and dashboard caches
+    await invalidatePropertyCaches(req.user.id);
+
     res.status(201).json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -387,6 +402,9 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       data: updateData,
     });
 
+    // Invalidate property and dashboard caches
+    await invalidatePropertyCaches(req.user.id);
+
     res.json({ success: true, property: toPublicProperty(updated) });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -419,6 +437,10 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     }
 
     await prisma.property.delete({ where: { id: property.id } });
+
+    // Invalidate property and dashboard caches
+    await invalidatePropertyCaches(req.user.id);
+
     res.json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
     console.error('Delete property error:', {

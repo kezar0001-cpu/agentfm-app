@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
 import { asyncHandler, sendError } from '../utils/errorHandler.js';
 import logger from '../utils/logger.js';
+import { cacheMiddleware, invalidate } from '../utils/cache.js';
 
 const router = Router();
 
@@ -63,8 +64,8 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ success: true, users });
 }));
 
-// GET /api/users/me - Get current user profile
-router.get('/me', asyncHandler(async (req, res) => {
+// GET /api/users/me - Get current user profile (cached for 1 hour)
+router.get('/me', cacheMiddleware({ ttl: 3600 }), asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
     select: {
@@ -143,6 +144,9 @@ router.patch('/:id', validate(userUpdateSchema), asyncHandler(async (req, res) =
       company: true,
     },
   });
+
+  // Invalidate user profile cache
+  await invalidate(`cache:/api/users/me:user:${req.user.id}`);
 
   logger.info(`User ${req.user.id} updated their profile`);
   res.json({ success: true, data: user });
