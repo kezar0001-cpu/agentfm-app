@@ -339,13 +339,11 @@ router.post('/cancel', async (req, res) => {
     const subscription = dbUser.subscriptions[0];
 
     // Cancel subscription in Stripe
-    const canceledSubscription = await stripe.subscriptions.update(
-      subscription.stripeSubscriptionId,
-      {
-        cancel_at_period_end: !immediate,
-        ...(immediate && { cancel_at: 'now' }),
-      }
-    );
+    const canceledSubscription = immediate
+      ? await stripe.subscriptions.cancel(subscription.stripeSubscriptionId)
+      : await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        });
 
     // Update subscription in database if immediate cancellation
     if (immediate) {
