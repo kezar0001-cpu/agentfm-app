@@ -87,7 +87,7 @@ export async function invalidatePattern(pattern) {
       return;
     }
 
-    await client.del(keysToDelete);
+    await client.del(...keysToDelete);
     logger.debug(`[Cache] Invalidated ${keysToDelete.length} keys for pattern ${pattern}`);
   } catch (error) {
     logger.warn(`[Cache] Failed to invalidate pattern ${pattern}:`, error.message);
