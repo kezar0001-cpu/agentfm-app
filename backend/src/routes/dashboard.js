@@ -1,8 +1,9 @@
 import express from 'express';
-import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js'; 
+import { getDashboardSummary, getRecentActivity } from '../../controllers/dashboardController.js';
 import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errorHandler.js';
 import prisma from '../config/prismaClient.js';
+import { cacheMiddleware } from '../utils/cache.js';
 
 const router = express.Router();
 
@@ -13,8 +14,8 @@ const router = express.Router();
  */
 router.use(requireAuth);
 
-// GET /api/dashboard/summary - Returns dashboard summary data
-router.get('/summary', asyncHandler(async (req, res) => {
+// GET /api/dashboard/summary - Returns dashboard summary data (cached for 5 minutes)
+router.get('/summary', cacheMiddleware({ ttl: 300 }), asyncHandler(async (req, res) => {
   const data = await getDashboardSummary(req, res);
   return data;
 }));

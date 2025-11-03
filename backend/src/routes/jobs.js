@@ -4,11 +4,17 @@ import validate from '../middleware/validate.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import { prisma } from '../config/prismaClient.js';
 import { notifyJobAssigned, notifyJobCompleted, notifyJobStarted, notifyJobReassigned } from '../utils/notificationService.js';
+import { invalidate } from '../utils/cache.js';
 
 const router = express.Router();
 
 const STATUSES = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+// Helper to invalidate dashboard cache for a user
+const invalidateDashboardCache = async (userId) => {
+  await invalidate(`cache:/api/dashboard/summary:user:${userId}`);
+};
 
 const jobCreateSchema = z.object({
   propertyId: z.string().min(1),
@@ -233,7 +239,10 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
         // Don't fail the job creation if notification fails
       }
     }
-    
+
+    // Invalidate dashboard cache for property manager
+    await invalidateDashboardCache(req.user.id);
+
     res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
@@ -385,6 +394,9 @@ router.post(
       } catch (notifError) {
         console.error('Failed to send bulk assignment notifications:', notifError);
       }
+
+      // Invalidate dashboard cache for property manager
+      await invalidateDashboardCache(req.user.id);
 
       res.json({ success: true, jobs: updatedJobs });
     } catch (error) {
@@ -547,6 +559,11 @@ router.patch('/:id/status', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNI
     } catch (notifError) {
       console.error('Failed to send job status notification:', notifError);
       // Don't fail the job update if notification fails
+    }
+
+    // Invalidate dashboard cache for property manager
+    if (existingJob.property.managerId) {
+      await invalidateDashboardCache(existingJob.property.managerId);
     }
 
     res.json(job);
@@ -790,7 +807,12 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
       console.error('Failed to send job notification:', notifError);
       // Don't fail the job update if notification fails
     }
-    
+
+    // Invalidate dashboard cache for property manager
+    if (existingJob.property.managerId) {
+      await invalidateDashboardCache(existingJob.property.managerId);
+    }
+
     res.json(job);
   } catch (error) {
     console.error('Error updating job:', error);
@@ -802,21 +824,33 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
 router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if job exists
     const existingJob = await prisma.job.findUnique({
       where: { id },
+      include: {
+        property: {
+          select: {
+            managerId: true,
+          },
+        },
+      },
     });
-    
+
     if (!existingJob) {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
-    
+
     // Delete job
     await prisma.job.delete({
       where: { id },
     });
-    
+
+    // Invalidate dashboard cache for property manager
+    if (existingJob.property.managerId) {
+      await invalidateDashboardCache(existingJob.property.managerId);
+    }
+
     res.json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
     console.error('Error deleting job:', error);
