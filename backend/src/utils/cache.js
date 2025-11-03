@@ -1,5 +1,5 @@
 // backend/src/utils/cache.js
-import { redisGet, redisSet, redisDel } from '../config/redisClient.js';
+import { redisGet, redisSet, redisDel, getRedisClient } from '../config/redisClient.js';
 import logger from './logger.js';
 
 /**
@@ -67,6 +67,34 @@ export async function invalidateMultiple(keys) {
 }
 
 /**
+ * Invalidate cache keys matching a pattern using SCAN
+ * @param {string} pattern - Redis match pattern (e.g. cache:/api/properties*user:123)
+ * @returns {Promise<void>}
+ */
+export async function invalidatePattern(pattern) {
+  try {
+    const client = getRedisClient();
+    if (!client?.isOpen) {
+      return;
+    }
+
+    const keysToDelete = [];
+    for await (const key of client.scanIterator({ MATCH: pattern })) {
+      keysToDelete.push(key);
+    }
+
+    if (keysToDelete.length === 0) {
+      return;
+    }
+
+    await client.del(keysToDelete);
+    logger.debug(`[Cache] Invalidated ${keysToDelete.length} keys for pattern ${pattern}`);
+  } catch (error) {
+    logger.warn(`[Cache] Failed to invalidate pattern ${pattern}:`, error.message);
+  }
+}
+
+/**
  * Middleware to cache GET requests
  * @param {Object} options - Cache options
  * @param {number} options.ttl - Time to live in seconds
@@ -123,5 +151,6 @@ export default {
   set,
   invalidate,
   invalidateMultiple,
+  invalidatePattern,
   cacheMiddleware,
 };

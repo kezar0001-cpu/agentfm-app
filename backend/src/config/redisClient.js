@@ -11,6 +11,7 @@ function createNoopClient() {
     async set() {},
     async setEx() {},
     async del() {},
+    async *scanIterator() {},
   };
 }
 
