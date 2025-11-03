@@ -17,7 +17,7 @@ This document describes the complete Forgot Password / Password Reset feature im
 - **Location**: `backend/src/routes/auth.js`
 - **Deployed on**: Render at https://api.buildstate.com.au
 - **Endpoints**:
-  - `POST /auth/forgot-password` - Request password reset
+  - `POST /auth/forgot-password` - Request password reset (normalizes email addresses by trimming and lowercasing before lookup)
   - `GET /auth/reset-password/validate` - Validate reset token (optional)
   - `POST /auth/reset-password` - Complete password reset
 

@@ -31,13 +31,15 @@ export default function ForgotPassword() {
     setEmailError('');
     setSuccess(false);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Validate email
-    if (!email) {
+    if (!normalizedEmail) {
       setEmailError('Email is required');
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(normalizedEmail)) {
       setEmailError('Please enter a valid email address');
       return;
     }
@@ -45,7 +47,7 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.post('/auth/forgot-password', { email });
+      const response = await apiClient.post('/auth/forgot-password', { email: normalizedEmail });
       const payload = response?.data ?? response;
 
       if (payload.success) {

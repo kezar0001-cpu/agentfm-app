@@ -514,7 +514,9 @@ const resetPasswordSchema = z.object({
 // ========================================
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { email } = forgotPasswordSchema.parse(req.body);
+    const rawEmail = typeof req.body.email === 'string' ? req.body.email : '';
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const { email } = forgotPasswordSchema.parse({ email: normalizedEmail });
 
     // Always return success to prevent email enumeration
     const genericResponse = {
