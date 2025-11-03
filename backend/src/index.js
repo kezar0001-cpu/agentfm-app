@@ -66,9 +66,17 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: 'Too many password reset attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/forgot-password', forgotPasswordLimiter);
 
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
