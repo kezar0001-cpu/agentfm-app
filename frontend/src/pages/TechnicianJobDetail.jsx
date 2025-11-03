@@ -14,6 +14,12 @@ import {
   Divider,
   Grid,
   Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -42,6 +48,8 @@ export default function TechnicianJobDetail() {
   const [actualCost, setActualCost] = useState('');
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState('');
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   // Fetch job details
   const { data: job, isLoading, error } = useQuery({
@@ -52,7 +60,7 @@ export default function TechnicianJobDetail() {
     },
   });
 
-  // Update job mutation
+  // Update job mutation (for notes and cost)
   const updateMutation = useMutation({
     mutationFn: async (updates) => {
       const response = await apiClient.patch(`/jobs/${id}`, updates);
@@ -71,8 +79,43 @@ export default function TechnicianJobDetail() {
     },
   });
 
+  // Status update mutation (uses new status endpoint)
+  const statusMutation = useMutation({
+    mutationFn: async (status) => {
+      const response = await apiClient.patch(`/jobs/${id}/status`, { status });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.technician() });
+      setUpdateSuccess('Job status updated successfully');
+      setUpdateError('');
+      setConfirmDialogOpen(false);
+      setPendingStatus(null);
+      setTimeout(() => setUpdateSuccess(''), 3000);
+    },
+    onError: (error) => {
+      setUpdateError(error.response?.data?.message || 'Failed to update job status');
+      setUpdateSuccess('');
+      setConfirmDialogOpen(false);
+      setPendingStatus(null);
+    },
+  });
+
   const handleStatusChange = (newStatus) => {
-    updateMutation.mutate({ status: newStatus });
+    setPendingStatus(newStatus);
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirmStatusChange = () => {
+    if (pendingStatus) {
+      statusMutation.mutate(pendingStatus);
+    }
+  };
+
+  const handleCancelStatusChange = () => {
+    setConfirmDialogOpen(false);
+    setPendingStatus(null);
   };
 
   const handleAddNotes = () => {
@@ -373,6 +416,44 @@ export default function TechnicianJobDetail() {
           </Grid>
         )}
       </DataState>
+
+      {/* Status Confirmation Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={statusMutation.isPending ? undefined : handleCancelStatusChange}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm Status Change</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {pendingStatus === 'IN_PROGRESS' && (
+              <>
+                Are you sure you want to start this job? This will notify the property manager that work has begun.
+              </>
+            )}
+            {pendingStatus === 'COMPLETED' && (
+              <>
+                Are you sure you want to mark this job as completed? This will notify the property manager that the job is finished.
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelStatusChange} disabled={statusMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmStatusChange}
+            variant="contained"
+            color="primary"
+            disabled={statusMutation.isPending}
+            startIcon={statusMutation.isPending ? <CircularProgress size={18} color="inherit" /> : null}
+          >
+            {statusMutation.isPending ? 'Updating...' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

@@ -50,9 +50,11 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import JobDetailModal from '../components/JobDetailModal';
+import JobStatusConfirmDialog from '../components/JobStatusConfirmDialog';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import toast from 'react-hot-toast';
+import { useJobStatusUpdate } from '../hooks/useJobStatusUpdate';
 
 const localizer = momentLocalizer(moment);
 
@@ -76,6 +78,15 @@ const JobsPage = () => {
   const [selectedJobIds, setSelectedJobIds] = useState([]);
   const [bulkTechnicianId, setBulkTechnicianId] = useState('');
   const [isConfirmBulkAssignOpen, setIsConfirmBulkAssignOpen] = useState(false);
+
+  // Job status update hook
+  const {
+    updateStatus,
+    confirmStatusUpdate,
+    closeConfirmDialog,
+    confirmDialogState,
+    isUpdating: isStatusUpdating,
+  } = useJobStatusUpdate();
 
   // Build query params
   const queryParams = new URLSearchParams();
@@ -297,9 +308,29 @@ const JobsPage = () => {
   };
 
   const onDragEnd = (result) => {
-    // For now, we'll just log the result.
-    // In a real app, you'd update the job status here.
-    console.log(result);
+    const { source, destination, draggableId } = result;
+
+    // Dropped outside a droppable area
+    if (!destination) {
+      return;
+    }
+
+    // Dropped in the same column
+    if (source.droppableId === destination.droppableId) {
+      return;
+    }
+
+    // Find the job being dragged
+    const job = jobs.find(j => j.id === draggableId);
+    if (!job) {
+      return;
+    }
+
+    const newStatus = destination.droppableId;
+    const currentStatus = job.status;
+
+    // Update the job status
+    updateStatus(job.id, currentStatus, newStatus, job.title);
   };
 
   const isOverdue = (job) => {
@@ -632,7 +663,7 @@ const JobsPage = () => {
                           >
                             {job.title}
                           </Typography>
-                          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
+                          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                             <Chip
                               label={job.status.replace('_', ' ')}
                               color={getStatusColor(job.status)}
@@ -645,6 +676,27 @@ const JobsPage = () => {
                               size="small"
                             />
                           </Stack>
+                          <TextField
+                            select
+                            size="small"
+                            value={job.status}
+                            onChange={(e) => updateStatus(job.id, job.status, e.target.value, job.title)}
+                            label="Update Status"
+                            sx={{
+                              minWidth: 160,
+                              mb: 1,
+                              '& .MuiOutlinedInput-root': {
+                                fontSize: '0.875rem',
+                              }
+                            }}
+                            disabled={['COMPLETED', 'CANCELLED'].includes(job.status)}
+                          >
+                            <MenuItem value="OPEN">Open</MenuItem>
+                            <MenuItem value="ASSIGNED">Assigned</MenuItem>
+                            <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                            <MenuItem value="COMPLETED">Completed</MenuItem>
+                            <MenuItem value="CANCELLED">Cancelled</MenuItem>
+                          </TextField>
                           {isOverdue(job) && (
                             <Chip
                               icon={<ErrorIcon fontSize="small" />}
@@ -876,6 +928,17 @@ const JobsPage = () => {
         job={selectedJob}
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
+      />
+
+      {/* Job Status Confirmation Dialog */}
+      <JobStatusConfirmDialog
+        open={confirmDialogState.open}
+        onClose={closeConfirmDialog}
+        onConfirm={confirmStatusUpdate}
+        currentStatus={confirmDialogState.currentStatus}
+        newStatus={confirmDialogState.newStatus}
+        jobTitle={confirmDialogState.jobTitle}
+        isLoading={isStatusUpdating}
       />
     </Container>
   );

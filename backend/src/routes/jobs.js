@@ -394,6 +394,168 @@ router.post(
   }
 );
 
+// PATCH /:id/status - Quick status update endpoint
+const statusUpdateSchema = z.object({
+  status: z.enum(STATUSES),
+});
+
+router.patch('/:id/status', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'), validate(statusUpdateSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Fetch existing job with related data
+    const existingJob = await prisma.job.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            managerId: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!existingJob) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    // Access control: Technicians can only update jobs assigned to them
+    if (req.user.role === 'TECHNICIAN') {
+      if (existingJob.assignedToId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update jobs assigned to you'
+        });
+      }
+    }
+
+    // Property managers can only update jobs for their properties
+    if (req.user.role === 'PROPERTY_MANAGER') {
+      if (existingJob.property.managerId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update jobs for your properties'
+        });
+      }
+    }
+
+    // Prevent changing status of completed/cancelled jobs
+    if (['COMPLETED', 'CANCELLED'].includes(existingJob.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot change status of completed or cancelled jobs',
+      });
+    }
+
+    // No change needed
+    if (existingJob.status === status) {
+      return res.json(existingJob);
+    }
+
+    // Prepare update data
+    const updateData = { status };
+
+    // If status is being set to COMPLETED, set completedDate
+    if (status === 'COMPLETED' && !existingJob.completedDate) {
+      updateData.completedDate = new Date();
+    }
+
+    // Update job
+    const job = await prisma.job.update({
+      where: { id },
+      data: updateData,
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            managerId: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            unitNumber: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Send notifications for status transitions
+    try {
+      // Job completion notification
+      if (status === 'COMPLETED' && existingJob.status !== 'COMPLETED') {
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+
+          const technician = job.assignedTo || { firstName: 'Unknown', lastName: 'Technician' };
+
+          if (manager) {
+            await notifyJobCompleted(job, technician, job.property, manager);
+          }
+        }
+      }
+
+      // Job started notification
+      if (status === 'IN_PROGRESS' && existingJob.status !== 'IN_PROGRESS') {
+        if (job.property.managerId) {
+          const manager = await prisma.user.findUnique({
+            where: { id: job.property.managerId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+
+          if (manager) {
+            await notifyJobStarted(job, job.property, manager);
+          }
+        }
+      }
+
+      // Job assigned notification (when status changes to ASSIGNED)
+      if (status === 'ASSIGNED' && existingJob.status !== 'ASSIGNED' && job.assignedTo) {
+        await notifyJobAssigned(job, job.assignedTo, job.property);
+      }
+    } catch (notifError) {
+      console.error('Failed to send job status notification:', notifError);
+      // Don't fail the job update if notification fails
+    }
+
+    res.json(job);
+  } catch (error) {
+    console.error('Error updating job status:', error);
+    res.status(500).json({ success: false, message: 'Failed to update job status' });
+  }
+});
+
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
