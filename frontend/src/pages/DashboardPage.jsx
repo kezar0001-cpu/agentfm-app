@@ -176,7 +176,7 @@ const DashboardPage = () => {
             gutterBottom
             sx={{
               fontWeight: 800,
-              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               letterSpacing: '-0.02em',
@@ -203,7 +203,7 @@ const DashboardPage = () => {
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 borderColor: 'primary.main',
-                bgcolor: 'rgba(37, 99, 235, 0.08)',
+                bgcolor: 'rgba(185, 28, 28, 0.08)',
                 transform: 'rotate(180deg)',
               },
             }}
@@ -217,11 +217,11 @@ const DashboardPage = () => {
             fullWidth
             sx={{
               maxWidth: { xs: '100%', md: 'none' },
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              boxShadow: '0 4px 14px 0 rgb(37 99 235 / 0.3)',
+              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+              boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
               '&:hover': {
-                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                boxShadow: '0 6px 20px 0 rgb(37 99 235 / 0.4)',
+                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
               },
             }}
           >

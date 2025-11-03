@@ -17,12 +17,12 @@ export default function StatCard({
 }) {
   // Define gradient backgrounds based on color
   const gradients = {
-    primary: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-    secondary: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-    success: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-    error: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-    warning: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-    info: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+    primary: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+    secondary: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)',
+    success: 'linear-gradient(135deg, #4ade80 0%, #16a34a 100%)',
+    error: 'linear-gradient(135deg, #fca5a5 0%, #dc2626 100%)',
+    warning: 'linear-gradient(135deg, #fdba74 0%, #ea580c 100%)',
+    info: 'linear-gradient(135deg, #fecaca 0%, #ef4444 100%)',
   };
 
   return (
@@ -80,11 +80,11 @@ export default function StatCard({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: `0 4px 14px 0 ${color === 'primary' ? 'rgb(37 99 235 / 0.25)' : color === 'secondary' ? 'rgb(16 185 129 / 0.25)' : 'rgb(0 0 0 / 0.1)'}`,
+              boxShadow: `0 4px 14px 0 ${color === 'primary' ? 'rgb(185 28 28 / 0.25)' : color === 'secondary' ? 'rgb(249 115 22 / 0.25)' : 'rgb(0 0 0 / 0.1)'}`,
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&:hover': {
                 transform: 'rotate(10deg) scale(1.1)',
-                boxShadow: `0 8px 20px 0 ${color === 'primary' ? 'rgb(37 99 235 / 0.35)' : color === 'secondary' ? 'rgb(16 185 129 / 0.35)' : 'rgb(0 0 0 / 0.15)'}`,
+                boxShadow: `0 8px 20px 0 ${color === 'primary' ? 'rgb(185 28 28 / 0.35)' : color === 'secondary' ? 'rgb(249 115 22 / 0.35)' : 'rgb(0 0 0 / 0.15)'}`,
               },
             }}
           >

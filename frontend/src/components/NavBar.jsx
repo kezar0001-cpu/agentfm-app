@@ -139,7 +139,7 @@ function NavBar() {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               transition: 'all 0.2s ease-in-out',
@@ -148,7 +148,7 @@ function NavBar() {
               },
             }}
           >
-            AgentFM
+            BuildState FM
           </Typography>
 
           <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
@@ -202,7 +202,7 @@ function NavBar() {
                   transition: 'width 0.3s ease-in-out',
                 },
                 '&:hover': {
-                  bgcolor: 'rgba(37, 99, 235, 0.08)',
+                  bgcolor: 'rgba(185, 28, 28, 0.08)',
                   '&::after': {
                     width: '60%',
                   },
@@ -238,14 +238,14 @@ function NavBar() {
                 sx={{
                   width: 36,
                   height: 36,
-                  background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                  background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
                   fontSize: '0.875rem',
                   fontWeight: 600,
-                  boxShadow: '0 2px 8px 0 rgb(37 99 235 / 0.3)',
+                  boxShadow: '0 2px 8px 0 rgb(185 28 28 / 0.3)',
                   transition: 'all 0.2s ease-in-out',
                   '&:hover': {
                     transform: 'scale(1.1)',
-                    boxShadow: '0 4px 12px 0 rgb(37 99 235 / 0.4)',
+                    boxShadow: '0 4px 12px 0 rgb(185 28 28 / 0.4)',
                   },
                 }}
               >
