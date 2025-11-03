@@ -525,8 +525,13 @@ router.post('/forgot-password', async (req, res) => {
     };
 
     // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+      },
     });
 
     // If user doesn't exist, return generic response without sending email
