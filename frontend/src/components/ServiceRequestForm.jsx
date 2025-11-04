@@ -31,7 +31,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
 
   // Fetch properties
-  const { data: properties, isLoading: loadingProperties } = useQuery({
+  const { data: properties = [], isLoading: loadingProperties } = useQuery({
     queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
@@ -40,7 +40,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
   });
 
   // Fetch units for selected property
-  const { data: units } = useQuery({
+  const { data: units = [] } = useQuery({
     queryKey: queryKeys.properties.units(formData.propertyId),
     queryFn: async () => {
       if (!formData.propertyId) return [];
@@ -234,7 +234,7 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
               required
               disabled={loadingProperties}
             >
-              {properties?.map((property) => (
+              {properties.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>
@@ -251,13 +251,13 @@ const ServiceRequestForm = ({ onSuccess, onCancel }) => {
               label="Unit"
               value={formData.unitId}
               onChange={(e) => handleChange('unitId', e.target.value)}
-              disabled={!formData.propertyId || !units?.length}
-              required={!!units?.length}
+              disabled={!formData.propertyId || !units.length}
+              required={units.length > 0}
             >
-              {units?.length === 0 && (
+              {units.length === 0 && (
                 <MenuItem value="">No units available</MenuItem>
               )}
-              {units?.map((unit) => (
+              {units.map((unit) => (
                 <MenuItem key={unit.id} value={unit.id}>
                   Unit {unit.unitNumber}
                 </MenuItem>

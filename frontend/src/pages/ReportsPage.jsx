@@ -200,7 +200,7 @@ export default function ReportsPage() {
                   error={!!errors.propertyId}
                   helperText={errors.propertyId?.message}
                 >
-                  {propertiesData?.map((prop) => (
+                  {propertiesData.map((prop) => (
                     <MenuItem key={prop.id} value={prop.id}>
                       {prop.name}
                     </MenuItem>
@@ -223,7 +223,7 @@ export default function ReportsPage() {
                   <MenuItem value="">
                     <em>None</em>
                   </MenuItem>
-                  {unitsData?.map((unit) => (
+                  {unitsData.map((unit) => (
                     <MenuItem key={unit.id} value={unit.id}>
                       {unit.unitNumber}
                     </MenuItem>

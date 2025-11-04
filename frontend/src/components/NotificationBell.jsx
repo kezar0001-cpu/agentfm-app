@@ -19,6 +19,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { format } from 'date-fns';
+import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 
 const NOTIFICATION_TYPE_COLORS = {
@@ -47,11 +48,11 @@ export default function NotificationBell() {
   });
 
   // Fetch notifications
-  const { data: notifications, isLoading } = useQuery({
+  const { data: notifications = [], isLoading } = useQuery({
     queryKey: queryKeys.notifications.list(),
     queryFn: async () => {
       const response = await apiClient.get('/notifications?limit=10');
-      return response.data;
+      return ensureArray(response.data, ['notifications', 'items', 'data.items']);
     },
     enabled: Boolean(anchorEl), // Only fetch when menu is open
   });
@@ -154,7 +155,7 @@ export default function NotificationBell() {
           </Box>
         )}
 
-        {!isLoading && notifications?.length === 0 && (
+        {!isLoading && notifications.length === 0 && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               No notifications
@@ -162,7 +163,7 @@ export default function NotificationBell() {
           </Box>
         )}
 
-        {!isLoading && notifications?.map((notification) => (
+        {!isLoading && notifications.map((notification) => (
           <MenuItem
             key={notification.id}
             sx={{
@@ -222,7 +223,7 @@ export default function NotificationBell() {
           </MenuItem>
         ))}
 
-        {!isLoading && notifications?.length > 0 && (
+        {!isLoading && notifications.length > 0 && (
           <>
             <Divider />
             <Box sx={{ p: 1, textAlign: 'center' }}>

@@ -66,16 +66,16 @@ export default function TeamManagementPage() {
   });
 
   // Fetch pending invites
-  const { data: invites, isLoading: invitesLoading } = useQuery({
+  const { data: invites = [], isLoading: invitesLoading } = useQuery({
     queryKey: queryKeys.teams.invites(),
     queryFn: async () => {
       const response = await apiClient.get('/invites');
-      return response.data.invites || [];
+      return ensureArray(response.data, ['invites', 'data.invites', 'items']);
     },
   });
 
   // Fetch properties for invite form
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery({
     queryKey: queryKeys.properties.selectOptions(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
@@ -224,7 +224,7 @@ export default function TeamManagementPage() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {invites?.length === 0 ? (
+          {invites.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} align="center">
                 <Typography color="text.secondary">
@@ -233,7 +233,7 @@ export default function TeamManagementPage() {
               </TableCell>
             </TableRow>
           ) : (
-            invites?.map((invite) => (
+            invites.map((invite) => (
               <TableRow key={invite.id}>
                 <TableCell>
                   <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
@@ -338,7 +338,7 @@ export default function TeamManagementPage() {
           <Tab label={`Owners (${owners.length})`} />
           <Tab label={`Technicians (${technicians.length})`} />
           <Tab label={`Tenants (${tenants.length})`} />
-          <Tab label={`Pending Invites (${invites?.length || 0})`} />
+          <Tab label={`Pending Invites (${invites.length})`} />
         </Tabs>
       </Paper>
 
@@ -397,7 +397,7 @@ export default function TeamManagementPage() {
               helperText="Assign to a specific property"
             >
               <MenuItem value="">None</MenuItem>
-              {properties?.map((property) => (
+              {properties.map((property) => (
                 <MenuItem key={property.id} value={property.id}>
                   {property.name}
                 </MenuItem>

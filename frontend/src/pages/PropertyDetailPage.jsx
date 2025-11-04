@@ -58,6 +58,7 @@ import {
 } from '../utils/formatPropertyLocation';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
+import ensureArray from '../utils/ensureArray';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
@@ -119,6 +120,8 @@ export default function PropertyDetailPage() {
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
     : null;
+
+  const activities = ensureArray(activityQuery.data, ['activities', 'data.activities', 'items']);
 
   // Flatten all pages into a single array
   const units = unitsQuery.data?.pages?.flatMap(page => page.items) || [];
@@ -719,15 +722,15 @@ export default function PropertyDetailPage() {
                   isLoading={activityQuery.isLoading}
                   isError={activityQuery.isError}
                   error={activityQuery.error}
-                  isEmpty={!activityQuery.data?.activities || activityQuery.data.activities.length === 0}
+                  isEmpty={activities.length === 0}
                   emptyMessage="No recent activity for this property"
                   onRetry={activityQuery.refetch}
                 >
                   <List>
-                    {activityQuery.data?.activities?.map((activity, index) => (
+                    {activities.map((activity, index) => (
                       <ListItem
                         key={`${activity.type}-${activity.id}-${activity.date}-${index}`}
-                        divider={index < activityQuery.data.activities.length - 1}
+                        divider={index < activities.length - 1}
                         sx={{ px: 0 }}
                       >
                         <ListItemText

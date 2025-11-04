@@ -52,7 +52,7 @@ export default function TechnicianDashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
 
   // Fetch jobs assigned to technician
-  const { data: jobs, isLoading, error, refetch } = useQuery({
+  const { data: jobs = [], isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.jobs.technician(),
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
@@ -106,9 +106,7 @@ export default function TechnicianDashboard() {
     }
   };
 
-  const getJobsByStatus = (status) => {
-    return jobs?.filter(job => job.status === status) || [];
-  };
+  const getJobsByStatus = (status) => jobs.filter(job => job.status === status);
 
   const openJobs = getJobsByStatus('OPEN');
   const inProgressJobs = getJobsByStatus('IN_PROGRESS');
@@ -184,7 +182,7 @@ export default function TechnicianDashboard() {
         emptyMessage="No jobs assigned to you yet"
       >
         <Grid container spacing={3}>
-          {jobs?.map((job) => (
+          {jobs.map((job) => (
             <Grid item xs={12} md={6} key={job.id}>
               <Card 
                 sx={{ 
