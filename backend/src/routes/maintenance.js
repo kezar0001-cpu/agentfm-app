@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
-import jwt from 'jsonwebtoken';
-import getJwtSecret from '../utils/getJwtSecret.js';
+import { verifyAccessToken } from '../utils/jwt.js';
 
 const router = Router();
 
@@ -15,7 +14,7 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, getJwtSecret());
+    const decoded = verifyAccessToken(token);
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },

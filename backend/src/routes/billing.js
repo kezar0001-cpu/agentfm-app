@@ -1,6 +1,4 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prismaClient.js';
 import {
   createStripeClient,
@@ -8,6 +6,7 @@ import {
   StripeNotConfiguredError,
 } from '../utils/stripeClient.js';
 import { sendEmail } from '../utils/email.js';
+import { verifyAccessToken } from '../utils/jwt.js';
 
 const router = express.Router();
 const stripe = createStripeClient();
@@ -85,7 +84,7 @@ router.post('/checkout', async (req, res) => {
 
     let user;
     try {
-      user = jwt.verify(token, getJwtSecret());
+      user = verifyAccessToken(token);
     } catch {
       return res.status(401).json({ error: 'Invalid token' });
     }
@@ -193,7 +192,7 @@ async function authenticateRequest(req) {
   if (!token) return null;
 
   try {
-    return jwt.verify(token, getJwtSecret());
+    return verifyAccessToken(token);
   } catch {
     return null;
   }
