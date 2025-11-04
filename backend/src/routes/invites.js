@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { sendInviteEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -127,6 +128,26 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
     // Generate the signup URL with the invite token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const signupUrl = `${frontendUrl}/signup?invite=${token}`;
+
+    // Send invitation email
+    try {
+      const inviterName = `${invite.invitedBy.firstName} ${invite.invitedBy.lastName}`;
+      const propertyName = invite.property?.name || null;
+      const unitName = invite.unit?.unitNumber || null;
+
+      await sendInviteEmail(
+        invite.email,
+        signupUrl,
+        inviterName,
+        invite.role,
+        propertyName,
+        unitName
+      );
+    } catch (emailError) {
+      console.error('Failed to send invite email:', emailError);
+      // Log error but don't fail the request - invite was created successfully
+      // The property manager can manually share the invite link if needed
+    }
 
     res.status(201).json({
       success: true,
