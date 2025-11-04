@@ -59,6 +59,8 @@ export const queryKeys = {
   },
   plans: {
     all: () => ['plans'],
+    filtered: (filters) => ['plans', filters],
+    detail: (id) => ['plan', id],
   },
   recommendations: {
     all: () => ['recommendations'],
