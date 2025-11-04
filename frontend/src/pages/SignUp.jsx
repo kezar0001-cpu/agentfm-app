@@ -4,7 +4,7 @@ import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
   IconButton, InputAdornment, Grid, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
-import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Google as GoogleIcon, ArrowBack } from '@mui/icons-material';
 import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { apiClient } from '../api/client.js';
 
@@ -138,6 +138,18 @@ export default function SignUp() {
     <Container component="main" maxWidth="sm">
       <Box sx={{ mt: { xs: 4, md: 8 }, mb: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center', px: { xs: 1, sm: 0 } }}>
         <Paper elevation={3} sx={{ p: { xs: 3, md: 4 }, width: '100%', borderRadius: 3 }}>
+          <Box sx={{ width: '100%', mb: 2, display: 'flex', justifyContent: 'flex-start' }}>
+            <Button
+              component={Link}
+              to="/"
+              startIcon={<ArrowBack />}
+              variant="text"
+              size="small"
+              sx={{ textTransform: 'none', fontWeight: 600, color: '#b91c1c' }}
+            >
+              Back to Buildstate FM
+            </Button>
+          </Box>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography variant="h3" component="h1" sx={{
               fontWeight: 700,
@@ -147,10 +159,10 @@ export default function SignUp() {
               WebkitTextFillColor: 'transparent',
               mb: 1
             }}>
-              BuildState FM
+              Buildstate FM
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>Create Account</Typography>
-            <Typography variant="body2" color="text.secondary">Join BuildState FM to streamline your property management</Typography>
+            <Typography variant="body2" color="text.secondary">Join Buildstate FM to streamline your property management</Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
