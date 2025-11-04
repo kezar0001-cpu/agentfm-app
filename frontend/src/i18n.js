@@ -33,6 +33,17 @@ const resources = {
       tenants: 'Tenants',
       maintenance: 'Maintenance',
       reports: 'Reports',
+      'reports.title': 'Reports Dashboard',
+      'reports.description': 'Generate and view reports for your properties.',
+      'reports.new_report': 'New Report',
+      'reports.financial.title': 'Financial Reports',
+      'reports.financial.description': 'Generate reports on income, expenses, and profitability.',
+      'reports.occupancy.title': 'Occupancy Reports',
+      'reports.occupancy.description': 'Track vacancy rates, lease expirations, and more.',
+      'reports.maintenance.title': 'Maintenance Reports',
+      'reports.maintenance.description': 'View maintenance history, costs, and response times.',
+      'reports.tenant.title': 'Tenant Reports',
+      'reports.tenant.description': 'Get insights into tenant demographics and payment history.',
       settings: 'Settings',
       
       // Properties

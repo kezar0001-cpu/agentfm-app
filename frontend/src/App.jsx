@@ -66,6 +66,8 @@ const InspectionDetailPage = lazy(() => import('./pages/InspectionDetailPage.jsx
 const JobsPage = lazy(() => import('./pages/JobsPage.jsx'));
 const PlansPage = lazy(() => import('./pages/PlansPage.jsx'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
+const NewReportsPage = lazy(() => import('./pages/NewReportsPage.jsx'));
+const ReportGenerator = lazy(() => import('./pages/ReportGenerator.jsx'));
 const RecommendationsPage = lazy(() => import('./pages/RecommendationsPage.jsx'));
 const ServiceRequestsPage = lazy(() => import('./pages/ServiceRequestsPage.jsx'));
 const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage.jsx'));
@@ -144,6 +146,8 @@ export default function App() {
           <Route path="/recommendations" element={<AuthGate><Layout><RecommendationsPage /></Layout></AuthGate>} />
           <Route path="/subscriptions" element={<AuthGate><Layout><SubscriptionsPage /></Layout></AuthGate>} />
           <Route path="/reports" element={<AuthGate><Layout><ReportsPage /></Layout></AuthGate>} />
+          <Route path="/reports-new" element={<AuthGate><Layout><NewReportsPage /></Layout></AuthGate>} />
+          <Route path="/reports/:reportType" element={<AuthGate><Layout><ReportGenerator /></Layout></AuthGate>} />
           <Route path="/profile" element={<AuthGate><Layout><ProfilePage /></Layout></AuthGate>} />
 
           {/* Role-specific dashboards */}
