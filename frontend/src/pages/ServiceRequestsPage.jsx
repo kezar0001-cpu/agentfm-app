@@ -183,10 +183,20 @@ const ServiceRequestsPage = () => {
         spacing={{ xs: 2, md: 0 }}
         alignItems={{ xs: 'flex-start', md: 'center' }}
         justifyContent="space-between"
-        sx={{ mb: 3 }}
+        sx={{ mb: 3, animation: 'fade-in-down 0.5s ease-out' }}
       >
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={{
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+            }}
+          >
             Service Requests
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -200,7 +210,15 @@ const ServiceRequestsPage = () => {
           startIcon={<AddIcon />}
           onClick={handleCreate}
           fullWidth
-          sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+          sx={{
+            maxWidth: { xs: '100%', md: 'auto' },
+            background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+            boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+              boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+            },
+          }}
         >
           {userRole === 'TENANT' ? 'Submit Request' : 'Create Request'}
         </Button>

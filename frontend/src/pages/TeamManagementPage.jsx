@@ -278,9 +278,20 @@ export default function TeamManagementPage() {
         justifyContent: 'space-between',
         alignItems: { xs: 'flex-start', sm: 'center' },
         gap: { xs: 2, sm: 0 },
-        mb: 3
+        mb: 3,
+        animation: 'fade-in-down 0.5s ease-out'
       }}>
-        <Typography variant="h4" fontWeight={600} sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+        <Typography
+          variant="h4"
+          sx={{
+            fontSize: { xs: '1.75rem', md: '2.125rem' },
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.02em',
+          }}
+        >
           Team Management
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' }, flexDirection: { xs: 'column', sm: 'row' } }}>
@@ -301,7 +312,15 @@ export default function TeamManagementPage() {
             startIcon={<PersonAddIcon />}
             onClick={() => setInviteDialogOpen(true)}
             fullWidth
-            sx={{ display: { xs: 'flex', sm: 'inline-flex' } }}
+            sx={{
+              display: { xs: 'flex', sm: 'inline-flex' },
+              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+              boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+              },
+            }}
           >
             Invite User
           </Button>

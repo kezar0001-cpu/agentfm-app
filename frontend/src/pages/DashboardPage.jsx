@@ -289,7 +289,7 @@ const DashboardPage = () => {
             title="Properties"
             value={summary?.properties?.total || 0}
             icon={<HomeIcon />}
-            color="primary"
+            color="#3b82f6"
             details={[
               { label: 'Active', value: summary?.properties?.active || 0 },
               { label: 'Inactive', value: summary?.properties?.inactive || 0 },
@@ -304,7 +304,7 @@ const DashboardPage = () => {
             title="Units"
             value={summary?.units?.total || 0}
             icon={<HomeIcon />}
-            color="success"
+            color="#10b981"
             details={[
               { label: 'Occupied', value: summary?.units?.occupied || 0 },
               { label: 'Available', value: summary?.units?.available || 0 },
@@ -319,7 +319,7 @@ const DashboardPage = () => {
             title="Jobs"
             value={summary?.jobs?.total || 0}
             icon={<BuildIcon />}
-            color="warning"
+            color="#f59e0b"
             details={[
               { label: 'Open', value: summary?.jobs?.open || 0 },
               { label: 'In Progress', value: summary?.jobs?.inProgress || 0 },
@@ -335,7 +335,7 @@ const DashboardPage = () => {
             title="Inspections"
             value={summary?.inspections?.total || 0}
             icon={<AssignmentIcon />}
-            color="info"
+            color="#8b5cf6"
             details={[
               { label: 'Scheduled', value: summary?.inspections?.scheduled || 0 },
               { label: 'Upcoming', value: summary?.inspections?.upcoming || 0 },
@@ -550,7 +550,7 @@ const StatCard = ({ title, value, icon, color, details, onClick }) => {
           </Box>
           <Box
             sx={{
-              bgcolor: `${color}.main`,
+              bgcolor: color,
               color: 'white',
               borderRadius: 2,
               p: 1.5,

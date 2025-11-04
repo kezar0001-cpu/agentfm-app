@@ -367,10 +367,21 @@ const JobsPage = () => {
         spacing={{ xs: 2, md: 0 }}
         alignItems={{ xs: 'flex-start', md: 'center' }}
         justifyContent="space-between"
-        sx={{ mb: 3 }}
+        sx={{ mb: 3, animation: 'fade-in-down 0.5s ease-out' }}
       >
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.75rem', md: '2.125rem' },
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+            }}
+          >
             Jobs
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
@@ -384,7 +395,13 @@ const JobsPage = () => {
           fullWidth
           sx={{
             maxWidth: { xs: '100%', md: 'auto' },
-            minHeight: { xs: 48, md: 36 }
+            minHeight: { xs: 48, md: 36 },
+            background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+            boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+              boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+            },
           }}
         >
           Create Job
