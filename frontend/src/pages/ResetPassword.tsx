@@ -160,10 +160,21 @@ export default function ResetPassword() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          bgcolor: 'background.default',
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, textAlign: 'center', maxWidth: 400 }}>
+        <Paper
+          elevation={3}
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            maxWidth: 400,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 4px 12px 0 rgb(0 0 0 / 0.1)',
+          }}
+        >
           <CircularProgress size={40} sx={{ mb: 2 }} />
           <Typography variant="h6">Validating reset link...</Typography>
         </Paper>
@@ -178,7 +189,7 @@ export default function ResetPassword() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        bgcolor: 'background.default',
         py: 4,
       }}
     >
@@ -187,7 +198,11 @@ export default function ResetPassword() {
           elevation={3}
           sx={{
             p: { xs: 3, sm: 4 },
-            borderRadius: 2,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 4px 12px 0 rgb(0 0 0 / 0.1)',
+            animation: 'fade-in 0.5s ease-out',
           }}
         >
           {/* Header */}
@@ -196,7 +211,13 @@ export default function ResetPassword() {
               variant="h4"
               component="h1"
               gutterBottom
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.02em',
+              }}
             >
               {success ? 'Password Reset Successful!' : 'Reset Your Password'}
             </Typography>
@@ -234,13 +255,22 @@ export default function ResetPassword() {
                   variant="contained"
                   component={Link}
                   to="/forgot-password"
-                  sx={{ textTransform: 'none', mb: 2 }}
+                  sx={{
+                    textTransform: 'none',
+                    mb: 2,
+                    background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                    boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                      boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+                    },
+                  }}
                 >
                   Request New Reset Link
                 </Button>
                 <Typography variant="body2">
                   or{' '}
-                  <Link to="/signin" style={{ color: '#1976d2' }}>
+                  <Link to="/signin" style={{ color: '#b91c1c', textDecoration: 'none' }}>
                     return to sign in
                   </Link>
                 </Typography>
@@ -335,6 +365,16 @@ export default function ResetPassword() {
                   textTransform: 'none',
                   fontSize: '1rem',
                   fontWeight: 600,
+                  background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                  boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                    boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+                  },
+                  '&:disabled': {
+                    background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                    opacity: 0.6,
+                  },
                 }}
               >
                 {isLoading ? (
@@ -386,11 +426,15 @@ export default function ResetPassword() {
 
         {/* Additional Information */}
         <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Typography variant="body2" color="white">
+          <Typography variant="body2" color="text.secondary">
             Need help? Contact support at{' '}
             <a
               href="mailto:support@buildtstate.com.au"
-              style={{ color: 'white', fontWeight: 600 }}
+              style={{
+                color: '#b91c1c',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
             >
               support@buildtstate.com.au
             </a>

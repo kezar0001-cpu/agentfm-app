@@ -79,7 +79,7 @@ export default function ForgotPassword() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        bgcolor: 'background.default',
         py: 4,
       }}
     >
@@ -88,7 +88,11 @@ export default function ForgotPassword() {
           elevation={3}
           sx={{
             p: { xs: 3, sm: 4 },
-            borderRadius: 2,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 4px 12px 0 rgb(0 0 0 / 0.1)',
+            animation: 'fade-in 0.5s ease-out',
           }}
         >
           {/* Header */}
@@ -97,7 +101,13 @@ export default function ForgotPassword() {
               variant="h4"
               component="h1"
               gutterBottom
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.02em',
+              }}
             >
               Forgot Password?
             </Typography>
@@ -164,6 +174,16 @@ export default function ForgotPassword() {
                   textTransform: 'none',
                   fontSize: '1rem',
                   fontWeight: 600,
+                  background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                  boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                    boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+                  },
+                  '&:disabled': {
+                    background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                    opacity: 0.6,
+                  },
                 }}
               >
                 {isLoading ? (
@@ -216,11 +236,15 @@ export default function ForgotPassword() {
 
         {/* Additional Information */}
         <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Typography variant="body2" color="white">
+          <Typography variant="body2" color="text.secondary">
             Need help? Contact support at{' '}
             <a
               href="mailto:support@buildtstate.com.au"
-              style={{ color: 'white', fontWeight: 600 }}
+              style={{
+                color: '#b91c1c',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
             >
               support@buildtstate.com.au
             </a>

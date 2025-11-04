@@ -59,8 +59,18 @@ export default function PlansPage() {
 
   return (
     <Stack spacing={4} sx={{ px: { xs: 2, sm: 3, md: 0 }, py: { xs: 2, md: 0 } }}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
+      <Box sx={{ animation: 'fade-in-down 0.5s ease-out' }}>
+        <Typography
+          variant="h4"
+          sx={{
+            fontSize: { xs: '1.75rem', md: '2.125rem' },
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.02em',
+          }}
+        >
           Maintenance Plans
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: '0.875rem', md: '1rem' } }}>

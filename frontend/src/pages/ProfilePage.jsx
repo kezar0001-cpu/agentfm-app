@@ -128,7 +128,18 @@ export default function ProfilePage() {
 
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{
+          fontWeight: 800,
+          background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          letterSpacing: '-0.02em',
+          animation: 'fade-in-down 0.5s ease-out',
+        }}
+      >
         Profile Settings
       </Typography>
 
