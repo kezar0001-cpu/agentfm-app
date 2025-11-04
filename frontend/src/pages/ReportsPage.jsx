@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -64,12 +64,16 @@ export default function ReportsPage() {
     enabled: !!selectedPropertyId,
   });
 
-  const { data: reportsData = [], isLoading: isLoadingReports } = useQuery({
+  const { data: rawReportsData = [], isLoading: isLoadingReports } = useQuery({
     queryKey: queryKeys.reports.all(),
     queryFn: async () => {
       const res = await apiClient.get('/reports');
-      // Backend returns array or object with reports
-      return Array.isArray(res.data) ? res.data : res.data?.reports || [];
+      return ensureArray(res.data, [
+        'reports',
+        'data.reports',
+        'data.items',
+        'items',
+      ]);
     },
     refetchInterval: (query) => {
       const reports = query.state.data;
@@ -79,6 +83,11 @@ export default function ReportsPage() {
       return isProcessing ? 5000 : false;
     },
   });
+
+  const reportsData = useMemo(
+    () => (Array.isArray(rawReportsData) ? rawReportsData : []),
+    [rawReportsData]
+  );
 
   const mutation = useMutation({
     mutationFn: (newReport) => apiClient.post('/reports', newReport),
@@ -108,7 +117,7 @@ export default function ReportsPage() {
 
   const propertyIdValue = watch('propertyId');
 
-  useState(() => {
+  useEffect(() => {
     if (propertyIdValue) {
       setSelectedPropertyId(propertyIdValue);
     }
