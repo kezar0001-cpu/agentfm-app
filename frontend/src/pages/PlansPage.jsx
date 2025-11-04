@@ -1,191 +1,555 @@
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Typography,
   Paper,
+  Stack,
+  Button,
+  TextField,
+  MenuItem,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  IconButton,
+  ToggleButtonGroup,
+  ToggleButton,
+  Dialog,
   Table,
+  TableBody,
+  TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  Stack,
-  TextField,
-  Button,
-  Alert,
-  MenuItem,
-  Chip,
+  InputAdornment,
+  Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import useApiQuery from '../hooks/useApiQuery.js';
-import useApiMutation from '../hooks/useApiMutation.js';
-import DataState from '../components/DataState.jsx';
-import { normaliseArray } from '../utils/error.js';
+import {
+  Add as AddIcon,
+  ViewModule as ViewModuleIcon,
+  ViewList as ViewListIcon,
+  CalendarMonth as CalendarMonthIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  TrendingUp as TrendingUpIcon,
+  Schedule as ScheduleIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Edit as EditIcon,
+  Visibility as VisibilityIcon,
+} from '@mui/icons-material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../api/client';
 import { queryKeys } from '../utils/queryKeys.js';
+import DataState from '../components/DataState.jsx';
+import PlanCard from '../components/PlanCard.jsx';
+import PlanDetailModal from '../components/PlanDetailModal.jsx';
+import MaintenancePlanForm from '../components/MaintenancePlanForm.jsx';
+import StatCard from '../components/StatCard.jsx';
+import ensureArray from '../utils/ensureArray';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import toast from 'react-hot-toast';
+import { format, isPast, isToday, parseISO, addDays } from 'date-fns';
 
-const schema = z.object({
-  name: z.string().min(1, 'forms.required'),
-  frequency: z.string().min(1, 'forms.required'),
-  description: z.string().optional(),
-});
+const localizer = momentLocalizer(moment);
+
+const FREQUENCY_OPTIONS = [
+  { value: '', label: 'All Frequencies' },
+  { value: 'DAILY', label: 'Daily' },
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'BIWEEKLY', label: 'Bi-weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'QUARTERLY', label: 'Quarterly' },
+  { value: 'SEMIANNUALLY', label: 'Semi-annually' },
+  { value: 'ANNUALLY', label: 'Annually' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Status' },
+  { value: 'true', label: 'Active Only' },
+  { value: 'false', label: 'Inactive Only' },
+];
 
 export default function PlansPage() {
-  const { t } = useTranslation();
-  const query = useApiQuery({ queryKey: queryKeys.plans.all(), url: '/plans' });
-  const mutation = useApiMutation({ url: '/plans', method: 'post', invalidateKeys: [queryKeys.plans.all()] });
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const queryClient = useQueryClient();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: { name: '', frequency: '', description: '' },
+  const [view, setView] = useState('card'); // 'card', 'table', 'calendar'
+  const [filters, setFilters] = useState({
+    propertyId: '',
+    frequency: '',
+    isActive: '',
+    search: '',
+  });
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const [detailPlanId, setDetailPlanId] = useState(null);
+
+  // Fetch plans
+  const { data: plansData, isLoading, error, refetch } = useQuery({
+    queryKey: queryKeys.plans.filtered(filters),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.propertyId) params.append('propertyId', filters.propertyId);
+      if (filters.frequency) params.append('frequency', filters.frequency);
+      if (filters.isActive) params.append('isActive', filters.isActive);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await apiClient.get(`/plans?${params.toString()}`);
+      return ensureArray(response.data);
+    },
   });
 
-  const plans = normaliseArray(query.data);
+  const plans = plansData || [];
 
-  const onSubmit = handleSubmit(async (values) => {
-    try {
-      await mutation.mutateAsync({ data: values });
-      reset();
-    } catch (error) {
-      // The error is surfaced via mutation state.
+  // Fetch properties for filter
+  const { data: propertiesData } = useQuery({
+    queryKey: queryKeys.properties.selectOptions(),
+    queryFn: async () => {
+      const response = await apiClient.get('/properties');
+      return ensureArray(response.data, ['properties', 'data', 'items', 'results']);
+    },
+  });
+
+  const properties = propertiesData || [];
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const activePlans = plans.filter((p) => p.isActive);
+    const today = new Date();
+    const nextWeek = addDays(today, 7);
+
+    const dueThisWeek = activePlans.filter((p) => {
+      const dueDate = p.nextDueDate ? parseISO(p.nextDueDate) : null;
+      return dueDate && dueDate >= today && dueDate <= nextWeek;
+    });
+
+    const overdue = activePlans.filter((p) => {
+      const dueDate = p.nextDueDate ? parseISO(p.nextDueDate) : null;
+      return dueDate && isPast(dueDate) && !isToday(dueDate);
+    });
+
+    const totalJobs = plans.reduce((sum, plan) => sum + (plan._count?.jobs || 0), 0);
+
+    return {
+      totalActive: activePlans.length,
+      dueThisWeek: dueThisWeek.length,
+      overdue: overdue.length,
+      totalJobs,
+    };
+  }, [plans]);
+
+  const handleViewChange = (event, newView) => {
+    if (newView !== null) {
+      setView(newView);
     }
-  });
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateClick = () => {
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleCreateSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.plans.all() });
+    toast.success('Maintenance plan created successfully');
+    setIsCreateDialogOpen(false);
+  };
+
+  const handleEditClick = (plan) => {
+    setSelectedPlanId(plan.id);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.plans.all() });
+    toast.success('Maintenance plan updated successfully');
+    setIsEditDialogOpen(false);
+    setSelectedPlanId(null);
+  };
+
+  const handleCardClick = (plan) => {
+    setDetailPlanId(plan.id);
+  };
+
+  const handleDetailClose = () => {
+    setDetailPlanId(null);
+  };
+
+  // Prepare calendar events
+  const calendarEvents = useMemo(() => {
+    return plans
+      .filter((plan) => plan.isActive && plan.nextDueDate)
+      .map((plan) => ({
+        id: plan.id,
+        title: plan.name,
+        start: new Date(plan.nextDueDate),
+        end: new Date(plan.nextDueDate),
+        resource: plan,
+      }));
+  }, [plans]);
+
+  const handleEventClick = (event) => {
+    setDetailPlanId(event.id);
+  };
+
+  const getFrequencyLabel = (frequency) => {
+    const labels = {
+      DAILY: 'Daily',
+      WEEKLY: 'Weekly',
+      BIWEEKLY: 'Bi-weekly',
+      MONTHLY: 'Monthly',
+      QUARTERLY: 'Quarterly',
+      SEMIANNUALLY: 'Semi-annually',
+      ANNUALLY: 'Annually',
+    };
+    return labels[frequency] || frequency;
+  };
+
+  const selectedPlan = selectedPlanId ? plans.find((p) => p.id === selectedPlanId) : null;
 
   return (
     <Stack spacing={4} sx={{ px: { xs: 2, sm: 3, md: 0 }, py: { xs: 2, md: 0 } }}>
+      {/* Header */}
       <Box sx={{ animation: 'fade-in-down 0.5s ease-out' }}>
-        <Typography
-          variant="h4"
-          sx={{
-            fontSize: { xs: '1.75rem', md: '2.125rem' },
-            fontWeight: 800,
-            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Maintenance Plans
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: '0.875rem', md: '1rem' } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontSize: { xs: '1.75rem', md: '2.125rem' },
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Maintenance Plans
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateClick}
+            sx={{ display: { xs: 'none', sm: 'flex' } }}
+          >
+            Create Plan
+          </Button>
+          <IconButton
+            color="primary"
+            onClick={handleCreateClick}
+            sx={{ display: { xs: 'flex', sm: 'none' } }}
+          >
+            <AddIcon />
+          </IconButton>
+        </Box>
+        <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
           Create and manage recurring maintenance schedules for your properties
         </Typography>
       </Box>
 
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
-        <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.125rem', md: '1.25rem' } }}>
-          {t('actions.create')} {t('plans.title')}
-        </Typography>
-        <form onSubmit={onSubmit} noValidate>
-          <Stack spacing={2}>
+      {/* Stats Cards */}
+      <Grid container spacing={3} sx={{ animation: 'fade-in 0.6s ease-out' }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Active Plans"
+            value={stats.totalActive}
+            icon={<CheckCircleIcon />}
+            trend={null}
+            color="#16a34a"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Due This Week"
+            value={stats.dueThisWeek}
+            icon={<ScheduleIcon />}
+            trend={null}
+            color="#f97316"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Overdue"
+            value={stats.overdue}
+            icon={<WarningIcon />}
+            trend={null}
+            color="#dc2626"
+            alert={stats.overdue > 0 ? `${stats.overdue} plan${stats.overdue > 1 ? 's' : ''} need${stats.overdue === 1 ? 's' : ''} attention` : null}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Jobs Created"
+            value={stats.totalJobs}
+            icon={<TrendingUpIcon />}
+            trend={null}
+            color="#3b82f6"
+          />
+        </Grid>
+      </Grid>
+
+      {/* Filters and View Toggle */}
+      <Paper sx={{ p: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6} md={3}>
             <TextField
-              id="plans-form-name"
-              name="name"
-              label={t('plans.name')}
               fullWidth
-              autoComplete="off"
-              {...register('name')}
-              error={Boolean(errors.name)}
-              helperText={errors.name && t(errors.name.message)}
+              size="small"
+              placeholder="Search plans..."
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
             />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
             <TextField
-              id="plans-form-frequency"
-              name="frequency"
-              label="Frequency"
               select
               fullWidth
-              {...register('frequency')}
-              error={Boolean(errors.frequency)}
-              helperText={errors.frequency && t(errors.frequency.message)}
+              size="small"
+              label="Property"
+              value={filters.propertyId}
+              onChange={(e) => handleFilterChange('propertyId', e.target.value)}
             >
-              <MenuItem value="DAILY">Daily</MenuItem>
-              <MenuItem value="WEEKLY">Weekly</MenuItem>
-              <MenuItem value="BIWEEKLY">Bi-weekly</MenuItem>
-              <MenuItem value="MONTHLY">Monthly</MenuItem>
-              <MenuItem value="QUARTERLY">Quarterly</MenuItem>
-              <MenuItem value="SEMIANNUALLY">Semi-annually</MenuItem>
-              <MenuItem value="ANNUALLY">Annually</MenuItem>
+              <MenuItem value="">All Properties</MenuItem>
+              {properties.map((property) => (
+                <MenuItem key={property.id} value={property.id}>
+                  {property.name}
+                </MenuItem>
+              ))}
             </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
             <TextField
-              id="plans-form-description"
-              name="description"
-              label="Description"
-              multiline
-              minRows={3}
+              select
               fullWidth
-              autoComplete="off"
-              {...register('description')}
-            />
-            {mutation.isError && <Alert severity="error">{mutation.error.message}</Alert>}
-            <Stack direction="row" justifyContent="flex-end">
-              <Button type="submit" variant="contained" disabled={isSubmitting || mutation.isPending}>
-                {t('actions.save')}
-              </Button>
-            </Stack>
-          </Stack>
-        </form>
+              size="small"
+              label="Frequency"
+              value={filters.frequency}
+              onChange={(e) => handleFilterChange('frequency', e.target.value)}
+            >
+              {FREQUENCY_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Status"
+              value={filters.isActive}
+              onChange={(e) => handleFilterChange('isActive', e.target.value)}
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <ToggleButtonGroup
+              value={view}
+              exclusive
+              onChange={handleViewChange}
+              fullWidth
+              size="small"
+            >
+              <ToggleButton value="card">
+                <Tooltip title="Card View">
+                  <ViewModuleIcon />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="table">
+                <Tooltip title="Table View">
+                  <ViewListIcon />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="calendar">
+                <Tooltip title="Calendar View">
+                  <CalendarMonthIcon />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Grid>
+        </Grid>
       </Paper>
 
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
-        <DataState
-          isLoading={query.isLoading}
-          isError={query.isError}
-          error={query.error}
-          isEmpty={!query.isLoading && !query.isError && plans.length === 0}
-          onRetry={query.refetch}
-        >
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table sx={{ minWidth: { xs: 500, md: 'auto' } }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t('plans.name')}</TableCell>
-                  <TableCell>{t('plans.frequency')}</TableCell>
-                  <TableCell>Description</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {plans.map((plan) => (
-                  <TableRow key={plan.id || plan.name}>
-                    <TableCell>
-                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
-                        {plan.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={plan.frequency}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          maxWidth: { xs: 200, md: 'none' },
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: { xs: 'nowrap', md: 'normal' }
-                        }}
-                      >
-                        {plan.description || 'No description'}
-                      </Typography>
-                    </TableCell>
+      {/* Content */}
+      <DataState
+        isLoading={isLoading}
+        isError={error}
+        error={error}
+        isEmpty={!isLoading && !error && plans.length === 0}
+        onRetry={refetch}
+        emptyMessage="No maintenance plans found. Create your first plan to get started."
+      >
+        {view === 'card' && (
+          <Grid container spacing={3} sx={{ animation: 'fade-in 0.5s ease-out' }}>
+            {plans.map((plan) => (
+              <Grid item xs={12} sm={6} md={4} key={plan.id}>
+                <PlanCard
+                  plan={plan}
+                  onClick={() => handleCardClick(plan)}
+                  onEdit={() => handleEditClick(plan)}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        {view === 'table' && (
+          <Paper sx={{ animation: 'fade-in 0.5s ease-out' }}>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Plan Name</TableCell>
+                    <TableCell>Property</TableCell>
+                    <TableCell>Frequency</TableCell>
+                    <TableCell>Next Due</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Jobs</TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        </DataState>
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {plans.map((plan) => {
+                    const nextDueDate = plan.nextDueDate ? parseISO(plan.nextDueDate) : null;
+                    const isOverdue = nextDueDate && isPast(nextDueDate) && !isToday(nextDueDate);
+                    const isDueToday = nextDueDate && isToday(nextDueDate);
+
+                    return (
+                      <TableRow key={plan.id} hover>
+                        <TableCell>
+                          <Typography variant="body1" fontWeight={500}>
+                            {plan.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {plan.property?.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={getFrequencyLabel(plan.frequency)}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: isOverdue
+                                ? 'error.main'
+                                : isDueToday
+                                ? 'warning.main'
+                                : 'text.primary',
+                              fontWeight: isOverdue || isDueToday ? 600 : 400,
+                            }}
+                          >
+                            {nextDueDate ? format(nextDueDate, 'MMM d, yyyy') : 'Not scheduled'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={plan.isActive ? 'Active' : 'Inactive'}
+                            size="small"
+                            color={plan.isActive ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={plan._count?.jobs || 0} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton size="small" onClick={() => handleCardClick(plan)}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => handleEditClick(plan)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        )}
+
+        {view === 'calendar' && (
+          <Paper sx={{ p: 2, animation: 'fade-in 0.5s ease-out' }}>
+            <Calendar
+              localizer={localizer}
+              events={calendarEvents}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: 600 }}
+              onSelectEvent={handleEventClick}
+              views={['month', 'week', 'agenda']}
+              defaultView="month"
+              eventPropGetter={(event) => ({
+                style: {
+                  backgroundColor: event.resource.isActive ? '#f97316' : '#9ca3af',
+                  borderColor: event.resource.isActive ? '#b91c1c' : '#6b7280',
+                },
+              })}
+            />
+          </Paper>
+        )}
+      </DataState>
+
+      {/* Create Dialog */}
+      <Dialog
+        open={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <MaintenancePlanForm
+          onSuccess={handleCreateSuccess}
+          onCancel={() => setIsCreateDialogOpen(false)}
+        />
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <MaintenancePlanForm
+          plan={selectedPlan}
+          onSuccess={handleEditSuccess}
+          onCancel={() => setIsEditDialogOpen(false)}
+        />
+      </Dialog>
+
+      {/* Detail Modal */}
+      <PlanDetailModal planId={detailPlanId} open={!!detailPlanId} onClose={handleDetailClose} />
     </Stack>
   );
 }
