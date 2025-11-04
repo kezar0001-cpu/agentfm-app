@@ -51,6 +51,7 @@ class ErrorBoundary extends React.Component {
 }
 
 // ---- Lazy pages (Vite will code-split these) ----
+const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const SignIn = lazy(() => import('./pages/SignIn.jsx'));
 const SignUp = lazy(() => import('./pages/SignUp.jsx'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback.jsx'));
@@ -125,8 +126,10 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
+          {/* Landing */}
+          <Route path="/" element={<LandingPage />} />
+
           {/* Protected */}
-          <Route path="/" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
           <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
 
           {/* Properties (no /properties/add route) */}
