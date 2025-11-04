@@ -46,7 +46,7 @@ export default function OwnerDashboard() {
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch properties owned by user
-  const { data: properties, isLoading: propertiesLoading, error: propertiesError } = useQuery({
+  const { data: properties = [], isLoading: propertiesLoading, error: propertiesError } = useQuery({
     queryKey: queryKeys.dashboard.ownerProperties(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
@@ -55,7 +55,7 @@ export default function OwnerDashboard() {
   });
 
   // Fetch jobs for owned properties
-  const { data: jobs, isLoading: jobsLoading } = useQuery({
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery({
     queryKey: queryKeys.jobs.owner(),
     queryFn: async () => {
       const response = await apiClient.get('/jobs');
@@ -64,7 +64,7 @@ export default function OwnerDashboard() {
   });
 
   // Fetch inspections for owned properties
-  const { data: inspections, isLoading: inspectionsLoading } = useQuery({
+  const { data: inspections = [], isLoading: inspectionsLoading } = useQuery({
     queryKey: queryKeys.inspections.owner(),
     queryFn: async () => {
       const response = await apiClient.get('/inspections');
@@ -72,10 +72,10 @@ export default function OwnerDashboard() {
     },
   });
 
-  const totalProperties = properties?.length || 0;
-  const totalUnits = properties?.reduce((sum, p) => sum + (p.totalUnits || 0), 0) || 0;
-  const activeJobs = jobs?.filter(j => j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length || 0;
-  const completedJobs = jobs?.filter(j => j.status === 'COMPLETED').length || 0;
+  const totalProperties = properties.length;
+  const totalUnits = properties.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
+  const activeJobs = jobs.filter(j => j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length;
+  const completedJobs = jobs.filter(j => j.status === 'COMPLETED').length;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -186,7 +186,7 @@ export default function OwnerDashboard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {properties?.map((property) => (
+                  {properties.map((property) => (
                     <TableRow key={property.id}>
                       <TableCell>{property.name}</TableCell>
                       <TableCell>
@@ -238,7 +238,7 @@ export default function OwnerDashboard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {jobs?.map((job) => (
+                  {jobs.map((job) => (
                     <TableRow key={job.id}>
                       <TableCell>{job.title}</TableCell>
                       <TableCell>{job.property?.name || 'N/A'}</TableCell>
@@ -299,7 +299,7 @@ export default function OwnerDashboard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {inspections?.map((inspection) => (
+                  {inspections.map((inspection) => (
                     <TableRow key={inspection.id}>
                       <TableCell>{inspection.title}</TableCell>
                       <TableCell>{inspection.property?.name || 'N/A'}</TableCell>

@@ -31,6 +31,7 @@ import DataState from '../components/DataState';
 import ServiceRequestForm from '../components/ServiceRequestForm';
 import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 import { CircularProgress } from '@mui/material';
+import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 
 const ServiceRequestsPage = () => {
@@ -606,11 +607,11 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
     estimatedCost: '',
   });
 
-  const { data: technicians } = useQuery({
+  const { data: technicians = [] } = useQuery({
     queryKey: ['technicians'],
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'users']);
     },
   });
 
@@ -651,7 +652,7 @@ const ConvertToJobDialog = ({ request, onClose, onSuccess }) => {
               onChange={(e) => setFormData({ ...formData, assignedToId: e.target.value })}
             >
               <MenuItem value="">Unassigned</MenuItem>
-              {technicians?.map((tech) => (
+              {technicians.map((tech) => (
                 <MenuItem key={tech.id} value={tech.id}>
                   {tech.firstName} {tech.lastName}
                 </MenuItem>

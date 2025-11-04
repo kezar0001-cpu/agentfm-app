@@ -30,6 +30,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import { format } from 'date-fns';
 import { queryKeys } from '../utils/queryKeys.js';
+import ensureArray from '../utils/ensureArray';
 
 const SERVICE_CATEGORIES = [
   'PLUMBING',
@@ -59,21 +60,21 @@ export default function TenantDashboard() {
   const [submitError, setSubmitError] = useState('');
 
   // Fetch tenant's unit information
-  const { data: units, isLoading: unitsLoading } = useQuery({
+  const { data: units = [], isLoading: unitsLoading } = useQuery({
     queryKey: queryKeys.dashboard.tenantUnits(),
     queryFn: async () => {
       // This would need a specific endpoint for tenant's units
       const response = await apiClient.get('/units');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'units']);
     },
   });
 
   // Fetch tenant's service requests
-  const { data: serviceRequests, isLoading: requestsLoading, error: requestsError } = useQuery({
+  const { data: serviceRequests = [], isLoading: requestsLoading, error: requestsError } = useQuery({
     queryKey: queryKeys.serviceRequests.tenant(),
     queryFn: async () => {
       const response = await apiClient.get('/service-requests');
-      return response.data;
+      return ensureArray(response.data, ['items', 'data.items', 'serviceRequests']);
     },
   });
 
@@ -106,7 +107,7 @@ export default function TenantDashboard() {
     }
 
     // Assuming we have the property and unit IDs from the units data
-    const unit = units?.[0];
+    const unit = units[0];
     if (!unit) {
       setSubmitError('No unit information found');
       return;
@@ -119,17 +120,17 @@ export default function TenantDashboard() {
     });
   };
 
-  const pendingRequests = serviceRequests?.filter(
+  const pendingRequests = serviceRequests.filter(
     r => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW'
-  ).length || 0;
-  
-  const approvedRequests = serviceRequests?.filter(
+  ).length;
+
+  const approvedRequests = serviceRequests.filter(
     r => r.status === 'APPROVED' || r.status === 'CONVERTED_TO_JOB'
-  ).length || 0;
-  
-  const completedRequests = serviceRequests?.filter(
+  ).length;
+
+  const completedRequests = serviceRequests.filter(
     r => r.status === 'COMPLETED'
-  ).length || 0;
+  ).length;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -265,7 +266,7 @@ export default function TenantDashboard() {
             emptyMessage="No service requests yet. Click 'New Service Request' to submit one."
           >
             <Stack spacing={2}>
-              {serviceRequests?.map((request) => (
+              {serviceRequests.map((request) => (
                 <Card key={request.id} variant="outlined">
                   <CardContent>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
