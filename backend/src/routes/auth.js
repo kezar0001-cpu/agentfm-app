@@ -1,35 +1,21 @@
-import getJwtSecret from '../utils/getJwtSecret.js';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../config/prismaClient.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+} from '../utils/jwt.js';
 
 const TRIAL_PERIOD_DAYS = 14;
-const ACCESS_TOKEN_EXPIRATION = '15m';
-const REFRESH_TOKEN_EXPIRATION = '7d';
 const REFRESH_COOKIE_NAME = 'refreshToken';
 
 const isProduction = process.env.NODE_ENV === 'production';
-
-function signAccessToken(user) {
-  return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, tokenType: 'access' },
-    getJwtSecret(),
-    { expiresIn: ACCESS_TOKEN_EXPIRATION }
-  );
-}
-
-function signRefreshToken(user) {
-  return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, tokenType: 'refresh' },
-    getJwtSecret(),
-    { expiresIn: REFRESH_TOKEN_EXPIRATION }
-  );
-}
 
 function refreshCookieOptions() {
   return {
@@ -46,8 +32,9 @@ function setRefreshTokenCookie(res, refreshToken) {
 }
 
 function issueAuthTokens(user, res) {
-  const accessToken = signAccessToken(user);
-  const refreshToken = signRefreshToken(user);
+  const basePayload = { id: user.id, email: user.email, role: user.role };
+  const accessToken = signAccessToken(basePayload);
+  const refreshToken = signRefreshToken(basePayload);
   if (res) {
     setRefreshTokenCookie(res, refreshToken);
   }
@@ -112,7 +99,7 @@ const requireAuth = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, getJwtSecret());
+    const decoded = verifyAccessToken(token);
     if (decoded.tokenType !== 'access') {
       throw new Error('Invalid token type');
     }
@@ -348,7 +335,7 @@ router.post('/refresh', async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, getJwtSecret());
+      decoded = verifyRefreshToken(refreshToken);
     } catch (error) {
       const message = error?.name === 'TokenExpiredError'
         ? 'Refresh token expired'

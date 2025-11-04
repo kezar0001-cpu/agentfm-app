@@ -1,5 +1,5 @@
 import prisma from '../config/prismaClient.js';
-import { verifyToken } from '../utils/jwt.js';
+import { verifyAccessToken } from '../utils/jwt.js';
 
 /**
  * Middleware to require authentication
@@ -16,7 +16,7 @@ export const requireAuth = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = verifyToken(token); // uses the single SECRET
+      decoded = verifyAccessToken(token);
     } catch (err) {
       console.error('JWT verify error:', err?.name, err?.message);
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
