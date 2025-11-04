@@ -4,7 +4,7 @@ import {
   Container, Box, TextField, Button, Typography, Paper, Alert, Divider,
   IconButton, InputAdornment, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
-import { Visibility, VisibilityOff, Google as GoogleIcon } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Google as GoogleIcon, ArrowBack } from '@mui/icons-material';
 import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { apiClient } from '../api/client.js';
 
@@ -88,6 +88,18 @@ export default function SignIn() {
     <Container component="main" maxWidth="sm">
       <Box sx={{ mt: { xs: 4, md: 8 }, mb: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center', px: { xs: 1, sm: 0 } }}>
         <Paper elevation={3} sx={{ p: { xs: 3, md: 4 }, width: '100%', borderRadius: 3 }}>
+          <Box sx={{ width: '100%', mb: 2, display: 'flex', justifyContent: 'flex-start' }}>
+            <Button
+              component={Link}
+              to="/"
+              startIcon={<ArrowBack />}
+              variant="text"
+              size="small"
+              sx={{ textTransform: 'none', fontWeight: 600, color: '#b91c1c' }}
+            >
+              Back to Buildstate FM
+            </Button>
+          </Box>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography
               variant="h3"
@@ -101,7 +113,7 @@ export default function SignIn() {
                 mb: 1
               }}
             >
-              BuildState FM
+              Buildstate FM
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
               Welcome Back

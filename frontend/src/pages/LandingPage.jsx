@@ -1,36 +1,54 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import heroIllustration from '../assets/landing/hero-operations.svg';
+import featureMaintenance from '../assets/landing/feature-maintenance.svg';
+import featureAnalytics from '../assets/landing/feature-analytics.svg';
+import avatarOperationsLead from '../assets/landing/avatar-operations-lead.svg';
+import avatarFacilitiesDirector from '../assets/landing/avatar-facilities-director.svg';
+
 const featureHighlights = [
   {
     title: 'Command Central Dashboard',
     description:
       'Visualise portfolio health at a glance with live KPIs for open jobs, overdue work, safety alerts, and subscription status reminders.',
+    image: featureAnalytics,
+    alt: 'Dashboard overview with live status widgets',
   },
   {
     title: 'Property & Unit Intelligence',
     description:
       'Create rich property records with image galleries, manage unit inventories, and keep everything searchable across your estate.',
+    image: featureMaintenance,
+    alt: 'Blueprint inspired illustration of connected buildings',
   },
   {
     title: 'Inspections That Stay On Track',
     description:
       'Schedule inspections, track progress, and capture follow-up work orders without losing momentum or compliance history.',
+    image: featureAnalytics,
+    alt: 'Inspection checklist illustration',
   },
   {
     title: 'Jobs & Service Requests',
     description:
       'Assign technicians, monitor status changes in real time, and convert recommendations into actionable jobs with one click.',
+    image: featureMaintenance,
+    alt: 'Service request kanban board illustration',
   },
   {
     title: 'Data-Driven Plans & Reports',
     description:
       'Build preventative maintenance plans, run owner-ready reports, and share insights that keep stakeholders aligned.',
+    image: featureAnalytics,
+    alt: 'Performance trends illustration',
   },
   {
     title: 'Team Access & Notifications',
     description:
       'Invite owners, tenants, and vendors, control roles, and keep everyone up to speed with notifications and global search.',
+    image: featureMaintenance,
+    alt: 'Team collaboration illustration',
   },
 ];
 
@@ -106,7 +124,7 @@ const faqs = [
       'Spin up your account in minutes, import properties, and start assigning jobs immediately. No complex configuration required.',
   },
   {
-    question: 'Does AgentFM support compliance reporting?',
+    question: 'Does Buildstate FM support compliance reporting?',
     answer:
       'Generate portfolio and property-level reports, track inspection outcomes, and share summaries with stakeholders anytime.',
   },
@@ -115,14 +133,16 @@ const faqs = [
 const testimonials = [
   {
     quote:
-      '“AgentFM replaced five disconnected tools. Our team completes inspections 30% faster and owners love the live dashboards.”',
+      '“Buildstate FM replaced five disconnected tools. Our team completes inspections 30% faster and owners love the live dashboards.”',
     name: 'Sasha I.',
     role: 'Head of Facilities, UrbanWorks Group',
+    avatar: avatarOperationsLead,
   },
   {
     quote: '“Technicians finally see the full job context and can close work orders from the field without paperwork.”',
     name: 'Daniel K.',
     role: 'Operations Manager, Prime Property Services',
+    avatar: avatarFacilitiesDirector,
   },
 ];
 
@@ -133,7 +153,9 @@ export default function LandingPage() {
     <div className="landing">
       <header className="landing-hero">
         <nav className="landing-nav">
-          <div className="landing-logo" onClick={() => navigate('/')}>AgentFM</div>
+          <Link to="/" className="landing-logo" aria-label="Buildstate FM home">
+            Buildstate FM
+          </Link>
           <div className="landing-nav-links">
             <a href="#features">Platform</a>
             <a href="#workflow">How it works</a>
@@ -155,8 +177,8 @@ export default function LandingPage() {
             <span className="landing-badge">The operating system for modern facilities teams</span>
             <h1>Bring every property, job, and inspection together in one command centre.</h1>
             <p>
-              AgentFM gives property and facilities teams a unified workspace to plan preventative maintenance, execute service
-              requests, and deliver owner-ready reporting without spreadsheets or fragmented tools.
+              Buildstate FM gives property and facilities teams a unified workspace to plan preventative maintenance, execute
+              service requests, and deliver owner-ready reporting without spreadsheets or fragmented tools.
             </p>
             <div className="landing-cta-group">
               <Link to="/signup" className="landing-button landing-button--primary">
@@ -183,6 +205,9 @@ export default function LandingPage() {
           </div>
 
           <div className="landing-hero-panel">
+            <figure className="landing-hero-figure">
+              <img src={heroIllustration} alt="Illustration of Buildstate FM operations dashboard" />
+            </figure>
             <div className="landing-hero-card">
               <h3>What&apos;s happening today</h3>
               <ul>
@@ -200,10 +225,6 @@ export default function LandingPage() {
                 View live dashboard
               </button>
             </div>
-            <div className="landing-hero-card landing-hero-card--secondary">
-              <h3>Smart search &amp; alerts</h3>
-              <p>Jump to any property, inspection, or service request in seconds and keep teams aligned with real-time alerts.</p>
-            </div>
           </div>
         </div>
       </header>
@@ -211,13 +232,16 @@ export default function LandingPage() {
       <main>
         <section id="features" className="landing-section">
           <div className="landing-section-header">
-            <span className="landing-eyebrow">Why AgentFM</span>
+            <span className="landing-eyebrow">Why Buildstate FM</span>
             <h2>A single platform for the entire property operations lifecycle</h2>
             <p>Everything your team needs to manage properties, vendors, inspections, and stakeholder expectations in one place.</p>
           </div>
           <div className="landing-grid">
             {featureHighlights.map((feature) => (
               <article key={feature.title} className="landing-card">
+                <figure className="landing-card-media">
+                  <img src={feature.image} alt={feature.alt} loading="lazy" />
+                </figure>
                 <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
               </article>
@@ -229,7 +253,7 @@ export default function LandingPage() {
           <div className="landing-section-header">
             <span className="landing-eyebrow">Workflow</span>
             <h2>From intake to insight without leaving the platform</h2>
-            <p>AgentFM guides every job, inspection, and subscription through a streamlined process your whole organisation can trust.</p>
+            <p>Buildstate FM guides every job, inspection, and subscription through a streamlined process your whole organisation can trust.</p>
           </div>
           <div className="landing-steps">
             {workflow.map((step) => (
@@ -264,8 +288,8 @@ export default function LandingPage() {
               <span className="landing-eyebrow landing-eyebrow--light">Built-in advantages</span>
               <h2>Enterprise-grade foundations without enterprise overhead</h2>
               <p>
-                AgentFM ships with the guardrails, localisation, and automation you need on day one—no plug-ins or custom
-                development required.
+                Buildstate FM ships with the guardrails, localisation, and automation you need on day one—no plug-ins or
+                custom development required.
               </p>
             </div>
             <div className="landing-list">
@@ -285,11 +309,14 @@ export default function LandingPage() {
         <section className="landing-section landing-section--muted">
           <div className="landing-section-header">
             <span className="landing-eyebrow">Customer stories</span>
-            <h2>Teams trust AgentFM to run high-performing portfolios</h2>
+            <h2>Teams trust Buildstate FM to run high-performing portfolios</h2>
           </div>
           <div className="landing-testimonials">
             {testimonials.map((testimonial) => (
               <figure key={testimonial.name} className="landing-testimonial">
+                {testimonial.avatar && (
+                  <img src={testimonial.avatar} alt={`${testimonial.name} headshot`} className="landing-testimonial-avatar" />
+                )}
                 <blockquote>{testimonial.quote}</blockquote>
                 <figcaption>
                   <strong>{testimonial.name}</strong>
@@ -307,7 +334,7 @@ export default function LandingPage() {
               <h2>Start free, upgrade when you&apos;re ready</h2>
               <p>
                 Launch with a full-featured trial, then pick the subscription tier that matches your portfolio size. Manage billing
-                and renewals directly inside AgentFM.
+                and renewals directly inside Buildstate FM.
               </p>
               <Link to="/subscriptions" className="landing-button landing-button--primary">
                 View plans
@@ -345,7 +372,7 @@ export default function LandingPage() {
         <section className="landing-section landing-section--cta">
           <div className="landing-section-header">
             <span className="landing-eyebrow landing-eyebrow--light">Get started</span>
-            <h2>Modern facilities teams run on AgentFM</h2>
+            <h2>Modern facilities teams run on Buildstate FM</h2>
             <p>Bring clarity to your operations in under 15 minutes. We&apos;ll handle the onboarding—you focus on your properties.</p>
           </div>
           <div className="landing-cta-group">
@@ -362,7 +389,7 @@ export default function LandingPage() {
       <footer className="landing-footer">
         <div className="landing-footer-content">
           <div>
-            <div className="landing-logo">AgentFM</div>
+            <div className="landing-logo">Buildstate FM</div>
             <p>All-in-one facilities and property operations platform.</p>
           </div>
           <div className="landing-footer-links">
@@ -372,7 +399,7 @@ export default function LandingPage() {
             <Link to="/reports">Reports</Link>
           </div>
         </div>
-        <p className="landing-footer-note">© {new Date().getFullYear()} AgentFM. All rights reserved.</p>
+        <p className="landing-footer-note">© {new Date().getFullYear()} Buildstate FM. All rights reserved.</p>
       </footer>
     </div>
   );
