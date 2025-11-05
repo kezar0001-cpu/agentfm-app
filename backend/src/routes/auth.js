@@ -380,7 +380,7 @@ router.get('/google', (req, res, next) => {
   if (!['PROPERTY_MANAGER'].includes(role)) {
     return res.status(400).json({ success: false, message: 'Google signup is only available for Property Managers' });
   }
-  passport.authenticate('google', { scope: ['profile', 'email'], state: role })(req, res, next);
+  passport.authenticate('google', { scope: ['openid', 'profile', 'email'], state: role })(req, res, next);
 });
 
 // ========================================
