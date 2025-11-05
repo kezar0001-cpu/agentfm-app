@@ -62,13 +62,13 @@ import {
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
-import { useAuth } from '../contexts/AuthContext';
+import { getCurrentUser } from '../lib/auth';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const user = getCurrentUser();
 
   const [currentTab, setCurrentTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
