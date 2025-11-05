@@ -11,6 +11,7 @@ import {
   verifyAccessToken,
   verifyRefreshToken,
 } from '../utils/jwt.js';
+import { validatePassword, getPasswordErrorMessage } from '../utils/passwordValidation.js';
 
 const TRIAL_PERIOD_DAYS = 14;
 const REFRESH_COOKIE_NAME = 'refreshToken';
@@ -134,13 +135,13 @@ const registerSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(1, 'Password is required'),
   phone: z.string().optional().refine((phone) => {
     if (!phone) return true;
     return /^\+[1-9]\d{1,14}$/.test(phone.replace(/[\s\-\(\)]/g, ''));
   }, {
     message: "Phone number must be in a valid international format, e.g., +971 4 xxx-xxxx",
-  }), // 👈 COMMA ADDED HERE
+  }),
   role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional(),
   inviteToken: z.string().optional(), // Support for invite-based registration
 });
@@ -151,6 +152,16 @@ const registerSchema = z.object({
 router.post('/register', async (req, res) => {
   try {
     const { firstName, lastName, email, password, phone, role, inviteToken } = registerSchema.parse(req.body);
+
+    // Validate password strength and requirements
+    const passwordValidation = validatePassword(password, [email, firstName, lastName]);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: getPasswordErrorMessage(passwordValidation),
+        passwordRequirements: passwordValidation.requirements,
+      });
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -496,7 +507,7 @@ const forgotPasswordSchema = z.object({
 const resetPasswordSchema = z.object({
   selector: z.string().min(1, 'Selector is required'),
   token: z.string().min(1, 'Token is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 // ========================================
@@ -670,6 +681,20 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired reset link',
+      });
+    }
+
+    // Validate password strength and requirements
+    const passwordValidation = validatePassword(password, [
+      passwordReset.user.email,
+      passwordReset.user.firstName,
+      passwordReset.user.lastName,
+    ]);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: getPasswordErrorMessage(passwordValidation),
+        passwordRequirements: passwordValidation.requirements,
       });
     }
 
