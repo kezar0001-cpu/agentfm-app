@@ -12,6 +12,49 @@ const router = express.Router();
 const STATUSES = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
+// State machine for job status transitions
+// Defines valid transitions from each status to ensure data integrity
+const VALID_TRANSITIONS = {
+  OPEN: ['ASSIGNED', 'CANCELLED'],
+  ASSIGNED: ['IN_PROGRESS', 'OPEN', 'CANCELLED'],
+  IN_PROGRESS: ['COMPLETED', 'ASSIGNED', 'CANCELLED'],
+  COMPLETED: [], // Terminal state - no transitions allowed
+  CANCELLED: [], // Terminal state - no transitions allowed
+};
+
+/**
+ * Validates if a status transition is allowed by the state machine
+ * @param {string} currentStatus - The current job status
+ * @param {string} newStatus - The desired new status
+ * @returns {boolean} - True if transition is valid, false otherwise
+ */
+const isValidStatusTransition = (currentStatus, newStatus) => {
+  // If status is not changing, it's always valid
+  if (currentStatus === newStatus) {
+    return true;
+  }
+
+  // Check if the transition is allowed
+  const allowedTransitions = VALID_TRANSITIONS[currentStatus];
+  return allowedTransitions && allowedTransitions.includes(newStatus);
+};
+
+/**
+ * Gets a human-readable error message for invalid transitions
+ * @param {string} currentStatus - The current job status
+ * @param {string} newStatus - The attempted new status
+ * @returns {string} - Error message explaining why the transition is invalid
+ */
+const getTransitionErrorMessage = (currentStatus, newStatus) => {
+  const allowedTransitions = VALID_TRANSITIONS[currentStatus];
+
+  if (!allowedTransitions || allowedTransitions.length === 0) {
+    return `Cannot change status from ${currentStatus}. This is a terminal state.`;
+  }
+
+  return `Invalid status transition from ${currentStatus} to ${newStatus}. Allowed transitions: ${allowedTransitions.join(', ')}`;
+};
+
 // Helper to invalidate dashboard cache for a user
 const invalidateDashboardCache = async (userId) => {
   await invalidate(`cache:/api/dashboard/summary:user:${userId}`);
@@ -317,6 +360,24 @@ router.post(
         return sendError(res, 400, 'Completed or cancelled jobs cannot be reassigned', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
       }
 
+      // Validate status transitions for jobs that will change from OPEN to ASSIGNED
+      const invalidTransitionJob = jobs.find((job) => {
+        if (job.status === 'OPEN') {
+          // This job will transition from OPEN to ASSIGNED
+          return !isValidStatusTransition('OPEN', 'ASSIGNED');
+        }
+        return false;
+      });
+
+      if (invalidTransitionJob) {
+        return sendError(
+          res,
+          400,
+          getTransitionErrorMessage(invalidTransitionJob.status, 'ASSIGNED'),
+          ErrorCodes.BIZ_OPERATION_NOT_ALLOWED
+        );
+      }
+
       const updatedJobs = await prisma.$transaction(
         uniqueJobIds.map((jobId) => {
           const currentJob = jobMap.get(jobId);
@@ -477,14 +538,19 @@ router.patch('/:id/status', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNI
       }
     }
 
-    // Prevent changing status of completed/cancelled jobs
-    if (['COMPLETED', 'CANCELLED'].includes(existingJob.status)) {
-      return sendError(res, 400, 'Cannot change status of completed or cancelled jobs', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
-    }
-
     // No change needed
     if (existingJob.status === status) {
       return res.json(existingJob);
+    }
+
+    // Validate status transition using state machine
+    if (!isValidStatusTransition(existingJob.status, status)) {
+      return sendError(
+        res,
+        400,
+        getTransitionErrorMessage(existingJob.status, status),
+        ErrorCodes.BIZ_OPERATION_NOT_ALLOWED
+      );
     }
 
     // Prepare update data
@@ -694,10 +760,20 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
         return sendError(res, 403, 'You can only update jobs for your properties', ErrorCodes.ACC_ACCESS_DENIED);
       }
     }
-    
+
+    // Validate status transition using state machine if status is being changed
+    if (updates.status !== undefined && !isValidStatusTransition(existingJob.status, updates.status)) {
+      return sendError(
+        res,
+        400,
+        getTransitionErrorMessage(existingJob.status, updates.status),
+        ErrorCodes.BIZ_OPERATION_NOT_ALLOWED
+      );
+    }
+
     // Prepare update data
     const updateData = {};
-    
+
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.status !== undefined) updateData.status = updates.status;
