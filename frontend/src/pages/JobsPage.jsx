@@ -43,6 +43,7 @@ import {
 import { useQuery, useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import EmptyState from '../components/EmptyState';
 import JobForm from '../components/JobForm';
 import ensureArray from '../utils/ensureArray';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
@@ -602,18 +603,16 @@ const JobsPage = () => {
 
       {/* Jobs List / Views */}
       {!filteredJobs || filteredJobs.length === 0 ? (
-        <DataState
-          type="empty"
-          message="No jobs found"
-          action={
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreate}
-            >
-              Create First Job
-            </Button>
+        <EmptyState
+          icon={BuildIcon}
+          title={filters.status || filters.priority || filters.propertyId || filters.filter || searchTerm ? 'No jobs match your filters' : 'No jobs yet'}
+          description={
+            filters.status || filters.priority || filters.propertyId || filters.filter || searchTerm
+              ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+              : 'Get started by creating your first maintenance job. Track work orders, assign technicians, and monitor progress all in one place.'
           }
+          actionLabel={filters.status || filters.priority || filters.propertyId || filters.filter || searchTerm ? undefined : 'Create First Job'}
+          onAction={filters.status || filters.priority || filters.propertyId || filters.filter || searchTerm ? undefined : handleCreate}
         />
       ) : (
         <>

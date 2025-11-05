@@ -28,6 +28,7 @@ import {
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import EmptyState from '../components/EmptyState';
 import InspectionForm from '../components/InspectionForm';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
@@ -268,18 +269,16 @@ const InspectionsPage = () => {
 
       {/* Inspections List */}
       {!Array.isArray(inspections) || inspections.length === 0 ? (
-        <DataState
-          type="empty"
-          message="No inspections found"
-          action={
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreate}
-            >
-              Schedule First Inspection
-            </Button>
+        <EmptyState
+          icon={CheckCircleIcon}
+          title={filters.status || filters.propertyId || filters.dateFrom || filters.dateTo ? 'No inspections match your filters' : 'No inspections yet'}
+          description={
+            filters.status || filters.propertyId || filters.dateFrom || filters.dateTo
+              ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+              : 'Get started by scheduling your first property inspection. Stay on top of maintenance, document findings, and ensure compliance with ease.'
           }
+          actionLabel={filters.status || filters.propertyId || filters.dateFrom || filters.dateTo ? undefined : 'Schedule First Inspection'}
+          onAction={filters.status || filters.propertyId || filters.dateFrom || filters.dateTo ? undefined : handleCreate}
         />
       ) : (
         <Stack spacing={3}>
