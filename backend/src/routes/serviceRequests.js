@@ -835,11 +835,19 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
         unit: true,
       },
     });
-    
+
     if (!serviceRequest) {
       return res.status(404).json({ success: false, message: 'Service request not found' });
     }
-    
+
+    // Authorization check: Verify the requesting manager owns the property
+    if (serviceRequest.property.managerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to convert service requests for this property'
+      });
+    }
+
     // Verify assigned user exists if provided
     if (assignedToId) {
       const assignedUser = await prisma.user.findUnique({
