@@ -55,6 +55,7 @@ import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import toast from 'react-hot-toast';
 import { useJobStatusUpdate } from '../hooks/useJobStatusUpdate';
+import GradientButton from '../components/GradientButton';
 
 const localizer = momentLocalizer(moment);
 
@@ -388,24 +389,17 @@ const JobsPage = () => {
             Manage and track maintenance jobs
           </Typography>
         </Box>
-        <Button
-          variant="contained"
+        <GradientButton
           startIcon={<AddIcon />}
           onClick={handleCreate}
-          fullWidth
+          size="medium"
           sx={{
             maxWidth: { xs: '100%', md: 'auto' },
             minHeight: { xs: 48, md: 36 },
-            background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-            boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-              boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
-            },
           }}
         >
           Create Job
-        </Button>
+        </GradientButton>
       </Stack>
 
       {/* Search and View Toggle */}
@@ -629,7 +623,7 @@ const JobsPage = () => {
                 {filteredJobs.map((job) => {
                   const isSelected = selectedJobIds.includes(job.id);
                   return (
-                    <Grid item xs={12} md={6} lg={4} key={job.id}>
+                    <Grid item xs={12} sm={6} md={6} lg={4} key={job.id}>
                       <Card
                         sx={{
                           height: '100%',
@@ -642,6 +636,8 @@ const JobsPage = () => {
                           position: 'relative',
                           outline: isSelected ? '2px solid' : 'none',
                           outlineColor: 'primary.main',
+                          border: '1px solid',
+                          borderColor: isSelected ? 'primary.main' : 'divider',
                           '&:hover': {
                             transform: 'translateY(-4px)',
                             boxShadow: 4,
@@ -655,14 +651,13 @@ const JobsPage = () => {
                           sx={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}
                           inputProps={{ 'aria-label': `Select job ${job.title}` }}
                         />
-                        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 4 }}>
+                        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 5, pb: 2 }}>
                       <Box
                         sx={{
                           display: 'flex',
-                          flexDirection: { xs: 'column', sm: 'row' },
                           justifyContent: 'space-between',
-                          alignItems: { xs: 'flex-start', sm: 'flex-start' },
-                          gap: { xs: 1, sm: 2 },
+                          alignItems: 'flex-start',
+                          gap: 2,
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -670,27 +665,32 @@ const JobsPage = () => {
                             variant="h6"
                             gutterBottom
                             sx={{
-                              fontSize: { xs: '1rem', md: '1.25rem' },
+                              fontSize: '1.125rem',
+                              fontWeight: 700,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               display: '-webkit-box',
                               WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical'
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.3,
+                              mb: 1.5,
                             }}
                           >
                             {job.title}
                           </Typography>
-                          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
                             <Chip
                               label={job.status.replace('_', ' ')}
                               color={getStatusColor(job.status)}
                               size="small"
+                              sx={{ fontWeight: 500 }}
                             />
                             <Chip
                               icon={getPriorityIcon(job.priority)}
                               label={job.priority}
                               color={getPriorityColor(job.priority)}
                               size="small"
+                              sx={{ fontWeight: 500 }}
                             />
                           </Stack>
                           <TextField
@@ -701,7 +701,7 @@ const JobsPage = () => {
                             label="Update Status"
                             sx={{
                               minWidth: 160,
-                              mb: 1,
+                              mb: 1.5,
                               '& .MuiOutlinedInput-root': {
                                 fontSize: '0.875rem',
                               }
@@ -746,19 +746,20 @@ const JobsPage = () => {
                         variant="body2"
                         color="text.secondary"
                         sx={{
-                          mb: 1,
+                          mb: 2,
                           display: '-webkit-box',
-                          WebkitLineClamp: 3,
+                          WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
+                          lineHeight: 1.5,
                         }}
                       >
-                        {job.description}
+                        {job.description || 'No description provided'}
                       </Typography>
 
-                      <Stack spacing={1}>
+                      <Stack spacing={1} sx={{ mt: 'auto' }}>
                         <Box>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.5px' }}>
                             Property
                           </Typography>
                           <Typography
@@ -766,7 +767,8 @@ const JobsPage = () => {
                             sx={{
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              fontWeight: 500,
                             }}
                           >
                             {job.property?.name || 'N/A'}

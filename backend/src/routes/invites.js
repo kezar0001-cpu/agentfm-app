@@ -246,13 +246,27 @@ router.get('/:token', async (req, res) => {
 /**
  * GET /api/invites
  * Get all invites created by the authenticated Property Manager
+ * By default, only returns PENDING invites unless status query parameter is provided
  */
 router.get('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
+    const { status } = req.query;
+
+    // Build where clause - default to PENDING invites only
+    const where = {
+      invitedById: req.user.id,
+    };
+
+    // If status is explicitly provided, filter by it
+    // Otherwise, default to only PENDING invites
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = 'PENDING';
+    }
+
     const invites = await prisma.invite.findMany({
-      where: {
-        invitedById: req.user.id,
-      },
+      where,
       include: {
         property: true,
         unit: true,
