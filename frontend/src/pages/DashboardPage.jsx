@@ -31,6 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import GradientButton from '../components/GradientButton';
+import AnalyticsCharts from '../components/AnalyticsCharts';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining, formatDateTime } from '../utils/date.js';
 import { redirectToBillingPortal } from '../utils/billing.js';
@@ -339,6 +340,13 @@ const DashboardPage = () => {
           />
         </Grid>
       </Grid>
+
+      {/* Analytics Charts Section */}
+      {isSubscribed && (
+        <Box sx={{ mb: 4 }}>
+          <AnalyticsCharts months={6} />
+        </Box>
+      )}
 
       <Grid container spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
         {/* Recent Activity */}
