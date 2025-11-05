@@ -64,7 +64,7 @@ const optionalFloat = () =>
     .nullable()
     .optional();
 
-const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
+const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'FOR_SALE', 'FOR_RENT', 'UNDER_CONTRACT', 'SOLD', 'RENTED', 'UNDER_RENOVATION', 'UNDER_MAINTENANCE'];
 
 const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
@@ -90,6 +90,33 @@ const basePropertySchema = z.object({
     description: optionalString(),
     imageUrl: optionalUrl(),
     managerId: optionalString(),
+
+    // Enhanced property details
+    lotSize: optionalFloat(),
+    buildingSize: optionalFloat(),
+    numberOfFloors: optionalInt({ min: 0 }),
+    constructionType: optionalString(),
+    heatingSystem: optionalString(),
+    coolingSystem: optionalString(),
+
+    // Amenities (stored as JSON object)
+    amenities: z.any().optional().nullable(),
+
+    // Financial information (PM/Owner access only)
+    purchasePrice: optionalFloat(),
+    purchaseDate: z.preprocess((value) => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      if (typeof value === 'string') {
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date;
+      }
+      return null;
+    }, z.date().nullable().optional()),
+    currentMarketValue: optionalFloat(),
+    annualPropertyTax: optionalFloat(),
+    annualInsurance: optionalFloat(),
+    monthlyHOA: optionalFloat(),
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
@@ -162,14 +189,14 @@ const toPublicProperty = (property) => {
 
 const ensurePropertyAccess = (property, user, options = {}) => {
   const { requireWrite = false } = options;
-  
+
   if (!property) return { allowed: false, reason: 'Property not found', status: 404 };
-  
+
   // Property managers who manage the property have full access
   if (user.role === 'PROPERTY_MANAGER' && property.managerId === user.id) {
     return { allowed: true, canWrite: true };
   }
-  
+
   // Owners who own the property have read-only access
   if (user.role === 'OWNER' && property.owners?.some(o => o.ownerId === user.id)) {
     if (requireWrite) {
@@ -177,8 +204,17 @@ const ensurePropertyAccess = (property, user, options = {}) => {
     }
     return { allowed: true, canWrite: false };
   }
-  
+
   return { allowed: false, reason: 'Forbidden', status: 403 };
+};
+
+// Helper function to check document access based on role and access level
+const canAccessDocument = (document, user, property) => {
+  if (document.accessLevel === 'PUBLIC') return true;
+  if (document.accessLevel === 'PROPERTY_MANAGER' && user.role === 'PROPERTY_MANAGER' && property.managerId === user.id) return true;
+  if (document.accessLevel === 'OWNER' && (user.role === 'OWNER' || user.role === 'PROPERTY_MANAGER') && (property.managerId === user.id || property.owners?.some(o => o.ownerId === user.id))) return true;
+  if (document.accessLevel === 'TENANT' && user.role === 'TENANT') return true;
+  return false;
 };
 
 // ---------------------------------------------------------------------------
@@ -347,6 +383,43 @@ router.get('/:id', async (req, res) => {
             },
           },
         },
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { displayOrder: 'asc' }],
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        documents: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        notes: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -354,6 +427,16 @@ router.get('/:id', async (req, res) => {
     if (!access.allowed) {
       const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
       return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    // Filter documents based on access level
+    if (property.documents) {
+      property.documents = property.documents.filter(doc => canAccessDocument(doc, req.user, property));
+    }
+
+    // Filter notes based on role (owners can only see non-private notes unless they created them)
+    if (property.notes && req.user.role === 'OWNER') {
+      property.notes = property.notes.filter(note => !note.isPrivate || note.userId === req.user.id);
     }
 
     res.json({ success: true, property: toPublicProperty(property) });
@@ -561,6 +644,611 @@ router.get('/:id/activity', async (req, res) => {
   } catch (error) {
     console.error('Get property activity error:', error);
     return sendError(res, 500, 'Failed to fetch property activity', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property Images Routes
+// ---------------------------------------------------------------------------
+
+// GET /:id/images - List all images for a property
+router.get('/:id/images', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const images = await prisma.propertyImage.findMany({
+      where: { propertyId: req.params.id },
+      orderBy: [{ isPrimary: 'desc' }, { displayOrder: 'asc' }],
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    res.json({ success: true, images });
+  } catch (error) {
+    console.error('Get property images error:', error);
+    return sendError(res, 500, 'Failed to fetch property images', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /:id/images - Upload/add images to a property (PROPERTY_MANAGER only)
+router.post('/:id/images', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const imageSchema = z.object({
+      imageUrl: z.string().url('Must be a valid URL'),
+      caption: z.string().optional().nullable(),
+      isPrimary: z.boolean().optional().default(false),
+    });
+
+    const { imageUrl, caption, isPrimary } = imageSchema.parse(req.body);
+
+    // If setting as primary, unset all other primary images first
+    if (isPrimary) {
+      await prisma.propertyImage.updateMany({
+        where: { propertyId: req.params.id, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    // Get the current max displayOrder
+    const maxOrder = await prisma.propertyImage.aggregate({
+      where: { propertyId: req.params.id },
+      _max: { displayOrder: true },
+    });
+
+    const image = await prisma.propertyImage.create({
+      data: {
+        propertyId: req.params.id,
+        imageUrl,
+        caption,
+        isPrimary,
+        displayOrder: (maxOrder._max.displayOrder ?? -1) + 1,
+        uploadedBy: req.user.id,
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.status(201).json({ success: true, image });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Create property image error:', error);
+    return sendError(res, 500, 'Failed to add property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// PATCH /:id/images/:imageId - Update image details
+router.patch('/:id/images/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const imageUpdateSchema = z.object({
+      caption: z.string().optional().nullable(),
+      isPrimary: z.boolean().optional(),
+      displayOrder: z.number().int().min(0).optional(),
+    });
+
+    const updates = imageUpdateSchema.parse(req.body);
+
+    // If setting as primary, unset all other primary images first
+    if (updates.isPrimary) {
+      await prisma.propertyImage.updateMany({
+        where: { propertyId: req.params.id, isPrimary: true, id: { not: req.params.imageId } },
+        data: { isPrimary: false },
+      });
+    }
+
+    const image = await prisma.propertyImage.update({
+      where: { id: req.params.imageId, propertyId: req.params.id },
+      data: updates,
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, image });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Update property image error:', error);
+    return sendError(res, 500, 'Failed to update property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DELETE /:id/images/:imageId - Delete an image
+router.delete('/:id/images/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    await prisma.propertyImage.delete({
+      where: { id: req.params.imageId, propertyId: req.params.id },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('Delete property image error:', error);
+    return sendError(res, 500, 'Failed to delete property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /:id/images/reorder - Reorder images
+router.post('/:id/images/reorder', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const reorderSchema = z.object({
+      imageIds: z.array(z.string()),
+    });
+
+    const { imageIds } = reorderSchema.parse(req.body);
+
+    // Update display order for each image
+    const updates = imageIds.map((imageId, index) =>
+      prisma.propertyImage.update({
+        where: { id: imageId, propertyId: req.params.id },
+        data: { displayOrder: index },
+      })
+    );
+
+    await prisma.$transaction(updates);
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, message: 'Images reordered successfully' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Reorder property images error:', error);
+    return sendError(res, 500, 'Failed to reorder property images', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property Documents Routes
+// ---------------------------------------------------------------------------
+
+// GET /:id/documents - List property documents (filtered by access level)
+router.get('/:id/documents', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const documents = await prisma.propertyDocument.findMany({
+      where: { propertyId: req.params.id },
+      orderBy: { uploadedAt: 'desc' },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Filter based on access level
+    const accessibleDocs = documents.filter(doc => canAccessDocument(doc, req.user, property));
+
+    res.json({ success: true, documents: accessibleDocs });
+  } catch (error) {
+    console.error('Get property documents error:', error);
+    return sendError(res, 500, 'Failed to fetch property documents', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /:id/documents - Upload a document (PROPERTY_MANAGER only)
+router.post('/:id/documents', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const documentSchema = z.object({
+      fileName: z.string().min(1, 'File name is required'),
+      fileUrl: z.string().url('Must be a valid URL'),
+      fileSize: z.number().int().min(0),
+      mimeType: z.string().min(1),
+      category: z.enum(['LEASE', 'INSURANCE', 'CERTIFICATE', 'INSPECTION', 'TAX_DOCUMENT', 'WARRANTY', 'MAINTENANCE', 'DEED', 'MORTGAGE', 'APPRAISAL', 'OTHER']),
+      description: z.string().optional().nullable(),
+      accessLevel: z.enum(['PUBLIC', 'TENANT', 'OWNER', 'PROPERTY_MANAGER']).default('PROPERTY_MANAGER'),
+    });
+
+    const data = documentSchema.parse(req.body);
+
+    const document = await prisma.propertyDocument.create({
+      data: {
+        ...data,
+        propertyId: req.params.id,
+        uploadedBy: req.user.id,
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.status(201).json({ success: true, document });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Create property document error:', error);
+    return sendError(res, 500, 'Failed to add property document', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// GET /:id/documents/:docId - Get document details (with access check)
+router.get('/:id/documents/:docId', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const document = await prisma.propertyDocument.findUnique({
+      where: { id: req.params.docId, propertyId: req.params.id },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!document) {
+      return sendError(res, 404, 'Document not found', ErrorCodes.RES_RESOURCE_NOT_FOUND);
+    }
+
+    if (!canAccessDocument(document, req.user, property)) {
+      return sendError(res, 403, 'Access denied to this document', ErrorCodes.ACC_ACCESS_DENIED);
+    }
+
+    res.json({ success: true, document });
+  } catch (error) {
+    console.error('Get property document error:', error);
+    return sendError(res, 500, 'Failed to fetch property document', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DELETE /:id/documents/:docId - Delete a document (PROPERTY_MANAGER only)
+router.delete('/:id/documents/:docId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    await prisma.propertyDocument.delete({
+      where: { id: req.params.docId, propertyId: req.params.id },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, message: 'Document deleted successfully' });
+  } catch (error) {
+    console.error('Delete property document error:', error);
+    return sendError(res, 500, 'Failed to delete property document', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property Notes Routes
+// ---------------------------------------------------------------------------
+
+// GET /:id/notes - List property notes (PM and Owners only)
+router.get('/:id/notes', requireRole('PROPERTY_MANAGER', 'OWNER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const notes = await prisma.propertyNote.findMany({
+      where: {
+        propertyId: req.params.id,
+        // Owners can only see non-private notes unless they created them
+        ...(req.user.role === 'OWNER' && {
+          OR: [
+            { isPrivate: false },
+            { userId: req.user.id },
+          ],
+        }),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    res.json({ success: true, notes });
+  } catch (error) {
+    console.error('Get property notes error:', error);
+    return sendError(res, 500, 'Failed to fetch property notes', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /:id/notes - Create a property note (PM and Owners only)
+router.post('/:id/notes', requireRole('PROPERTY_MANAGER', 'OWNER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const noteSchema = z.object({
+      content: z.string().min(1, 'Note content is required'),
+      isPrivate: z.boolean().default(false),
+    });
+
+    const { content, isPrivate } = noteSchema.parse(req.body);
+
+    // Only property managers can create private notes
+    const actualIsPrivate = req.user.role === 'PROPERTY_MANAGER' ? isPrivate : false;
+
+    const note = await prisma.propertyNote.create({
+      data: {
+        propertyId: req.params.id,
+        userId: req.user.id,
+        content,
+        isPrivate: actualIsPrivate,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.status(201).json({ success: true, note });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Create property note error:', error);
+    return sendError(res, 500, 'Failed to create property note', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// PATCH /:id/notes/:noteId - Update a note (author only)
+router.patch('/:id/notes/:noteId', requireRole('PROPERTY_MANAGER', 'OWNER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const existingNote = await prisma.propertyNote.findUnique({
+      where: { id: req.params.noteId },
+    });
+
+    if (!existingNote || existingNote.propertyId !== req.params.id) {
+      return sendError(res, 404, 'Note not found', ErrorCodes.RES_RESOURCE_NOT_FOUND);
+    }
+
+    if (existingNote.userId !== req.user.id) {
+      return sendError(res, 403, 'You can only edit your own notes', ErrorCodes.ACC_ACCESS_DENIED);
+    }
+
+    const noteUpdateSchema = z.object({
+      content: z.string().min(1).optional(),
+      isPrivate: z.boolean().optional(),
+    });
+
+    const updates = noteUpdateSchema.parse(req.body);
+
+    // Only property managers can update isPrivate
+    if (updates.isPrivate !== undefined && req.user.role !== 'PROPERTY_MANAGER') {
+      delete updates.isPrivate;
+    }
+
+    const note = await prisma.propertyNote.update({
+      where: { id: req.params.noteId },
+      data: updates,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, note });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+    console.error('Update property note error:', error);
+    return sendError(res, 500, 'Failed to update property note', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DELETE /:id/notes/:noteId - Delete a note (author only)
+router.delete('/:id/notes/:noteId', requireRole('PROPERTY_MANAGER', 'OWNER'), async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { owners: { select: { ownerId: true } } },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const existingNote = await prisma.propertyNote.findUnique({
+      where: { id: req.params.noteId },
+    });
+
+    if (!existingNote || existingNote.propertyId !== req.params.id) {
+      return sendError(res, 404, 'Note not found', ErrorCodes.RES_RESOURCE_NOT_FOUND);
+    }
+
+    if (existingNote.userId !== req.user.id) {
+      return sendError(res, 403, 'You can only delete your own notes', ErrorCodes.ACC_ACCESS_DENIED);
+    }
+
+    await prisma.propertyNote.delete({
+      where: { id: req.params.noteId },
+    });
+
+    await invalidatePropertyCaches(req.user.id);
+
+    res.json({ success: true, message: 'Note deleted successfully' });
+  } catch (error) {
+    console.error('Delete property note error:', error);
+    return sendError(res, 500, 'Failed to delete property note', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
