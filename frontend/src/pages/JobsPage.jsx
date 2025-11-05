@@ -105,7 +105,7 @@ const JobsPage = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: queryKeys.jobs.filtered(filters),
+    queryKey: queryKeys.jobs.list(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams(queryParams);
       params.append('limit', '50');
@@ -124,7 +124,7 @@ const JobsPage = () => {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: queryKeys.properties.selectOptions(),
+    queryKey: queryKeys.properties.all(),
     queryFn: async () => {
       const response = await apiClient.get('/properties?limit=100&offset=0');
       return response.data;
@@ -134,7 +134,7 @@ const JobsPage = () => {
   const properties = propertiesData?.items || [];
 
   const { data: technicians = [] } = useQuery({
-    queryKey: queryKeys.technicians.all(),
+    queryKey: queryKeys.users.list({ role: 'TECHNICIAN' }),
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TECHNICIAN');
       return ensureArray(response.data, ['users', 'data', 'items', 'results']);

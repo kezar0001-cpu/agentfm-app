@@ -93,7 +93,7 @@ export default function PlansPage() {
 
   // Fetch plans
   const { data: plansData, isLoading, error, refetch } = useQuery({
-    queryKey: queryKeys.plans.filtered(filters),
+    queryKey: queryKeys.plans.list(filters),
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.propertyId) params.append('propertyId', filters.propertyId);
@@ -110,7 +110,7 @@ export default function PlansPage() {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: queryKeys.properties.selectOptions(),
+    queryKey: queryKeys.properties.all(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return ensureArray(response.data, ['properties', 'data', 'items', 'results']);

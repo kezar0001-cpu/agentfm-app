@@ -49,7 +49,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const propertyId = watch('propertyId');
 
   const { data: propertiesData, isLoading: loadingProperties } = useQuery({
-    queryKey: queryKeys.properties.selectOptions(),
+    queryKey: queryKeys.properties.all(),
     queryFn: async () => {
       const response = await apiClient.get('/properties');
       return response.data;
@@ -59,7 +59,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const properties = ensureArray(propertiesData, ['properties', 'data', 'items', 'results']);
 
   const { data: unitsData } = useQuery({
-    queryKey: queryKeys.properties.units(propertyId),
+    queryKey: queryKeys.units.list(propertyId),
     queryFn: async () => {
       if (!propertyId) return [];
       const response = await apiClient.get('/units', { params: { propertyId } });
@@ -71,7 +71,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
   const units = ensureArray(unitsData, ['units', 'data', 'items', 'results']);
 
   const { data: inspectorData = { inspectors: [] } } = useQuery({
-    queryKey: queryKeys.inspections.inspectors(),
+    queryKey: queryKeys.users.list({ role: 'TECHNICIAN' }),
     queryFn: async () => {
       const response = await apiClient.get('/inspections/inspectors');
       return response.data;

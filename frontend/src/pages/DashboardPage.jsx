@@ -58,7 +58,7 @@ const DashboardPage = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.dashboard.summary(),
+    queryKey: queryKeys.dashboard.stats(),
     queryFn: async () => {
       const response = await apiClient.get('/dashboard/summary');
       // Backend returns { success: true, summary: {...} }

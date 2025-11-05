@@ -36,7 +36,7 @@ export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }
 
   // Fetch available tenants (users with TENANT role)
   const { data: tenantsData, isLoading: tenantsLoading } = useQuery({
-    queryKey: queryKeys.tenants.all(),
+    queryKey: queryKeys.users.list({ role: 'TENANT' }),
     queryFn: async () => {
       const response = await apiClient.get('/users?role=TENANT');
       return response.data?.users || response.data || [];
@@ -83,9 +83,9 @@ export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.units.tenants(unitId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.units.detail(unitId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.units.root() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.detail(unitId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.all() });
       toast.success(isEditing ? 'Tenant assignment updated' : 'Tenant assigned successfully');
       onClose();
     },

@@ -66,7 +66,7 @@ const ServiceRequestsPage = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: queryKeys.serviceRequests.filtered(filters),
+    queryKey: queryKeys.serviceRequests.list(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams(queryParams);
       params.append('limit', '50');
@@ -85,7 +85,7 @@ const ServiceRequestsPage = () => {
 
   // Fetch properties for filter
   const { data: propertiesData } = useQuery({
-    queryKey: queryKeys.properties.selectOptions(),
+    queryKey: queryKeys.properties.all(),
     queryFn: async () => {
       const response = await apiClient.get('/properties?limit=100&offset=0');
       return response.data;
