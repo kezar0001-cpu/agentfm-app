@@ -117,7 +117,7 @@ export default function PlansPage() {
     },
   });
 
-  const properties = propertiesData || [];
+  const properties = ensureArray(propertiesData);
 
   // Calculate stats
   const stats = useMemo(() => {
