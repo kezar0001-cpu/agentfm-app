@@ -17,10 +17,8 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    saveTokenFromUrl?.();
-    const token = localStorage.getItem('auth_token');
-    if (token) navigate('/dashboard');
-  }, [navigate]);
+    saveTokenFromUrl?.(false);
+  }, []);
 
   const googleUrl = useMemo(() => {
     const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');

@@ -53,7 +53,7 @@ const DashboardPage = () => {
 
   // Fetch dashboard summary
   const {
-    data: summary,
+    data: summary = { properties: {}, units: {}, jobs: {}, inspections: {}, serviceRequests: {} },
     isLoading,
     error,
     refetch,
