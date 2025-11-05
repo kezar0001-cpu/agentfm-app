@@ -13,6 +13,7 @@ import compression from 'compression';
 import prisma, { prisma as prismaInstance } from './src/config/prismaClient.js';
 import logger from './src/utils/logger.js';
 import scheduleMaintenancePlanCron from './src/cron/maintenancePlans.js';
+import { initializeWebSocket } from './src/websocket.js';
 
 // ---- Load env
 dotenv.config();
@@ -289,6 +290,9 @@ async function startServer() {
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
     });
+
+    // Initialize WebSocket server
+    initializeWebSocket(server);
 
     let shuttingDown = false;
     const shutdown = async (signal) => {
