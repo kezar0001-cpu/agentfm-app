@@ -97,7 +97,7 @@ apiClient.interceptors.request.use(
   (config) => {
     // If the URL is relative (doesn't start with http), ensure it's prefixed with /api.
     if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/api')) {
-      config.url = `/api${config.url}`;
+      // REMOVED: config.url = `/api${config.url}`;
     }
 
     if (config.__isRefreshRequest || config._skipAuth) {
