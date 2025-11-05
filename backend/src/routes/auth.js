@@ -390,13 +390,13 @@ router.get(
   '/google/callback',
   (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://www.buildstate.com.au';
       return res.redirect(`${frontendUrl}/signin?error=oauth_not_configured`);
     }
     next();
   },
   passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/signin?error=auth_failed`,
+    failureRedirect: `${process.env.FRONTEND_URL || 'https://www.buildstate.com.au'}/signin?error=auth_failed`,
   }),
   async (req, res) => {
     try {
@@ -414,13 +414,13 @@ router.get(
       };
 
       const nextPath = dashboardRoutes[user.role] || '/dashboard';
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://www.buildstate.com.au';
 
       // Redirect to auth/callback page which will handle token storage
       res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&next=${encodeURIComponent(nextPath)}`);
     } catch (error) {
       console.error('OAuth callback error:', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://www.buildstate.com.au';
       res.redirect(`${frontendUrl}/signin?error=auth_failed`);
     }
   }
