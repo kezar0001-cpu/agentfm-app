@@ -2,6 +2,7 @@ import prisma from '../config/prismaClient.js';
 import { sendEmail } from './email.js';
 import emailTemplates from './emailTemplates.js';
 import logger from './logger.js';
+import { emitNotificationToUser } from '../websocket.js';
 
 /**
  * Unified notification service that creates in-app notifications
@@ -35,6 +36,14 @@ export async function sendNotification(userId, type, title, message, options = {
     });
 
     logger.info(`Created notification for user ${userId}: ${type}`);
+
+    // Emit real-time notification via WebSocket
+    try {
+      emitNotificationToUser(userId, notification);
+    } catch (wsError) {
+      // Log WebSocket error but don't fail the notification
+      logger.error(`Failed to emit WebSocket notification: ${wsError.message}`);
+    }
 
     // Send email if requested and user exists
     if (options.sendEmail !== false) {

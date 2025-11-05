@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   IconButton,
   Badge,
@@ -21,6 +21,8 @@ import { apiClient } from '../api/client';
 import { format } from 'date-fns';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import io from 'socket.io-client';
+import { getAuthToken } from '../lib/auth';
 
 const NOTIFICATION_TYPE_COLORS = {
   INSPECTION_SCHEDULED: 'info',
@@ -35,7 +37,9 @@ const NOTIFICATION_TYPE_COLORS = {
 
 export default function NotificationBell() {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const queryClient = useQueryClient();
+  const socketRef = useRef(null);
 
   // Fetch unread count
   const { data: countData } = useQuery({
@@ -44,10 +48,87 @@ export default function NotificationBell() {
       const response = await apiClient.get('/notifications/unread-count');
       return response.data;
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    // Use longer polling interval when WebSocket is connected (fallback only)
+    // Use shorter interval when WebSocket is not available
+    refetchInterval: isWebSocketConnected ? 120000 : 30000, // 2 minutes vs 30 seconds
     initialData: { count: 0 },
     retry: 1,
   });
+
+  // WebSocket connection setup
+  useEffect(() => {
+    const token = getAuthToken();
+
+    if (!token) {
+      console.warn('[NotificationBell] No auth token available for WebSocket connection');
+      return;
+    }
+
+    // Get the WebSocket URL from environment or construct it
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || window.location.origin;
+    const wsUrl = apiBaseUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+
+    console.log('[NotificationBell] Connecting to WebSocket:', wsUrl);
+
+    // Initialize Socket.IO client
+    const socket = io(wsUrl, {
+      auth: {
+        token,
+      },
+      transports: ['websocket', 'polling'], // Try WebSocket first, fall back to polling
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
+
+    socketRef.current = socket;
+
+    // Connection event handlers
+    socket.on('connect', () => {
+      console.log('[NotificationBell] WebSocket connected:', socket.id);
+      setIsWebSocketConnected(true);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('[NotificationBell] WebSocket disconnected:', reason);
+      setIsWebSocketConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[NotificationBell] WebSocket connection error:', error.message);
+      setIsWebSocketConnected(false);
+    });
+
+    // Listen for new notifications
+    socket.on('notification:new', (notification) => {
+      console.log('[NotificationBell] Received new notification:', notification);
+
+      // Invalidate and refetch notification queries to update the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.count() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+    });
+
+    // Listen for notification count updates
+    socket.on('notification:count', ({ count }) => {
+      console.log('[NotificationBell] Received notification count update:', count);
+
+      // Update the count in the query cache
+      queryClient.setQueryData(queryKeys.notifications.count(), { count });
+    });
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[NotificationBell] Cleaning up WebSocket connection');
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('notification:new');
+      socket.off('notification:count');
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [queryClient]);
 
   // Fetch notifications
   const { data: notifications = [], isLoading } = useQuery({
