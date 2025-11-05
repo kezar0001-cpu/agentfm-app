@@ -28,10 +28,11 @@ services:
         value: https://www.buildstate.com.au
       - key: APP_URL
         value: https://www.buildstate.com.au
-      # Increase Prisma migration lock timeout from default 10s to 60s
-      # to prevent timeout errors during deployment
-      - key: PRISMA_SCHEMA_ENGINE_LOCK_TIMEOUT
-        value: 60000
+      # Disable Prisma advisory locking to prevent timeout errors during deployment
+      # This is safe and recommended for connection poolers like Neon
+      # Ref: https://www.prisma.io/docs/orm/reference/environment-variables-reference
+      - key: PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK
+        value: "1"
 
   # -----------------------------
   # Frontend (Vite static site)
