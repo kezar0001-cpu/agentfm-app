@@ -171,7 +171,7 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
   const activeStep = statusIndex >= 0 ? statusIndex : 0;
   const isRejectedStatus = data?.status === 'REJECTED';
   const linkedJobs = data?.jobs || [];
-  const linkedJob = linkedJobs[0];
+  const linkedJob = linkedJobs[0]; // Assuming only one job can be linked for simplicity
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
@@ -214,15 +214,19 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
                 </Stack>
                 <Box sx={{ mt: 2 }}>
                   <Stepper activeStep={activeStep} alternativeLabel>
-                    {statusSteps.map((step, index) => (
-                      <Step key={step.key} completed={activeStep > index}>
-                        <StepLabel error={isRejectedStatus && step.key === 'UNDER_REVIEW'}>
-                          {step.label}
-                        </StepLabel>
-                      </Step>
-                    ))}
+                    {statusSteps.map((step, index) => {
+                      const isStepFailed = isRejectedStatus && step.key === 'UNDER_REVIEW';
+                      const isStepCompleted = activeStep > index || (activeStep === index && !isRejectedStatus);
+                      return (
+                        <Step key={step.key} completed={isStepCompleted}>
+                          <StepLabel error={isStepFailed}>
+                            {step.label}
+                          </StepLabel>
+                        </Step>
+                      );
+                    })}
                   </Stepper>
-                  {isRejectedStatus && (
+                  {isRejectedStatus && (data.status === 'REJECTED') && (
                     <Alert severity="error" sx={{ mt: 2 }}>
                       This request was rejected. Review notes are available below.
                     </Alert>
@@ -332,39 +336,37 @@ export default function ServiceRequestDetailModal({ requestId, open, onClose }) 
                 </Paper>
               )}
 
-              {/* Converted Jobs */}
-              {data.jobs && data.jobs.length > 0 && (
+              {/* Linked Job */}
+              {linkedJob && (
                 <Paper variant="outlined" sx={{ p: 2 }}>
                   <Typography variant="subtitle2" gutterBottom fontWeight={600}>
-                    Converted Jobs
+                    Linked Job
                   </Typography>
                   <List dense disablePadding>
-                    {data.jobs.map((job) => (
-                      <ListItem key={job.id} disableGutters>
-                        <ListItemText
-                          primary={job.title}
-                          secondary={
-                            <>
+                    <ListItem key={linkedJob.id} disableGutters>
+                      <ListItemText
+                        primary={linkedJob.title}
+                        secondary={
+                          <>
+                            <Chip
+                              label={linkedJob.status?.replace(/_/g, ' ')}
+                              size="small"
+                              sx={{ mr: 1, mt: 0.5 }}
+                            />
+                            {linkedJob.priority && (
                               <Chip
-                                label={job.status}
+                                label={linkedJob.priority}
                                 size="small"
                                 sx={{ mr: 1, mt: 0.5 }}
                               />
-                              {job.priority && (
-                                <Chip
-                                  label={job.priority}
-                                  size="small"
-                                  sx={{ mr: 1, mt: 0.5 }}
-                                />
-                              )}
-                              <Typography variant="caption" color="text.secondary">
-                                {formatDateTime(job.createdAt)}
-                              </Typography>
-                            </>
-                          }
-                        />
-                      </ListItem>
-                    ))}
+                            )}
+                            <Typography variant="caption" color="text.secondary">
+                              Created: {formatDateTime(linkedJob.createdAt)}
+                            </Typography>
+                          </>
+                        }
+                      />
+                    </ListItem>
                   </List>
                 </Paper>
               )}
