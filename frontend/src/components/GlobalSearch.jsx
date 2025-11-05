@@ -80,6 +80,8 @@ export default function GlobalSearch({ open, onClose }) {
     },
     enabled: debouncedTerm.length > 0,
     staleTime: 30000, // 30 seconds
+    initialData: { results: [] },
+    retry: 1,
   });
 
   const handleClose = useCallback(() => {
@@ -99,7 +101,7 @@ export default function GlobalSearch({ open, onClose }) {
     }
   };
 
-  const results = data?.results || [];
+  const results = (data && typeof data === 'object' && Array.isArray(data.results)) ? data.results : [];
 
   return (
     <Dialog

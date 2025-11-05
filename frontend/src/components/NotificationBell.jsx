@@ -45,6 +45,8 @@ export default function NotificationBell() {
       return response.data;
     },
     refetchInterval: 30000, // Refetch every 30 seconds
+    initialData: { count: 0 },
+    retry: 1,
   });
 
   // Fetch notifications
@@ -112,7 +114,7 @@ export default function NotificationBell() {
     markAllReadMutation.mutate();
   };
 
-  const unreadCount = countData?.count || 0;
+  const unreadCount = (countData && typeof countData === 'object' && 'count' in countData) ? countData.count : 0;
 
   return (
     <>
