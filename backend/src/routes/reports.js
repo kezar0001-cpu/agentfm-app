@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requirePropertyManagerSubscription } from '../middleware/auth.js';
 import { generateReport } from '../utils/reportGenerator.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -29,7 +30,7 @@ router.post('/', requirePropertyManagerSubscription, async (req, res) => {
     });
 
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
+      return sendError(res, 404, 'Property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
 
     const hasAccess =
@@ -37,7 +38,7 @@ router.post('/', requirePropertyManagerSubscription, async (req, res) => {
       req.user.role === 'OWNER' && property.owners.some(o => o.ownerId === req.user.id);
 
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     // If unitId is provided, verify it belongs to the property
@@ -50,7 +51,7 @@ router.post('/', requirePropertyManagerSubscription, async (req, res) => {
       });
 
       if (!unit) {
-        return res.status(400).json({ success: false, message: 'Unit does not belong to this property' });
+        return sendError(res, 400, 'Unit does not belong to this property', ErrorCodes.VAL_VALIDATION_ERROR);
       }
     }
 
@@ -97,10 +98,10 @@ router.post('/', requirePropertyManagerSubscription, async (req, res) => {
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, errors: error.issues });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to create report request:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate report' });
+    return sendError(res, 500, 'Failed to generate report', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -146,7 +147,7 @@ router.get('/', async (req, res) => {
     res.json({ success: true, reports });
   } catch (error) {
     console.error('Failed to fetch report requests:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch reports' });
+    return sendError(res, 500, 'Failed to fetch reports', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -165,7 +166,7 @@ router.get('/:id/data', async (req, res) => {
     });
 
     if (!report) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
+      return sendError(res, 404, 'Report not found', ErrorCodes.RES_REPORT_NOT_FOUND);
     }
 
     // Check access
@@ -175,11 +176,11 @@ router.get('/:id/data', async (req, res) => {
       report.requestedById === req.user.id;
 
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     if (report.status !== 'COMPLETED') {
-      return res.status(425).json({ success: false, message: 'Report is not ready yet.' });
+      return sendError(res, 425, 'Report is not ready yet.');
     }
 
     // Regenerate report data (in production, this would be cached/stored)
@@ -188,7 +189,7 @@ router.get('/:id/data', async (req, res) => {
     res.json({ success: true, data: reportData.data });
   } catch (error) {
     console.error('Failed to fetch report data:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch report data' });
+    return sendError(res, 500, 'Failed to fetch report data', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -209,7 +210,7 @@ router.get('/:id/download', async (req, res) => {
     });
 
     if (!report) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
+      return sendError(res, 404, 'Report not found', ErrorCodes.RES_REPORT_NOT_FOUND);
     }
 
     // Check access
@@ -219,22 +220,22 @@ router.get('/:id/download', async (req, res) => {
       report.requestedById === req.user.id;
 
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     if (report.status !== 'COMPLETED') {
-      return res.status(425).json({ success: false, message: 'Report is not ready yet.' });
+      return sendError(res, 425, 'Report is not ready yet.');
     }
 
     if (!report.fileUrl) {
-      return res.status(500).json({ success: false, message: 'Report file is missing.' });
+      return sendError(res, 500, 'Report file is missing.', ErrorCodes.ERR_INTERNAL_SERVER);
     }
 
     // In a real app, you would redirect to the fileUrl or stream the file
     res.json({ success: true, message: 'Report downloaded (placeholder)', url: report.fileUrl });
   } catch (error) {
     console.error('Failed to download report:', error);
-    res.status(500).json({ success: false, message: 'Failed to download report' });
+    return sendError(res, 500, 'Failed to download report', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

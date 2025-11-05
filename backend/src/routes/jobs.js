@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireActiveSubscription } from '../middlewa
 import { prisma } from '../config/prismaClient.js';
 import { notifyJobAssigned, notifyJobCompleted, notifyJobStarted, notifyJobReassigned } from '../utils/notificationService.js';
 import { invalidate } from '../utils/cache.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -151,7 +152,7 @@ router.get('/', requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching jobs:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch jobs' });
+    return sendError(res, 500, 'Failed to fetch jobs', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -164,9 +165,9 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
     });
-    
+
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
+      return sendError(res, 404, 'Property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
     
     // Verify unit exists if provided
@@ -174,9 +175,9 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
       const unit = await prisma.unit.findUnique({
         where: { id: unitId },
       });
-      
+
       if (!unit) {
-        return res.status(404).json({ success: false, message: 'Unit not found' });
+        return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
       }
     }
     
@@ -185,9 +186,9 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
       const assignedUser = await prisma.user.findUnique({
         where: { id: assignedToId },
       });
-      
+
       if (!assignedUser) {
-        return res.status(404).json({ success: false, message: 'Assigned user not found' });
+        return sendError(res, 404, 'Assigned user not found', ErrorCodes.RES_USER_NOT_FOUND);
       }
     }
     
@@ -247,7 +248,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
     res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
-    res.status(500).json({ success: false, message: 'Failed to create job' });
+    return sendError(res, 500, 'Failed to create job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -269,7 +270,7 @@ router.post(
       });
 
       if (!technician || technician.role !== 'TECHNICIAN') {
-        return res.status(404).json({ success: false, message: 'Technician not found' });
+        return sendError(res, 404, 'Technician not found', ErrorCodes.RES_USER_NOT_FOUND);
       }
 
       const jobs = await prisma.job.findMany({
@@ -301,25 +302,19 @@ router.post(
       });
 
       if (jobs.length !== uniqueJobIds.length) {
-        return res.status(404).json({ success: false, message: 'One or more jobs not found' });
+        return sendError(res, 404, 'One or more jobs not found', ErrorCodes.RES_JOB_NOT_FOUND);
       }
 
       const jobMap = new Map(jobs.map((job) => [job.id, job]));
 
       const unauthorizedJob = jobs.find((job) => job.property.managerId !== req.user.id);
       if (unauthorizedJob) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only assign jobs for your properties',
-        });
+        return sendError(res, 403, 'You can only assign jobs for your properties', ErrorCodes.ACC_ACCESS_DENIED);
       }
 
       const lockedJob = jobs.find((job) => ['COMPLETED', 'CANCELLED'].includes(job.status));
       if (lockedJob) {
-        return res.status(400).json({
-          success: false,
-          message: 'Completed or cancelled jobs cannot be reassigned',
-        });
+        return sendError(res, 400, 'Completed or cancelled jobs cannot be reassigned', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
       }
 
       const updatedJobs = await prisma.$transaction(
@@ -420,7 +415,7 @@ router.post(
       res.json({ success: true, jobs: updatedJobs });
     } catch (error) {
       console.error('Error bulk assigning jobs:', error);
-      res.status(500).json({ success: false, message: 'Failed to assign jobs' });
+      return sendError(res, 500, 'Failed to assign jobs', ErrorCodes.ERR_INTERNAL_SERVER);
     }
   }
 );
@@ -465,35 +460,26 @@ router.patch('/:id/status', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNI
     });
 
     if (!existingJob) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
 
     // Access control: Technicians can only update jobs assigned to them
     if (req.user.role === 'TECHNICIAN') {
       if (existingJob.assignedToId !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only update jobs assigned to you'
-        });
+        return sendError(res, 403, 'You can only update jobs assigned to you', ErrorCodes.ACC_ACCESS_DENIED);
       }
     }
 
     // Property managers can only update jobs for their properties
     if (req.user.role === 'PROPERTY_MANAGER') {
       if (existingJob.property.managerId !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only update jobs for your properties'
-        });
+        return sendError(res, 403, 'You can only update jobs for your properties', ErrorCodes.ACC_ACCESS_DENIED);
       }
     }
 
     // Prevent changing status of completed/cancelled jobs
     if (['COMPLETED', 'CANCELLED'].includes(existingJob.status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot change status of completed or cancelled jobs',
-      });
+      return sendError(res, 400, 'Cannot change status of completed or cancelled jobs', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
     }
 
     // No change needed
@@ -588,7 +574,7 @@ router.patch('/:id/status', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNI
     res.json(job);
   } catch (error) {
     console.error('Error updating job status:', error);
-    res.status(500).json({ success: false, message: 'Failed to update job status' });
+    return sendError(res, 500, 'Failed to update job status', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -630,12 +616,12 @@ router.get('/:id', requireAuth, async (req, res) => {
     });
     
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
-    
+
     // Access control: Check user has permission to view this job
     let hasAccess = false;
-    
+
     if (req.user.role === 'PROPERTY_MANAGER') {
       // Property managers can view jobs for properties they manage
       hasAccess = job.property.managerId === req.user.id;
@@ -649,12 +635,9 @@ router.get('/:id', requireAuth, async (req, res) => {
       // Tenants cannot view jobs directly (they use service requests)
       hasAccess = false;
     }
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied. You do not have permission to view this job.' 
-      });
+      return sendError(res, 403, 'Access denied. You do not have permission to view this job.', ErrorCodes.ACC_ACCESS_DENIED);
     }
     
     // Remove sensitive fields before sending response
@@ -667,7 +650,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching job:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch job' });
+    return sendError(res, 500, 'Failed to fetch job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -686,38 +669,29 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
     });
     
     if (!existingJob) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
-    
+
     // Access control: Technicians can only update jobs assigned to them
     if (req.user.role === 'TECHNICIAN') {
       if (existingJob.assignedToId !== req.user.id) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'You can only update jobs assigned to you' 
-        });
+        return sendError(res, 403, 'You can only update jobs assigned to you', ErrorCodes.ACC_ACCESS_DENIED);
       }
-      
+
       // Technicians can only update status, notes, and evidence
       const allowedFields = ['status', 'notes', 'actualCost', 'evidence'];
       const requestedFields = Object.keys(updates);
       const unauthorizedFields = requestedFields.filter(f => !allowedFields.includes(f));
-      
+
       if (unauthorizedFields.length > 0) {
-        return res.status(403).json({ 
-          success: false, 
-          message: `Technicians can only update: ${allowedFields.join(', ')}` 
-        });
+        return sendError(res, 403, `Technicians can only update: ${allowedFields.join(', ')}`, ErrorCodes.ACC_ACCESS_DENIED);
       }
     }
-    
+
     // Property managers can only update jobs for their properties
     if (req.user.role === 'PROPERTY_MANAGER') {
       if (existingJob.property.managerId !== req.user.id) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'You can only update jobs for your properties' 
-        });
+        return sendError(res, 403, 'You can only update jobs for your properties', ErrorCodes.ACC_ACCESS_DENIED);
       }
     }
     
@@ -835,7 +809,7 @@ router.patch('/:id', requireAuth, requireRole('PROPERTY_MANAGER', 'TECHNICIAN'),
     res.json(job);
   } catch (error) {
     console.error('Error updating job:', error);
-    res.status(500).json({ success: false, message: 'Failed to update job' });
+    return sendError(res, 500, 'Failed to update job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -857,7 +831,7 @@ router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, 
     });
 
     if (!existingJob) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
 
     // Delete job
@@ -873,7 +847,7 @@ router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, 
     res.json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
     console.error('Error deleting job:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete job' });
+    return sendError(res, 500, 'Failed to delete job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -889,7 +863,7 @@ const commentSchema = z.object({
 router.get('/:id/comments', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if job exists and user has access
     const job = await prisma.job.findUnique({
       where: { id },
@@ -906,21 +880,21 @@ router.get('/:id/comments', requireAuth, async (req, res) => {
         },
       },
     });
-    
+
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
-    
+
     // Check access based on role
-    const hasAccess = 
+    const hasAccess =
       req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
       req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
       req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
-    
+
     // Fetch comments
     const comments = await prisma.jobComment.findMany({
       where: { jobId: id },
@@ -942,7 +916,7 @@ router.get('/:id/comments', requireAuth, async (req, res) => {
     res.json({ success: true, comments });
   } catch (error) {
     console.error('Error fetching job comments:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch comments' });
+    return sendError(res, 500, 'Failed to fetch comments', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -970,19 +944,19 @@ router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, r
     });
     
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
+      return sendError(res, 404, 'Job not found', ErrorCodes.RES_JOB_NOT_FOUND);
     }
-    
+
     // Check access based on role
-    const hasAccess = 
+    const hasAccess =
       req.user.role === 'PROPERTY_MANAGER' && job.property?.managerId === req.user.id ||
       req.user.role === 'TECHNICIAN' && job.assignedToId === req.user.id ||
       req.user.role === 'OWNER' && job.property?.owners.some(o => o.ownerId === req.user.id);
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
-    
+
     // Create comment
     const comment = await prisma.jobComment.create({
       data: {
@@ -1005,7 +979,7 @@ router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, r
     res.status(201).json({ success: true, comment });
   } catch (error) {
     console.error('Error creating job comment:', error);
-    res.status(500).json({ success: false, message: 'Failed to create comment' });
+    return sendError(res, 500, 'Failed to create comment', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

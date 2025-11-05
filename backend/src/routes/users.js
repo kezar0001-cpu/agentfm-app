@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/prismaClient.js';
 import { requireAuth } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
-import { asyncHandler, sendError } from '../utils/errorHandler.js';
+import { asyncHandler, sendError, ErrorCodes } from '../utils/errorHandler.js';
 import logger from '../utils/logger.js';
 import { cacheMiddleware, invalidate } from '../utils/cache.js';
 
@@ -30,13 +30,13 @@ router.get('/', asyncHandler(async (req, res) => {
   const { role } = req.query;
 
   if (!role) {
-    return sendError(res, 400, 'Role query parameter is required');
+    return sendError(res, 400, 'Role query parameter is required', ErrorCodes.VAL_MISSING_FIELD);
   }
 
   // Access control: Only property managers can list users
   // This prevents unauthorized enumeration of users in the system
   if (req.user.role !== 'PROPERTY_MANAGER') {
-    return sendError(res, 403, 'Access denied. Only property managers can list users.');
+    return sendError(res, 403, 'Access denied. Only property managers can list users.', ErrorCodes.ACC_ACCESS_DENIED);
   }
 
   // Property managers can query for users they manage or work with
@@ -46,7 +46,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const requestedRole = role.toUpperCase();
 
   if (!allowedRoles.includes(requestedRole)) {
-    return sendError(res, 403, `Access denied. You can only list users with roles: ${allowedRoles.join(', ')}`);
+    return sendError(res, 403, `Access denied. You can only list users with roles: ${allowedRoles.join(', ')}`, ErrorCodes.ACC_ACCESS_DENIED);
   }
 
   // For better security, only return users associated with properties managed by this property manager
@@ -147,7 +147,7 @@ router.get('/me', cacheMiddleware({ ttl: 3600 }), asyncHandler(async (req, res) 
   });
 
   if (!user) {
-    return sendError(res, 404, 'User not found');
+    return sendError(res, 404, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
   }
 
   res.json({ success: true, data: user });
@@ -157,7 +157,7 @@ router.get('/me', cacheMiddleware({ ttl: 3600 }), asyncHandler(async (req, res) 
 router.get('/:id', asyncHandler(async (req, res) => {
   // Only allow users to view their own profile or property managers to view any
   if (req.user.id !== req.params.id && req.user.role !== 'PROPERTY_MANAGER') {
-    return sendError(res, 403, 'Access denied');
+    return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
   }
 
   const user = await prisma.user.findUnique({
@@ -179,7 +179,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    return sendError(res, 404, 'User not found');
+    return sendError(res, 404, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
   }
 
   res.json({ success: true, data: user });
@@ -189,7 +189,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 router.patch('/:id', validate(userUpdateSchema), asyncHandler(async (req, res) => {
   // Only allow users to update their own profile
   if (req.user.id !== req.params.id) {
-    return sendError(res, 403, 'Access denied');
+    return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
   }
 
   const user = await prisma.user.update({
@@ -217,7 +217,7 @@ router.patch('/:id', validate(userUpdateSchema), asyncHandler(async (req, res) =
 router.post('/:id/change-password', validate(passwordChangeSchema), asyncHandler(async (req, res) => {
   // Only allow users to change their own password
   if (req.user.id !== req.params.id) {
-    return sendError(res, 403, 'Access denied');
+    return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
   }
 
   const { currentPassword, newPassword } = req.body;
@@ -229,13 +229,13 @@ router.post('/:id/change-password', validate(passwordChangeSchema), asyncHandler
   });
 
   if (!user) {
-    return sendError(res, 404, 'User not found');
+    return sendError(res, 404, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
   }
 
   // Verify current password
   const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isValidPassword) {
-    return sendError(res, 401, 'Current password is incorrect');
+    return sendError(res, 401, 'Current password is incorrect', ErrorCodes.AUTH_INVALID_CREDENTIALS);
   }
 
   // Hash new password

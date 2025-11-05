@@ -11,6 +11,7 @@ import {
   notifyManagerOwnerRejected,
   notifyOwnerJobCreated,
 } from '../utils/notificationService.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -137,7 +138,7 @@ router.get('/', requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching service requests:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch service requests' });
+    return sendError(res, 500, 'Failed to fetch service requests', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -189,10 +190,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     });
     
     if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service request not found',
-      });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
     
     // Access control: Check user has access to property
@@ -202,19 +200,13 @@ router.get('/:id', requireAuth, async (req, res) => {
       req.user.role === 'TENANT' && request.requestedById === req.user.id;
     
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-      });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
-    
+
     res.json({ success: true, request });
   } catch (error) {
     console.error('Error fetching service request:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch service request',
-    });
+    return sendError(res, 500, 'Failed to fetch service request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -240,7 +232,7 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
     });
     
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
+      return sendError(res, 404, 'Property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
     
     // Verify user has access to create requests for this property
@@ -253,10 +245,7 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
     } else if (req.user.role === 'TENANT') {
       // Verify tenant has active lease for the unit
       if (!unitId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Tenants must specify a unit for service requests' 
-        });
+        return sendError(res, 400, 'Tenants must specify a unit for service requests', ErrorCodes.VAL_VALIDATION_ERROR);
       }
       
       const tenantUnit = await prisma.unitTenant.findFirst({
@@ -277,37 +266,23 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
       // Verify tenant has lease AND unit belongs to the specified property
       hasAccess = !!tenantUnit && tenantUnit.unit.propertyId === propertyId;
     } else if (req.user.role === 'TECHNICIAN') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Technicians cannot create service requests' 
-      });
+      return sendError(res, 403, 'Technicians cannot create service requests', ErrorCodes.ACC_ROLE_REQUIRED);
     }
-    
+
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have access to create service requests for this property'
-      });
+      return sendError(res, 403, 'You do not have access to create service requests for this property', ErrorCodes.ACC_PROPERTY_ACCESS_DENIED);
     }
 
     // Verify the relevant subscription is active
     if (req.user.role === 'PROPERTY_MANAGER') {
       if (!isSubscriptionActive(req.user)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Your trial period has expired. Please upgrade your plan to continue.',
-          code: 'TRIAL_EXPIRED',
-        });
+        return sendError(res, 403, 'Your trial period has expired. Please upgrade your plan to continue.', ErrorCodes.SUB_TRIAL_EXPIRED);
       }
     } else {
       const manager = property.manager;
 
       if (!manager || !isSubscriptionActive(manager)) {
-        return res.status(403).json({
-          success: false,
-          message: 'This property\'s subscription has expired. Please contact your property manager.',
-          code: 'MANAGER_SUBSCRIPTION_REQUIRED',
-        });
+        return sendError(res, 403, 'This property\'s subscription has expired. Please contact your property manager.', ErrorCodes.SUB_MANAGER_SUBSCRIPTION_REQUIRED);
       }
     }
 
@@ -367,7 +342,7 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
     res.status(201).json(request);
   } catch (error) {
     console.error('Error creating service request:', error);
-    res.status(500).json({ success: false, message: 'Failed to create service request' });
+    return sendError(res, 500, 'Failed to create service request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -391,7 +366,7 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
     });
     
     if (!existing) {
-      return res.status(404).json({ success: false, message: 'Service request not found' });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
     
     // Verify user has access to update this request
@@ -411,34 +386,22 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
       
       // Tenants can only update if request is still in SUBMITTED status
       if (existing.status !== 'SUBMITTED') {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'You can only update service requests that are still in submitted status' 
-        });
+        return sendError(res, 403, 'You can only update service requests that are still in submitted status', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
       }
     } else if (req.user.role === 'TECHNICIAN') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Technicians cannot update service requests directly' 
-      });
+      return sendError(res, 403, 'Technicians cannot update service requests directly', ErrorCodes.ACC_ROLE_REQUIRED);
     }
-    
+
     if (!hasAccess) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You do not have access to update this service request' 
-      });
+      return sendError(res, 403, 'You do not have access to update this service request', ErrorCodes.ACC_ACCESS_DENIED);
     }
-    
+
     // Verify requested fields are allowed for this role
     const requestedFields = Object.keys(updates);
     const unauthorizedFields = requestedFields.filter(f => !allowedFields.includes(f));
-    
+
     if (unauthorizedFields.length > 0) {
-      return res.status(403).json({ 
-        success: false, 
-        message: `You can only update the following fields: ${allowedFields.join(', ')}` 
-      });
+      return sendError(res, 403, `You can only update the following fields: ${allowedFields.join(', ')}`, ErrorCodes.ACC_ACCESS_DENIED);
     }
     
     // Prepare update data
@@ -476,7 +439,7 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
     res.json(request);
   } catch (error) {
     console.error('Error updating service request:', error);
-    res.status(500).json({ success: false, message: 'Failed to update service request' });
+    return sendError(res, 500, 'Failed to update service request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -487,10 +450,7 @@ router.post('/:id/estimate', requireAuth, requireRole('PROPERTY_MANAGER'), async
     const { managerEstimatedCost, costBreakdownNotes } = req.body;
 
     if (!managerEstimatedCost || managerEstimatedCost <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid estimated cost is required'
-      });
+      return sendError(res, 400, 'Valid estimated cost is required', ErrorCodes.VAL_VALIDATION_ERROR);
     }
 
     // Get service request
@@ -520,23 +480,17 @@ router.post('/:id/estimate', requireAuth, requireRole('PROPERTY_MANAGER'), async
     });
 
     if (!serviceRequest) {
-      return res.status(404).json({ success: false, message: 'Service request not found' });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
 
     // Verify it's the property manager
     if (serviceRequest.property.managerId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only the property manager can add cost estimates'
-      });
+      return sendError(res, 403, 'Only the property manager can add cost estimates', ErrorCodes.ACC_ROLE_REQUIRED);
     }
 
     // Verify it's in the correct status
     if (serviceRequest.status !== 'PENDING_MANAGER_REVIEW') {
-      return res.status(400).json({
-        success: false,
-        message: 'Service request must be in PENDING_MANAGER_REVIEW status'
-      });
+      return sendError(res, 400, 'Service request must be in PENDING_MANAGER_REVIEW status', ErrorCodes.BIZ_INVALID_STATUS_TRANSITION);
     }
 
     // Update service request with cost estimate
@@ -599,7 +553,7 @@ router.post('/:id/estimate', requireAuth, requireRole('PROPERTY_MANAGER'), async
     res.json({ success: true, request: updatedRequest });
   } catch (error) {
     console.error('Error adding cost estimate:', error);
-    res.status(500).json({ success: false, message: 'Failed to add cost estimate' });
+    return sendError(res, 500, 'Failed to add cost estimate', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -634,24 +588,18 @@ router.post('/:id/approve', requireAuth, requireRole('OWNER'), async (req, res) 
     });
 
     if (!serviceRequest) {
-      return res.status(404).json({ success: false, message: 'Service request not found' });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
 
     // Verify owner has access
     const isOwner = serviceRequest.property.owners.some(o => o.ownerId === req.user.id);
     if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only property owners can approve service requests'
-      });
+      return sendError(res, 403, 'Only property owners can approve service requests', ErrorCodes.ACC_ROLE_REQUIRED);
     }
 
     // Verify it's in the correct status
     if (serviceRequest.status !== 'PENDING_OWNER_APPROVAL') {
-      return res.status(400).json({
-        success: false,
-        message: 'Service request must be in PENDING_OWNER_APPROVAL status'
-      });
+      return sendError(res, 400, 'Service request must be in PENDING_OWNER_APPROVAL status', ErrorCodes.BIZ_INVALID_STATUS_TRANSITION);
     }
 
     // Update service request to approved
@@ -704,7 +652,7 @@ router.post('/:id/approve', requireAuth, requireRole('OWNER'), async (req, res) 
     res.json({ success: true, request: updatedRequest });
   } catch (error) {
     console.error('Error approving service request:', error);
-    res.status(500).json({ success: false, message: 'Failed to approve service request' });
+    return sendError(res, 500, 'Failed to approve service request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -715,10 +663,7 @@ router.post('/:id/reject', requireAuth, requireRole('OWNER'), async (req, res) =
     const { rejectionReason } = req.body;
 
     if (!rejectionReason || rejectionReason.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rejection reason is required'
-      });
+      return sendError(res, 400, 'Rejection reason is required', ErrorCodes.VAL_VALIDATION_ERROR);
     }
 
     // Get service request
@@ -746,24 +691,18 @@ router.post('/:id/reject', requireAuth, requireRole('OWNER'), async (req, res) =
     });
 
     if (!serviceRequest) {
-      return res.status(404).json({ success: false, message: 'Service request not found' });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
 
     // Verify owner has access
     const isOwner = serviceRequest.property.owners.some(o => o.ownerId === req.user.id);
     if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only property owners can reject service requests'
-      });
+      return sendError(res, 403, 'Only property owners can reject service requests', ErrorCodes.ACC_ROLE_REQUIRED);
     }
 
     // Verify it's in the correct status
     if (serviceRequest.status !== 'PENDING_OWNER_APPROVAL') {
-      return res.status(400).json({
-        success: false,
-        message: 'Service request must be in PENDING_OWNER_APPROVAL status'
-      });
+      return sendError(res, 400, 'Service request must be in PENDING_OWNER_APPROVAL status', ErrorCodes.BIZ_INVALID_STATUS_TRANSITION);
     }
 
     // Update service request to rejected
@@ -817,7 +756,7 @@ router.post('/:id/reject', requireAuth, requireRole('OWNER'), async (req, res) =
     res.json({ success: true, request: updatedRequest });
   } catch (error) {
     console.error('Error rejecting service request:', error);
-    res.status(500).json({ success: false, message: 'Failed to reject service request' });
+    return sendError(res, 500, 'Failed to reject service request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -837,15 +776,12 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
     });
 
     if (!serviceRequest) {
-      return res.status(404).json({ success: false, message: 'Service request not found' });
+      return sendError(res, 404, 'Service request not found', ErrorCodes.RES_SERVICE_REQUEST_NOT_FOUND);
     }
 
     // Authorization check: Verify the requesting manager owns the property
     if (serviceRequest.property.managerId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to convert service requests for this property'
-      });
+      return sendError(res, 403, 'You do not have permission to convert service requests for this property', ErrorCodes.ACC_PROPERTY_ACCESS_DENIED);
     }
 
     // Verify assigned user exists if provided
@@ -853,18 +789,15 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
       const assignedUser = await prisma.user.findUnique({
         where: { id: assignedToId },
       });
-      
+
       if (!assignedUser) {
-        return res.status(404).json({ success: false, message: 'Assigned user not found' });
+        return sendError(res, 404, 'Assigned user not found', ErrorCodes.RES_USER_NOT_FOUND);
       }
     }
-    
+
     // Check if service request is approved (for owner-initiated requests)
     if (serviceRequest.status === 'PENDING_MANAGER_REVIEW' || serviceRequest.status === 'PENDING_OWNER_APPROVAL') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot convert service request that is still pending approval'
-      });
+      return sendError(res, 400, 'Cannot convert service request that is still pending approval', ErrorCodes.BIZ_OPERATION_NOT_ALLOWED);
     }
 
     // Use approved budget if available, otherwise use provided or existing estimated cost
@@ -972,7 +905,7 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
     res.json({ success: true, job, serviceRequest: updatedRequest });
   } catch (error) {
     console.error('Error converting service request to job:', error);
-    res.status(500).json({ success: false, message: 'Failed to convert service request to job' });
+    return sendError(res, 500, 'Failed to convert service request to job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

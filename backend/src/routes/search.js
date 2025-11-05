@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
+import { asyncHandler, sendError, ErrorCodes } from '../utils/errorHandler.js';
 import prisma from '../config/prismaClient.js';
 
 const router = express.Router();

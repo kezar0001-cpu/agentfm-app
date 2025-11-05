@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -98,14 +99,14 @@ router.post('/:id/move-in', requireRole(['PROPERTY_MANAGER']), async (req, res) 
         break;
 
       default:
-        res.status(400).json({ message: 'Invalid step' });
+        return sendError(res, ErrorCodes.VAL_VALIDATION_ERROR, 'Invalid step');
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Validation error', errors: error.flatten() });
+      return sendError(res, ErrorCodes.VAL_VALIDATION_ERROR, 'Validation error', null, error.flatten());
     }
     console.error('Move-in error:', error);
-    res.status(500).json({ message: 'Failed to process move-in step' });
+    return sendError(res, ErrorCodes.ERR_INTERNAL_SERVER, 'Failed to process move-in step');
   }
 });
 
@@ -171,14 +172,14 @@ router.post('/:id/move-out', requireRole(['PROPERTY_MANAGER']), async (req, res)
         break;
 
       default:
-        res.status(400).json({ message: 'Invalid step' });
+        return sendError(res, ErrorCodes.VAL_VALIDATION_ERROR, 'Invalid step');
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Validation error', errors: error.flatten() });
+      return sendError(res, ErrorCodes.VAL_VALIDATION_ERROR, 'Validation error', null, error.flatten());
     }
     console.error('Move-out error:', error);
-    res.status(500).json({ message: 'Failed to process move-out step' });
+    return sendError(res, ErrorCodes.ERR_INTERNAL_SERVER, 'Failed to process move-out step');
   }
 });
 

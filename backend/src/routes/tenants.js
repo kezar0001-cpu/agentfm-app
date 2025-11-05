@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -118,10 +119,7 @@ router.get('/', async (req, res) => {
     const where = buildTenantAccessWhere(req.user);
 
     if (!where) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-      });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     const tenants = await prisma.user.findMany({
@@ -138,10 +136,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Get tenants error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch tenants',
-    });
+    return sendError(res, 500, 'Failed to fetch tenants', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -151,10 +146,7 @@ router.get('/:id', async (req, res) => {
     const where = buildTenantAccessWhere(req.user);
 
     if (!where) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-      });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     const tenant = await prisma.user.findFirst({
@@ -166,10 +158,7 @@ router.get('/:id', async (req, res) => {
     });
 
     if (!tenant) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tenant not found',
-      });
+      return sendError(res, 404, 'Tenant not found', ErrorCodes.RES_TENANT_NOT_FOUND);
     }
 
     res.json({
@@ -178,10 +167,7 @@ router.get('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Get tenant error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch tenant',
-    });
+    return sendError(res, 500, 'Failed to fetch tenant', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

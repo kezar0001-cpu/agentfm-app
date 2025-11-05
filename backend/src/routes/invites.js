@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { sendInviteEmail } from '../utils/email.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -41,10 +42,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists',
-      });
+      return sendError(res, 400, 'User with this email already exists', ErrorCodes.BIZ_EMAIL_ALREADY_REGISTERED);
     }
 
     // Check if there's already a pending invite for this email
@@ -59,10 +57,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
     });
 
     if (existingInvite) {
-      return res.status(400).json({
-        success: false,
-        message: 'A pending invite already exists for this email',
-      });
+      return sendError(res, 400, 'A pending invite already exists for this email', ErrorCodes.RES_ALREADY_EXISTS);
     }
 
     // If inviting to a property, verify the property exists and belongs to this manager
@@ -75,10 +70,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
       });
 
       if (!property) {
-        return res.status(404).json({
-          success: false,
-          message: 'Property not found or you do not have permission',
-        });
+        return sendError(res, 404, 'Property not found or you do not have permission', ErrorCodes.RES_PROPERTY_NOT_FOUND);
       }
     }
 
@@ -90,10 +82,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
       });
 
       if (!unit || unit.property.managerId !== req.user.id) {
-        return res.status(404).json({
-          success: false,
-          message: 'Unit not found or you do not have permission',
-        });
+        return sendError(res, 404, 'Unit not found or you do not have permission', ErrorCodes.RES_UNIT_NOT_FOUND);
       }
     }
 
@@ -164,17 +153,10 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) 
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: error.errors,
-      });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
     console.error('Create invite error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create invite',
-    });
+    return sendError(res, 500, 'Failed to create invite', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -202,26 +184,17 @@ router.get('/:token', async (req, res) => {
     });
 
     if (!invite) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invite not found',
-      });
+      return sendError(res, 404, 'Invite not found', ErrorCodes.RES_INVITE_NOT_FOUND);
     }
 
     // Check if invite has expired
     if (new Date() > new Date(invite.expiresAt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'This invite has expired',
-      });
+      return sendError(res, 400, 'This invite has expired', ErrorCodes.BIZ_INVITE_EXPIRED);
     }
 
     // Check if invite has already been accepted
     if (invite.status !== 'PENDING') {
-      return res.status(400).json({
-        success: false,
-        message: 'This invite has already been used',
-      });
+      return sendError(res, 400, 'This invite has already been used', ErrorCodes.BIZ_INVITE_ALREADY_ACCEPTED);
     }
 
     res.json({
@@ -236,10 +209,7 @@ router.get('/:token', async (req, res) => {
     });
   } catch (error) {
     console.error('Get invite error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve invite',
-    });
+    return sendError(res, 500, 'Failed to retrieve invite', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -290,10 +260,7 @@ router.get('/', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) =
     });
   } catch (error) {
     console.error('Get invites error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve invites',
-    });
+    return sendError(res, 500, 'Failed to retrieve invites', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -310,17 +277,11 @@ router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, 
     });
 
     if (!invite) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invite not found',
-      });
+      return sendError(res, 404, 'Invite not found', ErrorCodes.RES_INVITE_NOT_FOUND);
     }
 
     if (invite.invitedById !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to delete this invite',
-      });
+      return sendError(res, 403, 'You do not have permission to delete this invite', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     await prisma.invite.delete({
@@ -333,10 +294,7 @@ router.delete('/:id', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, 
     });
   } catch (error) {
     console.error('Delete invite error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete invite',
-    });
+    return sendError(res, 500, 'Failed to delete invite', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

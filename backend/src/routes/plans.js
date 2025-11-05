@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -143,7 +144,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json(plans);
   } catch (error) {
     console.error('Error fetching maintenance plans:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch maintenance plans' });
+    return sendError(res, 500, 'Failed to fetch maintenance plans', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -197,7 +198,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     });
 
     if (!plan) {
-      return res.status(404).json({ success: false, message: 'Maintenance plan not found' });
+      return sendError(res, 404, 'Maintenance plan not found', ErrorCodes.RES_NOT_FOUND);
     }
 
     // Verify user has access
@@ -207,13 +208,13 @@ router.get('/:id', requireAuth, async (req, res) => {
       req.user.role === 'TECHNICIAN'; // Technicians can view all plans
 
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'You do not have permission to access this plan' });
+      return sendError(res, 403, 'You do not have permission to access this plan', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     res.json(plan);
   } catch (error) {
     console.error('Error fetching maintenance plan:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch maintenance plan' });
+    return sendError(res, 500, 'Failed to fetch maintenance plan', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -223,7 +224,7 @@ router.post('/', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req, res
     const parsed = planSchema.safeParse(req.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      return res.status(400).json({ error: issue?.message || 'Invalid request' });
+      return sendError(res, 400, issue?.message || 'Invalid request', ErrorCodes.VAL_VALIDATION_ERROR, parsed.error.issues);
     }
 
     const { name, propertyId, frequency, description, nextDueDate, autoCreateJobs, isActive } = parsed.data;
@@ -231,7 +232,9 @@ router.post('/', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req, res
     // Verify property exists and user has access
     const { hasAccess, error, property } = await verifyPropertyAccess(propertyId, req.user.id, req.user.role);
     if (!hasAccess) {
-      return res.status(property ? 403 : 404).json({ success: false, message: error });
+      const statusCode = property ? 403 : 404;
+      const errorCode = property ? ErrorCodes.ACC_PROPERTY_ACCESS_DENIED : ErrorCodes.RES_PROPERTY_NOT_FOUND;
+      return sendError(res, statusCode, error, errorCode);
     }
 
     // Create maintenance plan
@@ -266,7 +269,7 @@ router.post('/', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req, res
     res.status(201).json(plan);
   } catch (error) {
     console.error('Error creating maintenance plan:', error);
-    res.status(500).json({ success: false, message: 'Failed to create maintenance plan' });
+    return sendError(res, 500, 'Failed to create maintenance plan', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -278,7 +281,7 @@ router.patch('/:id', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req,
     const parsed = planUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      return res.status(400).json({ error: issue?.message || 'Invalid request' });
+      return sendError(res, 400, issue?.message || 'Invalid request', ErrorCodes.VAL_VALIDATION_ERROR, parsed.error.issues);
     }
 
     // Check if plan exists and user has access
@@ -295,12 +298,12 @@ router.patch('/:id', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req,
     });
 
     if (!existingPlan) {
-      return res.status(404).json({ success: false, message: 'Maintenance plan not found' });
+      return sendError(res, 404, 'Maintenance plan not found', ErrorCodes.RES_NOT_FOUND);
     }
 
     // Verify user has access
     if (req.user.role === 'PROPERTY_MANAGER' && existingPlan.property.managerId !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'You do not have permission to update this plan' });
+      return sendError(res, 403, 'You do not have permission to update this plan', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     const { name, frequency, description, nextDueDate, autoCreateJobs, isActive } = parsed.data;
@@ -338,7 +341,7 @@ router.patch('/:id', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req,
     res.json(plan);
   } catch (error) {
     console.error('Error updating maintenance plan:', error);
-    res.status(500).json({ success: false, message: 'Failed to update maintenance plan' });
+    return sendError(res, 500, 'Failed to update maintenance plan', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -361,12 +364,12 @@ router.delete('/:id', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req
     });
 
     if (!existingPlan) {
-      return res.status(404).json({ success: false, message: 'Maintenance plan not found' });
+      return sendError(res, 404, 'Maintenance plan not found', ErrorCodes.RES_NOT_FOUND);
     }
 
     // Verify user has access
     if (req.user.role === 'PROPERTY_MANAGER' && existingPlan.property.managerId !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'You do not have permission to delete this plan' });
+      return sendError(res, 403, 'You do not have permission to delete this plan', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     await prisma.maintenancePlan.delete({
@@ -376,7 +379,7 @@ router.delete('/:id', requireAuth, requireRole(['PROPERTY_MANAGER']), async (req
     res.json({ success: true, message: 'Maintenance plan deleted successfully' });
   } catch (error) {
     console.error('Error deleting maintenance plan:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete maintenance plan' });
+    return sendError(res, 500, 'Failed to delete maintenance plan', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

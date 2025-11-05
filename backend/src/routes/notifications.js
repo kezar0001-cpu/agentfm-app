@@ -1,7 +1,7 @@
 import express from 'express';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/errorHandler.js';
+import { asyncHandler, sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -53,11 +53,11 @@ router.patch('/:id/read', asyncHandler(async (req, res) => {
   });
   
   if (!notification) {
-    return res.status(404).json({ success: false, message: 'Notification not found' });
+    return sendError(res, 404, 'Notification not found', ErrorCodes.RES_NOT_FOUND);
   }
   
   if (notification.userId !== req.user.id) {
-    return res.status(403).json({ success: false, message: 'Access denied' });
+    return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
   }
   
   const updated = await prisma.notification.update({
@@ -101,11 +101,11 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   });
   
   if (!notification) {
-    return res.status(404).json({ success: false, message: 'Notification not found' });
+    return sendError(res, 404, 'Notification not found', ErrorCodes.RES_NOT_FOUND);
   }
   
   if (notification.userId !== req.user.id) {
-    return res.status(403).json({ success: false, message: 'Access denied' });
+    return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
   }
   
   await prisma.notification.delete({

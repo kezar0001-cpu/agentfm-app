@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -44,9 +45,9 @@ const upload = multer({
 router.post('/single', requireAuth, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
+      return sendError(res, 400, 'No file uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);
     }
-    
+
     const url = `/uploads/${req.file.filename}`;
     console.log('✅ Uploaded by user', req.user.id, ':', req.file.originalname, '->', req.file.path);
     res.status(201).json({ success: true, url });
@@ -60,7 +61,7 @@ router.post('/single', requireAuth, upload.single('file'), (req, res) => {
         console.error('Failed to clean up file:', cleanupError);
       }
     }
-    res.status(500).json({ success: false, error: 'Upload failed' });
+    return sendError(res, 500, 'Upload failed', ErrorCodes.FILE_UPLOAD_FAILED);
   }
 });
 
@@ -73,9 +74,9 @@ router.post('/single', requireAuth, upload.single('file'), (req, res) => {
 router.post('/multiple', requireAuth, upload.array('files', 5), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, error: 'No files uploaded' });
+      return sendError(res, 400, 'No files uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);
     }
-    
+
     const urls = req.files.map(file => `/uploads/${file.filename}`);
     console.log(`✅ Uploaded ${req.files.length} files by user`, req.user.id);
     res.status(201).json({ success: true, urls });
@@ -91,7 +92,7 @@ router.post('/multiple', requireAuth, upload.array('files', 5), (req, res) => {
         }
       });
     }
-    res.status(500).json({ success: false, error: 'Upload failed' });
+    return sendError(res, 500, 'Upload failed', ErrorCodes.FILE_UPLOAD_FAILED);
   }
 });
 

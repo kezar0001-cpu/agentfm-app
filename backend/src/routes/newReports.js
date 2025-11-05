@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requirePropertyManagerSubscription } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -39,7 +40,7 @@ const handleReportRequest = async (req, res, schema, reportGenerator) => {
     });
 
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
+      return sendError(res, 404, 'Property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
 
     const hasAccess =
@@ -47,7 +48,7 @@ const handleReportRequest = async (req, res, schema, reportGenerator) => {
       req.user.role === 'OWNER' && property.owners.some(o => o.ownerId === req.user.id);
 
     if (!hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+      return sendError(res, 403, 'Access denied', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     const reportData = await reportGenerator(payload, property);
@@ -55,10 +56,10 @@ const handleReportRequest = async (req, res, schema, reportGenerator) => {
     res.status(200).json({ success: true, report: reportData });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, errors: error.issues });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error(`Failed to create report:`, error);
-    res.status(500).json({ success: false, message: `Failed to generate report` });
+    return sendError(res, 500, 'Failed to generate report', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 };
 

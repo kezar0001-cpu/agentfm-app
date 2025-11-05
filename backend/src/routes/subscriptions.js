@@ -3,6 +3,7 @@ import { z } from 'zod';
 import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json(subscriptions);
   } catch (error) {
     console.error('Error fetching subscriptions:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch subscriptions' });
+    return sendError(res, 500, 'Failed to fetch subscriptions', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -40,13 +41,13 @@ router.get('/current', requireAuth, async (req, res) => {
     });
     
     if (!subscription) {
-      return res.status(404).json({ success: false, message: 'No active subscription found' });
+      return sendError(res, 404, 'No active subscription found', ErrorCodes.RES_NOT_FOUND);
     }
     
     res.json(subscription);
   } catch (error) {
     console.error('Error fetching current subscription:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch subscription' });
+    return sendError(res, 500, 'Failed to fetch subscription', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
