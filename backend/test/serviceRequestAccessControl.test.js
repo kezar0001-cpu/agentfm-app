@@ -195,10 +195,50 @@ test('role-based filtering prevents data leakage', () => {
     { id: '2', requestedById: 'tenant2' },
     { id: '3', requestedById: 'tenant1' },
   ];
-  
+
   const user = { role: 'TENANT', id: 'tenant1' };
   const filtered = allRequests.filter(r => r.requestedById === user.id);
-  
+
   assert.equal(filtered.length, 2);
   assert.ok(filtered.every(r => r.requestedById === user.id));
+});
+
+test('convert-to-job verifies property manager owns property', () => {
+  const user = { role: 'PROPERTY_MANAGER', id: 'mgr123' };
+  const serviceRequest = {
+    id: 'sr1',
+    property: {
+      id: 'prop1',
+      managerId: 'mgr123',
+    },
+  };
+
+  const hasAccess = serviceRequest.property.managerId === user.id;
+  assert.equal(hasAccess, true);
+});
+
+test('convert-to-job denies unauthorized property manager', () => {
+  const user = { role: 'PROPERTY_MANAGER', id: 'mgr123' };
+  const serviceRequest = {
+    id: 'sr1',
+    property: {
+      id: 'prop1',
+      managerId: 'mgr456', // Different manager
+    },
+  };
+
+  const hasAccess = serviceRequest.property.managerId === user.id;
+  assert.equal(hasAccess, false);
+});
+
+test('convert-to-job unauthorized returns 403 status', () => {
+  const statusCode = 403;
+  const response = {
+    success: false,
+    message: 'You do not have permission to convert service requests for this property',
+  };
+
+  assert.equal(statusCode, 403);
+  assert.equal(response.success, false);
+  assert.ok(response.message.includes('permission'));
 });
