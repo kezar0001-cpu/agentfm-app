@@ -39,29 +39,90 @@ router.get('/', asyncHandler(async (req, res) => {
     return sendError(res, 403, 'Access denied. Only property managers can list users.');
   }
 
-  // Property managers can only query for TECHNICIAN role
-  // This prevents them from enumerating owners, other managers, or tenants
-  const allowedRoles = ['TECHNICIAN'];
+  // Property managers can query for users they manage or work with
+  // Allowed roles: OWNER (property owners), TENANT (tenants), TECHNICIAN (service providers)
+  // Not allowed: PROPERTY_MANAGER (other managers)
+  const allowedRoles = ['OWNER', 'TENANT', 'TECHNICIAN'];
   const requestedRole = role.toUpperCase();
-  
+
   if (!allowedRoles.includes(requestedRole)) {
     return sendError(res, 403, `Access denied. You can only list users with roles: ${allowedRoles.join(', ')}`);
   }
 
-  const users = await prisma.user.findMany({
+  // For better security, only return users associated with properties managed by this property manager
+  // Get all properties managed by the current user
+  const managedProperties = await prisma.property.findMany({
     where: {
-      role: requestedRole,
+      managerId: req.user.id,
     },
     select: {
       id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      role: true,
     },
   });
-  
-  res.json({ success: true, users });
+
+  const propertyIds = managedProperties.map(p => p.id);
+
+  let users;
+
+  if (requestedRole === 'OWNER') {
+    // Get owners of managed properties
+    const propertyOwnerships = await prisma.propertyOwner.findMany({
+      where: {
+        propertyId: { in: propertyIds },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+    users = propertyOwnerships.map(po => po.user);
+  } else if (requestedRole === 'TENANT') {
+    // Get tenants of units in managed properties
+    const units = await prisma.unit.findMany({
+      where: {
+        propertyId: { in: propertyIds },
+        tenantId: { not: null },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+    users = units.map(unit => unit.tenant).filter(Boolean);
+  } else {
+    // For TECHNICIAN role, return all technicians (they're not property-specific)
+    users = await prisma.user.findMany({
+      where: {
+        role: requestedRole,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
+    });
+  }
+
+  // Remove duplicates (same owner might own multiple properties)
+  const uniqueUsers = Array.from(new Map(users.map(user => [user.id, user])).values());
+
+  res.json({ success: true, users: uniqueUsers });
 }));
 
 // GET /api/users/me - Get current user profile (cached for 1 hour)
