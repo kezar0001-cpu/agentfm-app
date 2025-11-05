@@ -28,6 +28,7 @@ import {
 import { useQuery, useMutation, useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import EmptyState from '../components/EmptyState';
 import ServiceRequestForm from '../components/ServiceRequestForm';
 import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 import { CircularProgress } from '@mui/material';
@@ -294,18 +295,18 @@ const ServiceRequestsPage = () => {
 
       {/* Service Requests List */}
       {requestList.length === 0 ? (
-        <DataState
-          type="empty"
-          message="No service requests found"
-          action={
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreate}
-            >
-              {userRole === 'TENANT' ? 'Submit First Request' : 'Create Request'}
-            </Button>
+        <EmptyState
+          icon={AssignmentIcon}
+          title={filters.status || filters.category || filters.propertyId ? 'No service requests match your filters' : 'No service requests yet'}
+          description={
+            filters.status || filters.category || filters.propertyId
+              ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+              : userRole === 'TENANT'
+                ? 'Need maintenance or repairs? Submit your first service request and we\'ll take care of it promptly.'
+                : 'Start managing service requests from your tenants. Track issues, assign jobs, and keep everyone informed.'
           }
+          actionLabel={filters.status || filters.category || filters.propertyId ? undefined : (userRole === 'TENANT' ? 'Submit First Request' : 'Create Request')}
+          onAction={filters.status || filters.category || filters.propertyId ? undefined : handleCreate}
         />
       ) : (
         <Stack spacing={3}>

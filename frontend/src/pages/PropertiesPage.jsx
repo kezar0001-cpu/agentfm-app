@@ -40,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import DataState from '../components/DataState';
+import EmptyState from '../components/EmptyState';
 import PropertyForm from '../components/PropertyForm';
 import PropertyOnboardingWizard from '../components/PropertyOnboardingWizard';
 import { normaliseArray } from '../utils/error';
@@ -287,14 +288,24 @@ export default function PropertiesPage() {
           isLoading={isLoading}
           isError={isError}
           error={error}
-          isEmpty={filteredProperties.length === 0}
-          emptyMessage={searchTerm || filterStatus !== 'all'
-            ? 'No properties match your filters'
-            : 'No properties yet. Add your first property to get started!'}
+          isEmpty={false}
         >
-          <Stack spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
-            <Grid container spacing={3}>
-              {filteredProperties.map((property) => (
+          {filteredProperties.length === 0 ? (
+            <EmptyState
+              icon={HomeIcon}
+              title={searchTerm || filterStatus !== 'all' ? 'No properties match your filters' : 'No properties yet'}
+              description={
+                searchTerm || filterStatus !== 'all'
+                  ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+                  : 'Get started by adding your first property. You can manage units, track maintenance, and monitor inspections all in one place.'
+              }
+              actionLabel={searchTerm || filterStatus !== 'all' ? undefined : 'Add First Property'}
+              onAction={searchTerm || filterStatus !== 'all' ? undefined : handleCreate}
+            />
+          ) : (
+            <Stack spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
+              <Grid container spacing={3}>
+                {filteredProperties.map((property) => (
                 <Grid item xs={12} sm={6} md={4} key={property.id}>
                   <Card
                     sx={{
@@ -429,21 +440,22 @@ export default function PropertiesPage() {
               ))}
             </Grid>
 
-            {/* Load More Button */}
-            {hasNextPage && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
-                >
-                  {isFetchingNextPage ? 'Loading...' : 'Load More'}
-                </Button>
-              </Box>
-            )}
-          </Stack>
+              {/* Load More Button */}
+              {hasNextPage && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
+                  >
+                    {isFetchingNextPage ? 'Loading...' : 'Load More'}
+                  </Button>
+                </Box>
+              )}
+            </Stack>
+          )}
         </DataState>
       </Stack>
 
