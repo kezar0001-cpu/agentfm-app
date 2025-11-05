@@ -52,6 +52,8 @@ import { formatDate, formatDateTime } from '../utils/date';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
+import PropertyImageManager from '../components/PropertyImageManager';
+import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import { normaliseArray } from '../utils/error';
 import {
   formatPropertyAddressLine,
@@ -60,11 +62,13 @@ import {
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
+import { getCurrentUser } from '../lib/auth';
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = getCurrentUser();
 
   const [currentTab, setCurrentTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -121,6 +125,9 @@ export default function PropertyDetailPage() {
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
     : null;
+
+  // Check if current user can edit this property
+  const canEdit = user?.role === 'PROPERTY_MANAGER' && property?.managerId === user?.id;
 
   const activities = ensureArray(activityQuery.data, ['activities', 'data.activities', 'items']);
 
@@ -415,6 +422,8 @@ export default function PropertyDetailPage() {
                 <Tab label="Overview" />
                 <Tab label={`Units (${units.length})`} />
                 <Tab label="Owners" />
+                <Tab label="Images" />
+                <Tab label="Documents" />
                 <Tab label="Activity" />
               </Tabs>
             </Paper>
@@ -712,7 +721,30 @@ export default function PropertyDetailPage() {
               </Paper>
             )}
 
+            {/* Images Tab */}
             {currentTab === 3 && (
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                  Property Images
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <PropertyImageManager propertyId={id} canEdit={canEdit} />
+              </Paper>
+            )}
+
+            {/* Documents Tab */}
+            {currentTab === 4 && (
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                  Property Documents
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <PropertyDocumentManager propertyId={id} canEdit={canEdit} />
+              </Paper>
+            )}
+
+            {/* Activity Tab */}
+            {currentTab === 5 && (
               <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Recent Activity
