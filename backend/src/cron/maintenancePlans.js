@@ -4,6 +4,21 @@ import { notifyJobAssigned } from '../utils/notificationService.js';
 
 const FALLBACK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Hash a string to a 32-bit integer for use with PostgreSQL advisory locks
+ * @param {string} str - The string to hash
+ * @returns {number} A 32-bit integer
+ */
+function hashStringToInt(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
 function createFallbackCron() {
   return {
     schedule(_expression, task) {
@@ -83,8 +98,33 @@ function calculateNextDueDate(currentDueDate, frequency) {
 async function createJobForPlan(plan) {
   const now = new Date();
   const nextDueDate = calculateNextDueDate(plan.nextDueDate, plan.frequency);
+  const scheduledDate = plan.nextDueDate || now;
 
   const result = await prisma.$transaction(async (tx) => {
+    // Acquire an advisory lock on the maintenance plan ID to prevent concurrent job creation
+    // The lock is automatically released at transaction end
+    // Using a hash of the plan ID to convert it to a numeric lock ID
+    const lockId = hashStringToInt(plan.id);
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockId})`);
+
+    // Defensive check: Verify no job was already created for this nextDueDate
+    // This prevents duplicates even if multiple cron jobs somehow bypass the lock
+    const existingJob = await tx.job.findFirst({
+      where: {
+        maintenancePlanId: plan.id,
+        scheduledDate: scheduledDate,
+      },
+    });
+
+    if (existingJob) {
+      logger.info('Job already exists for this maintenance plan and scheduled date', {
+        planId: plan.id,
+        jobId: existingJob.id,
+        scheduledDate: scheduledDate,
+      });
+      return existingJob;
+    }
+
     const job = await tx.job.create({
       data: {
         title: `Maintenance: ${plan.name}`,
@@ -94,7 +134,7 @@ async function createJobForPlan(plan) {
         priority: 'MEDIUM',
         propertyId: plan.propertyId,
         maintenancePlanId: plan.id,
-        scheduledDate: plan.nextDueDate || now,
+        scheduledDate: scheduledDate,
       },
       include: {
         assignedTo: {
