@@ -11,6 +11,9 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    sourcemap: true, // Enable source maps for debugging production builds
   }
 });
 
