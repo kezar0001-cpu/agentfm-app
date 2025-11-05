@@ -58,7 +58,7 @@ export default function InspectionDetailPage() {
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
 
-  const [completeData, setCompleteData] = useState({ findings: '', notes: '', tags: [], autoCreateJobs: true });
+  const [completeData, setCompleteData] = useState({ findings: '', notes: '', tags: [], autoCreateJobs: true, confirmJobCreation: false });
   const [previewJobs, setPreviewJobs] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
   const [reminderForm, setReminderForm] = useState({ remindAt: '', recipients: [], note: '', channel: 'IN_APP' });
@@ -480,7 +480,12 @@ export default function InspectionDetailPage() {
         />
       </Dialog>
 
-      <Dialog open={completeDialogOpen} onClose={() => setCompleteDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={completeDialogOpen} onClose={() => {
+        setCompleteDialogOpen(false);
+        setShowPreview(false);
+        setPreviewJobs([]);
+        setCompleteData((prev) => ({ ...prev, confirmJobCreation: false }));
+      }} maxWidth="md" fullWidth>
         <DialogTitle>Complete inspection</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
@@ -561,6 +566,18 @@ export default function InspectionDetailPage() {
                     </Paper>
                   ))}
                 </Stack>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                  <input
+                    type="checkbox"
+                    id="confirmJobCreation"
+                    checked={completeData.confirmJobCreation}
+                    onChange={(e) => setCompleteData((prev) => ({ ...prev, confirmJobCreation: e.target.checked }))}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label htmlFor="confirmJobCreation" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    I confirm that I want to create these jobs.
+                  </label>
+                </Box>
               </Box>
             )}
 
@@ -576,6 +593,7 @@ export default function InspectionDetailPage() {
             setCompleteDialogOpen(false);
             setShowPreview(false);
             setPreviewJobs([]);
+            setCompleteData((prev) => ({ ...prev, confirmJobCreation: false }));
           }}>
             Cancel
           </Button>
@@ -584,7 +602,7 @@ export default function InspectionDetailPage() {
             color="success"
             onClick={handleCompleteSubmit}
             startIcon={<CheckCircleIcon />}
-            disabled={completeMutation.isPending}
+            disabled={completeMutation.isPending || (showPreview && previewJobs.length > 0 && !completeData.confirmJobCreation)}
           >
             {completeMutation.isPending ? 'Completing...' : 'Complete inspection'}
           </Button>
