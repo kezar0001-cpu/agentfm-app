@@ -14,45 +14,9 @@ import {
   useTheme,
 } from '@mui/material';
 import useApiMutation from '../hooks/useApiMutation';
-import { COUNTRIES } from '../lib/countries';
-import { queryKeys } from '../utils/queryKeys.js';
-import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
-import { FormTextField, FormSelect } from './form';
-
-const COUNTRY_ALIASES = {
-  USA: 'United States',
-  US: 'United States',
-  'U.S.A': 'United States',
-  UAE: 'United Arab Emirates',
-  'U.A.E.': 'United Arab Emirates',
-  UK: 'United Kingdom',
-  GB: 'United Kingdom',
-  'U.K.': 'United Kingdom',
-  KSA: 'Saudi Arabia',
-};
-
-const normaliseCountryValue = (input) => {
-  if (!input) return '';
-  const trimmed = input.trim();
-  if (!trimmed) return '';
-  const alias = COUNTRY_ALIASES[trimmed.toUpperCase()];
-  if (alias) return alias;
-
-  const match = COUNTRIES.find(
-    (country) => country.name.toLowerCase() === trimmed.toLowerCase(),
-  );
-
-  return match ? match.name : trimmed;
-};
-
-const PROPERTY_TYPES = [
-  'Residential',
-  'Commercial',
-  'Mixed-Use',
-  'Industrial',
-  'Retail',
-  'Office',
-];
+import PropertyBasicInfo from './forms/PropertyBasicInfo';
+import PropertyLocation from './forms/PropertyLocation';
+import PropertyManagement from './forms/PropertyManagement';
 
 const PROPERTY_STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
@@ -141,11 +105,6 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
     }
   };
 
-  const countryOptions = COUNTRIES.map((country) => ({
-    value: country.name,
-    label: country.name,
-  }));
-
   return (
     <Dialog
       open={open}
@@ -167,123 +126,14 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           )}
 
           <Grid container spacing={2}>
-            {/* Property Name */}
             <Grid item xs={12}>
-              <FormTextField
-                name="name"
-                control={control}
-                label="Property Name"
-                required
-              />
+              <PropertyBasicInfo control={control} />
             </Grid>
-
-            {/* Address */}
             <Grid item xs={12}>
-              <FormTextField
-                name="address"
-                control={control}
-                label="Street Address"
-                required
-              />
+              <PropertyLocation control={control} />
             </Grid>
-
-            {/* City, Region, Postal Code, Country */}
-            <Grid item xs={12} sm={6} md={3}>
-              <FormTextField
-                name="city"
-                control={control}
-                label="City"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormTextField
-                name="state"
-                control={control}
-                label="State / Province / Region"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormTextField
-                name="zipCode"
-                control={control}
-                label="Postal Code"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormSelect
-                name="country"
-                control={control}
-                label="Country"
-                options={countryOptions}
-                required
-              />
-            </Grid>
-
-            {/* Property Type & Status */}
-            <Grid item xs={12} sm={6}>
-              <FormSelect
-                name="propertyType"
-                control={control}
-                label="Property Type"
-                options={PROPERTY_TYPES}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormSelect
-                name="status"
-                control={control}
-                label="Status"
-                options={PROPERTY_STATUSES}
-              />
-            </Grid>
-
-            {/* Year Built & Total Units */}
-            <Grid item xs={12} sm={4}>
-              <FormTextField
-                name="yearBuilt"
-                control={control}
-                label="Year Built"
-                type="number"
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormTextField
-                name="totalUnits"
-                control={control}
-                label="Total Units"
-                type="number"
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormTextField
-                name="totalArea"
-                control={control}
-                label="Total Area"
-                type="number"
-              />
-            </Grid>
-
-            {/* Description */}
             <Grid item xs={12}>
-              <FormTextField
-                name="description"
-                control={control}
-                label="Description"
-                multiline
-                rows={3}
-              />
-            </Grid>
-
-            {/* Image URL */}
-            <Grid item xs={12}>
-              <FormTextField
-                name="imageUrl"
-                control={control}
-                label="Image URL (optional)"
-                helperText="Enter a URL to an image of the property"
-              />
+              <PropertyManagement control={control} />
             </Grid>
           </Grid>
         </Box>

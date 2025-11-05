@@ -15,12 +15,9 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
-import ensureArray from '../utils/ensureArray';
-import { queryKeys } from '../utils/queryKeys.js';
-import { jobSchema, jobDefaultValues } from '../schemas/jobSchema';
-import { FormTextField, FormSelect } from './form';
+import JobSchedule from './forms/JobSchedule';
+import JobAssignment from './forms/JobAssignment';
+import JobCostEstimate from './forms/JobCostEstimate';
 
 const PRIORITY_OPTIONS = [
   { value: 'LOW', label: 'Low' },
@@ -272,54 +269,11 @@ const JobForm = ({ job, onSuccess, onCancel }) => {
             />
           </Grid>
 
-          <Grid item xs={12}>
-            <FormSelect
-              name="assignedToId"
-              control={control}
-              label="Assign to Technician (Optional)"
-              options={technicianOptions}
-            />
-          </Grid>
+          <JobAssignment control={control} technicianOptions={technicianOptions} />
 
-          <Grid item xs={12} sm={6}>
-            <Controller
-              name="scheduledDate"
-              control={control}
-              render={({ field, fieldState: { error } }) => (
-                <TextField
-                  {...field}
-                  fullWidth
-                  type="datetime-local"
-                  label="Scheduled Date (Optional)"
-                  error={!!error}
-                  helperText={error?.message}
-                  InputLabelProps={{ shrink: true }}
-                  inputProps={{
-                    'aria-invalid': !!error,
-                    'aria-describedby': error ? 'scheduledDate-error' : undefined,
-                  }}
-                  FormHelperTextProps={{
-                    id: error ? 'scheduledDate-error' : undefined,
-                    role: error ? 'alert' : undefined,
-                    'aria-live': error ? 'polite' : undefined,
-                  }}
-                />
-              )}
-            />
-          </Grid>
+          <JobSchedule control={control} />
 
-          <Grid item xs={12} sm={6}>
-            <FormTextField
-              name="estimatedCost"
-              control={control}
-              label="Estimated Cost (Optional)"
-              type="number"
-              inputProps={{
-                min: 0,
-                step: 0.01,
-              }}
-            />
-          </Grid>
+          <JobCostEstimate control={control} />
 
           <Grid item xs={12}>
             <FormTextField
