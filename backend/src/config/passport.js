@@ -116,19 +116,12 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
             return done(new Error('Google signup is only available for Property Managers'), null);
           }
 
-          // Create organization
-          const org = await prisma.org.create({
-            data: {
-              name: `${firstName}'s Organization`
-            }
-          });
-
           // Calculate trial end date (14 days)
           const trialEndDate = calculateTrialEndDate();
 
           const passwordHash = await generatePlaceholderPasswordHash();
 
-          // Create user
+          // Create user (aligned with regular registration - no org creation)
           user = await prisma.user.create({
             data: {
               email,
@@ -139,8 +132,7 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
               emailVerified: true, // Google emails are verified
               subscriptionPlan: 'FREE_TRIAL',
               subscriptionStatus: 'TRIAL',
-              trialEndDate,
-              orgId: org.id
+              trialEndDate
             }
           });
 
@@ -192,8 +184,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id },
-      include: { org: true }
+      where: { id }
     });
     done(null, user);
   } catch (error) {
