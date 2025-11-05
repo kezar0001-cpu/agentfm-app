@@ -29,3 +29,5 @@ export function useNotification() {
     showInfo: useCallback((msg) => showNotification(msg, 'info'), [showNotification]),
   };
 }
+
+export default useNotification;
