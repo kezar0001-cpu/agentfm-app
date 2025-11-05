@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export default function useNotification() {
+export function useNotification() {
   const [notification, setNotification] = useState({
     open: false,
     message: '',
@@ -29,3 +29,5 @@ export default function useNotification() {
     showInfo: useCallback((msg) => showNotification(msg, 'info'), [showNotification]),
   };
 }
+
+export default useNotification;

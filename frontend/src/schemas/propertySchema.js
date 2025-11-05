@@ -64,3 +64,22 @@ export const propertyDefaultValues = {
   description: '',
   imageUrl: '',
 };
+
+export const DOCUMENT_CATEGORIES = [
+  { value: 'LEASE_AGREEMENT', label: 'Lease Agreement' },
+  { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'PERMIT', label: 'Permit' },
+  { value: 'INSPECTION_REPORT', label: 'Inspection Report' },
+  { value: 'MAINTENANCE_RECORD', label: 'Maintenance Record' },
+  { value: 'FINANCIAL', label: 'Financial' },
+  { value: 'LEGAL', label: 'Legal' },
+  { value: 'PHOTOS', label: 'Photos' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+export const DOCUMENT_ACCESS_LEVELS = [
+  { value: 'PUBLIC', label: 'Public' },
+  { value: 'TENANT', label: 'Tenant' },
+  { value: 'OWNER', label: 'Owner' },
+  { value: 'PROPERTY_MANAGER', label: 'Property Manager' },
+];
