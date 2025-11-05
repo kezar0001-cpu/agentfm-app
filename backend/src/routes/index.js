@@ -30,7 +30,6 @@ const router = Router();
 router.use('/auth', authRouter);
 router.use('/jobs', jobsRouter);
 router.use('/units', unitsRouter);
-import unitsRouter from './units.js';
 router.use('/properties', propertiesRouter);
 router.use('/dashboard', dashboardRouter);
 router.use('/inspections', inspectionsRouter);
