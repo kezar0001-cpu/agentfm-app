@@ -17,12 +17,19 @@ import useApiMutation from '../hooks/useApiMutation';
 import PropertyBasicInfo from './forms/PropertyBasicInfo';
 import PropertyLocation from './forms/PropertyLocation';
 import PropertyManagement from './forms/PropertyManagement';
+import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
+import { queryKeys } from '../utils/queryKeys';
 
 const PROPERTY_STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'INACTIVE', label: 'Inactive' },
   { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
 ];
+
+// Helper function to normalize country values from backend
+const normaliseCountryValue = (country) => {
+  return country || '';
+};
 
 export default function PropertyForm({ open, onClose, property, onSuccess }) {
   const isEdit = !!property;
