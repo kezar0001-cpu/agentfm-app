@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
-import { isAuthenticated } from './lib/auth.js';
+import { refreshCurrentUser } from './lib/auth.js';
 
 function AuthGate({ children }) {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        const authenticated = isAuthenticated();
+        const user = await refreshCurrentUser();
         
-        console.log('AuthGate checking authentication:', authenticated);
+        console.log('AuthGate checking authentication:', !!user);
 
-        if (!authenticated) {
+        if (!user) {
           console.log('Not authenticated, redirecting to signin');
           navigate('/signin', { replace: true });
         } else {
