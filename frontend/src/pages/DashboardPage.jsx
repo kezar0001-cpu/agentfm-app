@@ -30,6 +30,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
+import GradientButton from '../components/GradientButton';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining } from '../utils/date.js';
 import { redirectToBillingPortal } from '../utils/billing.js';
@@ -210,23 +211,17 @@ const DashboardPage = () => {
           >
             <RefreshIcon />
           </IconButton>
-          <Button
-            variant="contained"
+          <GradientButton
             startIcon={<AddIcon />}
             onClick={() => navigate('/properties', { state: { openCreateDialog: true } })}
-            fullWidth
+            size="medium"
             sx={{
-              maxWidth: { xs: '100%', md: 'none' },
-              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-              boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-                boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
-              },
+              maxWidth: { xs: '100%', md: 'auto' },
+              minWidth: { md: 150 },
             }}
           >
             Add Property
-          </Button>
+          </GradientButton>
         </Stack>
       </Stack>
 
@@ -439,40 +434,60 @@ const DashboardPage = () => {
 
           {/* Service Requests Summary (if applicable) */}
           {summary?.serviceRequests && summary.serviceRequests.total > 0 && (
-            <Paper sx={{ p: { xs: 2, md: 3 } }}>
-              <Typography variant="h6" gutterBottom>
+            <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="h6" gutterBottom fontWeight={700}>
                 Service Requests
               </Typography>
               <Divider sx={{ mb: 2 }} />
               <Stack spacing={1}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary">
                     Submitted
                   </Typography>
                   <Chip
-                    label={summary.serviceRequests.submitted}
+                    label={summary.serviceRequests.submitted || 0}
                     size="small"
                     color="warning"
                   />
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary">
                     Under Review
                   </Typography>
                   <Chip
-                    label={summary.serviceRequests.underReview}
+                    label={summary.serviceRequests.underReview || 0}
                     size="small"
                     color="info"
                   />
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary">
                     Approved
                   </Typography>
                   <Chip
-                    label={summary.serviceRequests.approved}
+                    label={summary.serviceRequests.approved || 0}
                     size="small"
                     color="success"
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Converted to Jobs
+                  </Typography>
+                  <Chip
+                    label={summary.serviceRequests.converted || 0}
+                    size="small"
+                    color="primary"
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Completed
+                  </Typography>
+                  <Chip
+                    label={summary.serviceRequests.completed || 0}
+                    size="small"
+                    color="default"
                   />
                 </Box>
                 <Button
@@ -618,6 +633,18 @@ const ActivityItem = ({ item }) => {
     return icons[type] || <InfoIcon fontSize="small" />;
   };
 
+  const getIconColor = (type) => {
+    const colors = {
+      property: '#3b82f6', // Blue - matches Properties card
+      unit: '#10b981',     // Green - matches Units card
+      job: '#f59e0b',      // Orange - matches Jobs card
+      inspection: '#8b5cf6', // Purple - matches Inspections card
+      service_request: '#f59e0b', // Orange - same as jobs
+      notification: '#3b82f6', // Blue - info color
+    };
+    return colors[type] || '#3b82f6'; // Default to blue
+  };
+
   const getRoute = (type, id, currentItem) => {
     const routes = {
       inspection: '/inspections',
@@ -659,7 +686,7 @@ const ActivityItem = ({ item }) => {
     >
       <Box
         sx={{
-          bgcolor: 'primary.main',
+          bgcolor: getIconColor(item.type),
           color: 'white',
           borderRadius: 1,
           p: 1,

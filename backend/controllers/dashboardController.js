@@ -18,7 +18,7 @@ export const getDashboardSummary = async (req, res) => {
       units:      { total: 0, occupied: 0, available: 0, maintenance: 0 },
       jobs:       { total: 0, open: 0, assigned: 0, inProgress: 0, completed: 0, overdue: 0 },
       inspections:{ total: 0, scheduled: 0, inProgress: 0, completed: 0, upcoming: 0 },
-      serviceRequests: { total: 0, submitted: 0, underReview: 0, approved: 0 },
+      serviceRequests: { total: 0, submitted: 0, underReview: 0, approved: 0, converted: 0, completed: 0 },
       alerts: [],
     };
 
@@ -143,6 +143,7 @@ export const getDashboardSummary = async (req, res) => {
     }
 
     // ---------- Service Requests (only surfaced for PM & Owner in the buckets)
+    // Preserves history by including converted and completed requests
     if (role === 'PROPERTY_MANAGER' || role === 'OWNER') {
       const byStatus = await prisma.serviceRequest.groupBy({
         by: ['status'],
@@ -151,9 +152,11 @@ export const getDashboardSummary = async (req, res) => {
       });
       summary.serviceRequests.total = byStatus.reduce((n, r) => n + r._count._all, 0);
       for (const r of byStatus) {
-        if (r.status === 'SUBMITTED')     summary.serviceRequests.submitted = r._count._all;
-        if (r.status === 'UNDER_REVIEW')  summary.serviceRequests.underReview = r._count._all;
-        if (r.status === 'APPROVED')      summary.serviceRequests.approved = r._count._all;
+        if (r.status === 'SUBMITTED')        summary.serviceRequests.submitted = r._count._all;
+        if (r.status === 'UNDER_REVIEW')     summary.serviceRequests.underReview = r._count._all;
+        if (r.status === 'APPROVED')         summary.serviceRequests.approved = r._count._all;
+        if (r.status === 'CONVERTED_TO_JOB') summary.serviceRequests.converted = r._count._all;
+        if (r.status === 'COMPLETED')        summary.serviceRequests.completed = r._count._all;
       }
     }
 

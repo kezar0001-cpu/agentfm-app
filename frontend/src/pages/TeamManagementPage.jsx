@@ -38,6 +38,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import GradientButton from '../components/GradientButton';
 
 export default function TeamManagementPage() {
   const queryClient = useQueryClient();
@@ -307,23 +308,17 @@ export default function TeamManagementPage() {
           >
             Refresh
           </Button>
-          <Button
-            variant="contained"
+          <GradientButton
             startIcon={<PersonAddIcon />}
             onClick={() => setInviteDialogOpen(true)}
-            fullWidth
+            size="medium"
             sx={{
               display: { xs: 'flex', sm: 'inline-flex' },
-              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-              boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-                boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
-              },
+              maxWidth: { xs: '100%', sm: 'auto' },
             }}
           >
             Invite User
-          </Button>
+          </GradientButton>
         </Box>
       </Box>
 

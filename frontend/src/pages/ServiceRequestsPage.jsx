@@ -33,6 +33,7 @@ import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 import { CircularProgress } from '@mui/material';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import GradientButton from '../components/GradientButton';
 
 const ServiceRequestsPage = () => {
   const navigate = useNavigate();
@@ -206,23 +207,16 @@ const ServiceRequestsPage = () => {
               : 'Review and manage tenant service requests'}
           </Typography>
         </Box>
-        <Button
-          variant="contained"
+        <GradientButton
           startIcon={<AddIcon />}
           onClick={handleCreate}
-          fullWidth
+          size="medium"
           sx={{
             maxWidth: { xs: '100%', md: 'auto' },
-            background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-            boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-              boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
-            },
           }}
         >
           {userRole === 'TENANT' ? 'Submit Request' : 'Create Request'}
-        </Button>
+        </GradientButton>
       </Stack>
 
       {/* Filters */}
