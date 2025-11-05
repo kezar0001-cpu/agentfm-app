@@ -47,7 +47,7 @@ function calculateTrialEndDate(baseDate = new Date()) {
   return endDate;
 }
 
-async function ensureTrialState(user) {
+async function ensureTrialState(user, updateLoginTime = false) {
   if (!user) return user;
 
   const now = new Date();
@@ -65,6 +65,11 @@ async function ensureTrialState(user) {
     if (trialEndDate && trialEndDate <= now) {
       updates.subscriptionStatus = 'SUSPENDED';
     }
+  }
+
+  // Optionally update lastLoginAt during login (combine with other updates)
+  if (updateLoginTime) {
+    updates.lastLoginAt = now;
   }
 
   if (Object.keys(updates).length > 0) {
@@ -305,9 +310,8 @@ router.post('/login', async (req, res) => {
 
     const { accessToken, refreshToken } = issueAuthTokens(user, res);
 
-    await prisma.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
-
-    const userWithTrial = await ensureTrialState(user);
+    // Combine trial state check and lastLoginAt update in single operation
+    const userWithTrial = await ensureTrialState(user, true);
 
     const { passwordHash: _ph, ...userWithoutPassword } = userWithTrial;
     res.json({ success: true, token: accessToken, accessToken, refreshToken, user: userWithoutPassword });
