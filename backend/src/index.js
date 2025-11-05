@@ -32,6 +32,44 @@ const maintenancePlanCronTask = scheduleMaintenancePlanCron();
 // Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);
 
+// ---- CORS (MUST come before rate limiters and other middleware)
+const allowlist = new Set(
+  (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
+    .map((s) => s && s.trim())
+    .filter(Boolean)
+);
+if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
+[
+  'https://www.buildstate.com.au',
+  'https://buildstate.com.au',
+  'https://api.buildstate.com.au',
+  'https://agentfm.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+].forEach((o) => allowlist.add(o));
+const dynamicOriginMatchers = [
+  /https:\/\/.+\.vercel\.app$/,
+];
+
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
+    if (allowlist.has(origin)) return cb(null, true);
+    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+      return cb(null, true);
+    }
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
 // ---- Security Middleware
 // Helmet helps secure Express apps by setting various HTTP headers
 app.use(helmet({
@@ -83,42 +121,6 @@ app.use(mongoSanitize());
 
 // Compression middleware
 app.use(compression());
-
-// ---- CORS
-const allowlist = new Set(
-  (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
-    .map((s) => s && s.trim())
-    .filter(Boolean)
-);
-if (process.env.FRONTEND_URL) allowlist.add(process.env.FRONTEND_URL.trim());
-[
-  'https://www.buildstate.com.au',
-  'https://buildstate.com.au',
-  'https://api.buildstate.com.au',
-  'https://agentfm.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-].forEach((o) => allowlist.add(o));
-const dynamicOriginMatchers = [
-  /https:\/\/.+\.vercel\.app$/,
-];
-
-const corsOptions = {
-  origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowlist.has(origin)) return cb(null, true);
-    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
-      return cb(null, true);
-    }
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['set-cookie'],
-};
-
-app.use(cors(corsOptions));
 app.use(cookieParser());
 
 // ---- Serve Static Files ---
