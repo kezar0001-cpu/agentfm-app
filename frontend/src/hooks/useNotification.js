@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export default function useNotification() {
+export function useNotification() {
   const [notification, setNotification] = useState({
     open: false,
     message: '',
