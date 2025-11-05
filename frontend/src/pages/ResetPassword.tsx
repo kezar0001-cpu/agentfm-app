@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Lock, CheckCircle } from '@mui/icons-material';
 import { apiClient } from '../api/client.js';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -77,8 +78,8 @@ export default function ResetPassword() {
     if (!pwd) {
       return 'Password is required';
     }
-    if (pwd.length < 8) {
-      return 'Password must be at least 8 characters long';
+    if (pwd.length < 12) {
+      return 'Password must be at least 12 characters long';
     }
     if (!/(?=.*[a-z])/.test(pwd)) {
       return 'Password must contain at least one lowercase letter';
@@ -88,6 +89,9 @@ export default function ResetPassword() {
     }
     if (!/(?=.*\d)/.test(pwd)) {
       return 'Password must contain at least one number';
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(pwd)) {
+      return 'Password must contain at least one special character';
     }
     return null;
   };
@@ -299,7 +303,7 @@ export default function ResetPassword() {
                   setPasswordError('');
                 }}
                 error={!!passwordError}
-                helperText={passwordError || 'Must be at least 8 characters with uppercase, lowercase, and numbers'}
+                helperText={passwordError}
                 disabled={isLoading}
                 InputProps={{
                   startAdornment: (
@@ -317,9 +321,11 @@ export default function ResetPassword() {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ mb: 2 }}
+                sx={{ mb: 0 }}
                 autoFocus
               />
+
+              <PasswordStrengthMeter password={password} />
 
               {/* Confirm Password Field */}
               <TextField
@@ -412,13 +418,16 @@ export default function ResetPassword() {
                 Password Requirements:
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                • At least 8 characters long
+                • At least 12 characters long
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 • Contains uppercase and lowercase letters
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 • Contains at least one number
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                • Contains at least one special character
               </Typography>
             </Box>
           )}

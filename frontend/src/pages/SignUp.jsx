@@ -7,6 +7,7 @@ import {
 import { Visibility, VisibilityOff, Google as GoogleIcon, ArrowBack } from '@mui/icons-material';
 import { saveTokenFromUrl, setCurrentUser } from '../lib/auth';
 import { apiClient } from '../api/client.js';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -79,7 +80,21 @@ export default function SignUp() {
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) { setError('Please enter a valid email address'); return false; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return false; }
+
+    // Validate password requirements
+    const passwordRequirements = {
+      minLength: password.length >= 12,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /\d/.test(password),
+      hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password),
+    };
+
+    if (!Object.values(passwordRequirements).every(Boolean)) {
+      setError('Password does not meet all requirements. Please check the requirements below.');
+      return false;
+    }
+
     if (password !== confirmPassword) { setError('Passwords do not match'); return false; }
     const phoneRegex = /^[\d\s\-\+\(\)]+$/;
     if (phone && !phoneRegex.test(phone)) { setError('Please enter a valid phone number'); return false; }
@@ -246,7 +261,7 @@ export default function SignUp() {
             <TextField
               margin="normal" required fullWidth name="password" label="Password"
               type={showPassword ? 'text' : 'password'} id="password" autoComplete="new-password"
-              value={formData.password} onChange={handleChange} disabled={loading} helperText="Minimum 8 characters"
+              value={formData.password} onChange={handleChange} disabled={loading}
               InputProps={{ endAdornment: (
                 <InputAdornment position="end">
                   <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
@@ -255,6 +270,8 @@ export default function SignUp() {
                 </InputAdornment>
               )}}
             />
+
+            <PasswordStrengthMeter password={formData.password} />
 
             <TextField
               margin="normal" required fullWidth name="confirmPassword" label="Confirm Password"
