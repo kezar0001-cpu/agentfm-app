@@ -517,6 +517,8 @@ enum UnitStatus {
   OCCUPIED
   MAINTENANCE
   VACANT
+  PENDING_MOVE_IN
+  PENDING_MOVE_OUT
 }
 
 enum InviteStatus {

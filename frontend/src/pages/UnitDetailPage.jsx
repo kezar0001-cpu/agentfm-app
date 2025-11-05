@@ -52,11 +52,16 @@ import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 import Breadcrumbs from '../components/Breadcrumbs';
 
+import MoveInWizard from '../components/MoveInWizard';
+import MoveOutWizard from '../components/MoveOutWizard';
+
 const getStatusColor = (status) => {
   const colors = {
     AVAILABLE: 'success',
     OCCUPIED: 'primary',
     MAINTENANCE: 'warning',
+    PENDING_MOVE_IN: 'info',
+    PENDING_MOVE_OUT: 'info',
     VACANT: 'default',
   };
   return colors[status] || 'default';
@@ -72,6 +77,8 @@ export default function UnitDetailPage() {
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+  const [moveInWizardOpen, setMoveInWizardOpen] = useState(false);
+  const [moveOutWizardOpen, setMoveOutWizardOpen] = useState(false);
 
   // Fetch unit details
   const unitQuery = useQuery({
@@ -247,6 +254,22 @@ export default function UnitDetailPage() {
                   >
                     Edit Unit
                   </Button>
+                  {unit.status === 'AVAILABLE' && (
+                    <Button
+                      variant="contained"
+                      onClick={() => setMoveInWizardOpen(true)}
+                    >
+                      Move In
+                    </Button>
+                  )}
+                  {unit.status === 'OCCUPIED' && (
+                    <Button
+                      variant="contained"
+                      onClick={() => setMoveOutWizardOpen(true)}
+                    >
+                      Move Out
+                    </Button>
+                  )}
                 </Stack>
               </Box>
             </Box>
@@ -650,6 +673,32 @@ export default function UnitDetailPage() {
                   Remove
                 </Button>
               </DialogActions>
+            </Dialog>
+
+            {/* Move In Wizard Dialog */}
+            <Dialog
+              open={moveInWizardOpen}
+              onClose={() => setMoveInWizardOpen(false)}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogTitle>Move In Wizard</DialogTitle>
+              <DialogContent>
+                <MoveInWizard unitId={id} onComplete={() => setMoveInWizardOpen(false)} />
+              </DialogContent>
+            </Dialog>
+
+            {/* Move Out Wizard Dialog */}
+            <Dialog
+              open={moveOutWizardOpen}
+              onClose={() => setMoveOutWizardOpen(false)}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogTitle>Move Out Wizard</DialogTitle>
+              <DialogContent>
+                <MoveOutWizard unitId={id} onComplete={() => setMoveOutWizardOpen(false)} />
+              </DialogContent>
             </Dialog>
           </>
         )}
