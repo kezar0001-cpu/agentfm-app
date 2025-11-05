@@ -54,7 +54,7 @@ export default function TeamManagementPage() {
 
   // Fetch all users
   const { data: users, isLoading: usersLoading } = useQuery({
-    queryKey: queryKeys.users.all(),
+    queryKey: queryKeys.teams.users(),
     queryFn: async () => {
       const roles = ['OWNER', 'TECHNICIAN', 'TENANT'];
       const promises = roles.map(role =>
@@ -67,7 +67,7 @@ export default function TeamManagementPage() {
 
   // Fetch pending invites
   const { data: invites = [], isLoading: invitesLoading } = useQuery({
-    queryKey: queryKeys.invites.all(),
+    queryKey: queryKeys.teams.invites(),
     queryFn: async () => {
       const response = await apiClient.get('/invites');
       return ensureArray(response.data, ['invites', 'data.invites', 'items']);
