@@ -58,13 +58,33 @@ export async function sendNotification(userId, type, title, message, options = {
           const templateKey = getTemplateKeyFromType(type);
           if (templateKey && emailTemplates[templateKey]) {
             const emailContent = emailTemplates[templateKey](options.emailData || {});
-            await sendEmail(user.email, emailContent.subject, emailContent.html);
-            logger.info(`Sent email notification to ${user.email}: ${type}`);
+
+            // Prepare metadata for email tracking
+            const emailMetadata = {
+              userId,
+              notificationType: type,
+              entityType: options.entityType,
+              entityId: options.entityId,
+            };
+
+            await sendEmail(user.email, emailContent.subject, emailContent.html, emailMetadata);
+            logger.info(`Sent email notification to ${user.email}: ${type}`, {
+              userId,
+              notificationType: type,
+              entityType: options.entityType,
+              entityId: options.entityId,
+            });
           }
         }
       } catch (emailError) {
         // Log email error but don't fail the notification
-        logger.error(`Failed to send email notification: ${emailError.message}`);
+        logger.error(`Failed to send email notification: ${emailError.message}`, {
+          userId,
+          notificationType: type,
+          entityType: options.entityType,
+          entityId: options.entityId,
+          error: emailError.message,
+        });
       }
     }
 
@@ -274,17 +294,25 @@ export async function notifyTrialExpiring(user, daysRemaining) {
  */
 export async function sendWelcomeEmail(user) {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  
+
   try {
     const emailContent = emailTemplates.welcomeEmail({
       userName: `${user.firstName} ${user.lastName}`,
       dashboardUrl: `${frontendUrl}/dashboard`,
     });
-    
-    await sendEmail(user.email, emailContent.subject, emailContent.html);
-    logger.info(`Sent welcome email to ${user.email}`);
+
+    const emailMetadata = {
+      userId: user.id,
+      emailType: 'welcome',
+    };
+
+    await sendEmail(user.email, emailContent.subject, emailContent.html, emailMetadata);
+    logger.info(`Sent welcome email to ${user.email}`, emailMetadata);
   } catch (error) {
-    logger.error(`Failed to send welcome email: ${error.message}`);
+    logger.error(`Failed to send welcome email: ${error.message}`, {
+      userId: user.id,
+      error: error.message,
+    });
   }
 }
 

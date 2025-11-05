@@ -1,6 +1,18 @@
 import { Resend } from 'resend';
+import { getRedisClient } from '../config/redisClient.js';
+import logger from './logger.js';
 
 let resendClient;
+
+// Email retry configuration
+const RETRY_CONFIG = {
+  MAX_RETRIES: 3,
+  INITIAL_DELAY_MS: 1000, // 1 second
+  MAX_DELAY_MS: 30000, // 30 seconds
+  BACKOFF_MULTIPLIER: 2,
+  RETRY_QUEUE_PREFIX: 'email:retry:',
+  RETRY_QUEUE_TTL: 86400, // 24 hours
+};
 
 function getResendClient() {
   if (resendClient) {
@@ -27,34 +39,277 @@ function ensureResendClient() {
 }
 
 /**
- * Send a generic email
+ * Email Retry Queue Manager
+ * Manages retry state and scheduling for failed email attempts
+ */
+class EmailRetryQueue {
+  constructor() {
+    this.redis = getRedisClient();
+  }
+
+  /**
+   * Generate unique key for email retry tracking
+   */
+  getRetryKey(emailId) {
+    return `${RETRY_CONFIG.RETRY_QUEUE_PREFIX}${emailId}`;
+  }
+
+  /**
+   * Store retry attempt information
+   */
+  async storeRetryAttempt(emailId, attemptNumber, emailData, error) {
+    if (!this.redis?.isOpen) {
+      logger.warn('[EmailRetry] Redis not available, cannot store retry attempt', {
+        emailId,
+        attemptNumber,
+      });
+      return;
+    }
+
+    try {
+      const key = this.getRetryKey(emailId);
+      const retryData = {
+        emailId,
+        attemptNumber,
+        emailData: {
+          to: emailData.to,
+          subject: emailData.subject,
+          from: emailData.from,
+        },
+        error: {
+          message: error?.message,
+          code: error?.code,
+          statusCode: error?.statusCode,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.redis.set(key, JSON.stringify(retryData), {
+        EX: RETRY_CONFIG.RETRY_QUEUE_TTL,
+      });
+
+      logger.info('[EmailRetry] Stored retry attempt', {
+        emailId,
+        attemptNumber,
+        to: emailData.to,
+      });
+    } catch (err) {
+      logger.error('[EmailRetry] Failed to store retry attempt', {
+        emailId,
+        error: err.message,
+      });
+    }
+  }
+
+  /**
+   * Get retry attempt information
+   */
+  async getRetryAttempt(emailId) {
+    if (!this.redis?.isOpen) {
+      return null;
+    }
+
+    try {
+      const key = this.getRetryKey(emailId);
+      const data = await this.redis.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (err) {
+      logger.error('[EmailRetry] Failed to get retry attempt', {
+        emailId,
+        error: err.message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Remove retry attempt from queue (on success)
+   */
+  async removeRetryAttempt(emailId) {
+    if (!this.redis?.isOpen) {
+      return;
+    }
+
+    try {
+      const key = this.getRetryKey(emailId);
+      await this.redis.del(key);
+      logger.info('[EmailRetry] Removed retry attempt', { emailId });
+    } catch (err) {
+      logger.error('[EmailRetry] Failed to remove retry attempt', {
+        emailId,
+        error: err.message,
+      });
+    }
+  }
+
+  /**
+   * Calculate exponential backoff delay
+   */
+  calculateBackoffDelay(attemptNumber) {
+    const delay = Math.min(
+      RETRY_CONFIG.INITIAL_DELAY_MS * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attemptNumber - 1),
+      RETRY_CONFIG.MAX_DELAY_MS
+    );
+    return delay;
+  }
+}
+
+const emailRetryQueue = new EmailRetryQueue();
+
+/**
+ * Generate unique email ID for tracking
+ */
+function generateEmailId(to, subject) {
+  return `${to}-${subject}-${Date.now()}`;
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Extract error details from various error types
+ */
+function extractErrorDetails(error) {
+  return {
+    message: error?.message || 'Unknown error',
+    code: error?.code || error?.error?.code || 'UNKNOWN_ERROR',
+    statusCode: error?.statusCode || error?.error?.statusCode,
+    name: error?.name,
+  };
+}
+
+/**
+ * Send email with retry logic and exponential backoff
  * @param {string} to - Recipient email address
  * @param {string} subject - Email subject
  * @param {string} html - Email HTML content
+ * @param {object} metadata - Optional metadata for tracking (e.g., jobId, userId)
+ * @param {number} attemptNumber - Current attempt number (for internal use)
  */
-export async function sendEmail(to, subject, html) {
+async function sendEmailWithRetry(to, subject, html, metadata = {}, attemptNumber = 1) {
+  const emailId = metadata.emailId || generateEmailId(to, subject);
+  const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+
+  const logContext = {
+    emailId,
+    to,
+    subject,
+    attemptNumber,
+    maxRetries: RETRY_CONFIG.MAX_RETRIES,
+    ...metadata,
+  };
+
   try {
-    const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+    logger.info('[Email] Attempting to send email', logContext);
 
     const resend = ensureResendClient();
 
-    const { data, error } = await resend.emails.send({
+    const emailData = {
       from: emailFrom,
       to: to,
       subject: subject,
       html: html,
-    });
+    };
+
+    const { data, error } = await resend.emails.send(emailData);
 
     if (error) {
-      console.error('Error sending email:', error);
-      throw new Error('Failed to send email');
+      const errorDetails = extractErrorDetails(error);
+
+      logger.error('[Email] Resend API returned error', {
+        ...logContext,
+        error: errorDetails,
+      });
+
+      // Store retry attempt in Redis
+      await emailRetryQueue.storeRetryAttempt(emailId, attemptNumber, emailData, errorDetails);
+
+      // Determine if we should retry
+      if (attemptNumber < RETRY_CONFIG.MAX_RETRIES) {
+        const delay = emailRetryQueue.calculateBackoffDelay(attemptNumber);
+
+        logger.warn('[Email] Retrying email after delay', {
+          ...logContext,
+          delayMs: delay,
+          nextAttempt: attemptNumber + 1,
+        });
+
+        await sleep(delay);
+
+        return sendEmailWithRetry(to, subject, html, { ...metadata, emailId }, attemptNumber + 1);
+      } else {
+        logger.error('[Email] Max retry attempts reached, email failed permanently', {
+          ...logContext,
+          error: errorDetails,
+        });
+
+        throw new Error(`Failed to send email after ${RETRY_CONFIG.MAX_RETRIES} attempts: ${errorDetails.message}`);
+      }
     }
+
+    // Success - remove from retry queue
+    await emailRetryQueue.removeRetryAttempt(emailId);
+
+    logger.info('[Email] Email sent successfully', {
+      ...logContext,
+      emailDataId: data?.id,
+    });
 
     return data;
   } catch (error) {
-    console.error('Email sending error:', error);
-    throw error;
+    const errorDetails = extractErrorDetails(error);
+
+    logger.error('[Email] Exception while sending email', {
+      ...logContext,
+      error: errorDetails,
+      stack: error.stack,
+    });
+
+    // Store retry attempt in Redis
+    await emailRetryQueue.storeRetryAttempt(
+      emailId,
+      attemptNumber,
+      { from: emailFrom, to, subject },
+      errorDetails
+    );
+
+    // Determine if we should retry
+    if (attemptNumber < RETRY_CONFIG.MAX_RETRIES) {
+      const delay = emailRetryQueue.calculateBackoffDelay(attemptNumber);
+
+      logger.warn('[Email] Retrying email after exception', {
+        ...logContext,
+        delayMs: delay,
+        nextAttempt: attemptNumber + 1,
+      });
+
+      await sleep(delay);
+
+      return sendEmailWithRetry(to, subject, html, { ...metadata, emailId }, attemptNumber + 1);
+    } else {
+      logger.error('[Email] Max retry attempts reached after exception', {
+        ...logContext,
+        error: errorDetails,
+      });
+
+      throw error;
+    }
   }
+}
+
+/**
+ * Send a generic email
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} html - Email HTML content
+ * @param {object} metadata - Optional metadata for tracking (e.g., jobId, userId)
+ */
+export async function sendEmail(to, subject, html, metadata = {}) {
+  return sendEmailWithRetry(to, subject, html, metadata);
 }
 
 /**
@@ -62,30 +317,17 @@ export async function sendEmail(to, subject, html) {
  * @param {string} to - Recipient email address
  * @param {string} resetUrl - Password reset URL with selector and token
  * @param {string} firstName - User's first name
+ * @param {object} metadata - Optional metadata for tracking (e.g., userId)
  */
-export async function sendPasswordResetEmail(to, resetUrl, firstName) {
-  try {
-    const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+export async function sendPasswordResetEmail(to, resetUrl, firstName, metadata = {}) {
+  const subject = 'Reset Your Password';
+  const html = generatePasswordResetEmailHTML(firstName, resetUrl);
 
-    const resend = ensureResendClient();
-
-    const { data, error } = await resend.emails.send({
-      from: emailFrom,
-      to: to,
-      subject: 'Reset Your Password',
-      html: generatePasswordResetEmailHTML(firstName, resetUrl),
-    });
-
-    if (error) {
-      console.error('Error sending password reset email:', error);
-      throw new Error('Failed to send password reset email');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Email sending error:', error);
-    throw error;
-  }
+  return sendEmailWithRetry(to, subject, html, {
+    ...metadata,
+    emailType: 'password_reset',
+    firstName,
+  });
 }
 
 /**
@@ -217,30 +459,20 @@ function generatePasswordResetEmailHTML(firstName, resetUrl) {
  * @param {string} role - Role the user is being invited as
  * @param {string} propertyName - Optional property name
  * @param {string} unitName - Optional unit name
+ * @param {object} metadata - Optional metadata for tracking (e.g., inviteId, inviterId)
  */
-export async function sendInviteEmail(to, inviteUrl, inviterName, role, propertyName = null, unitName = null) {
-  try {
-    const emailFrom = process.env.EMAIL_FROM || 'Buildstate <no-reply@buildtstate.com.au>';
+export async function sendInviteEmail(to, inviteUrl, inviterName, role, propertyName = null, unitName = null, metadata = {}) {
+  const subject = 'You\'ve been invited to join Buildstate';
+  const html = generateInviteEmailHTML(inviteUrl, inviterName, role, propertyName, unitName);
 
-    const resend = ensureResendClient();
-
-    const { data, error } = await resend.emails.send({
-      from: emailFrom,
-      to: to,
-      subject: 'You\'ve been invited to join Buildstate',
-      html: generateInviteEmailHTML(inviteUrl, inviterName, role, propertyName, unitName),
-    });
-
-    if (error) {
-      console.error('Error sending invite email:', error);
-      throw new Error('Failed to send invite email');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Email sending error:', error);
-    throw error;
-  }
+  return sendEmailWithRetry(to, subject, html, {
+    ...metadata,
+    emailType: 'team_invite',
+    inviterName,
+    role,
+    propertyName,
+    unitName,
+  });
 }
 
 /**
