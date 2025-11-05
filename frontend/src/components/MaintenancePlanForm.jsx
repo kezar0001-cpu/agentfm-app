@@ -21,6 +21,7 @@ import { apiClient } from '../api/client';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 import { FormTextField, FormSelect, FormDatePicker } from './form';
+import { toISOString } from '../utils/date';
 
 const FREQUENCY_OPTIONS = [
   { value: 'DAILY', label: 'Daily' },
@@ -97,7 +98,7 @@ const MaintenancePlanForm = ({ plan, onSuccess, onCancel }) => {
     try {
       const payload = {
         ...data,
-        nextDueDate: data.nextDueDate?.toISOString(),
+        nextDueDate: toISOString(data.nextDueDate),
       };
 
       if (isEditing) {

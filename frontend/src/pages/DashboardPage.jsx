@@ -32,7 +32,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import GradientButton from '../components/GradientButton';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
-import { calculateDaysRemaining } from '../utils/date.js';
+import { calculateDaysRemaining, formatDateTime } from '../utils/date.js';
 import { redirectToBillingPortal } from '../utils/billing.js';
 import { queryKeys } from '../utils/queryKeys.js';
 
@@ -662,7 +662,7 @@ const ActivityItem = ({ item }) => {
   const statusLabel = item.status ? item.status.replace(/_/g, ' ') : null;
   const priorityLabel = item.priority ? item.priority.replace(/_/g, ' ') : null;
   const formattedDate = item.date
-    ? new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+    ? formatDateTime(item.date)
     : 'Date unavailable';
 
   return (

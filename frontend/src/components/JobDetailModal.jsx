@@ -38,6 +38,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { formatDistanceToNow } from 'date-fns';
 import { queryKeys } from '../utils/queryKeys.js';
+import { formatDate } from '../utils/date';
 
 const JobDetailModal = ({ job, open, onClose }) => {
   const queryClient = useQueryClient();
@@ -136,7 +137,7 @@ const JobDetailModal = ({ job, open, onClose }) => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <CalendarTodayIcon sx={{ mr: 1, color: 'text.secondary' }} />
                 <Typography variant="body1">
-                  {job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString() : 'Not Scheduled'}
+                  {job.scheduledDate ? formatDate(job.scheduledDate) : 'Not Scheduled'}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>

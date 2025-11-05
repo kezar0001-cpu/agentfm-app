@@ -26,7 +26,7 @@ import useApiQuery from '../hooks/useApiQuery.js';
 import useApiMutation from '../hooks/useApiMutation.js';
 import DataState from '../components/DataState.jsx';
 import { normaliseArray } from '../utils/error.js';
-import { calculateDaysRemaining } from '../utils/date.js';
+import { calculateDaysRemaining, formatDate } from '../utils/date.js';
 import { useCurrentUser } from '../context/UserContext.jsx';
 import { redirectToBillingPortal } from '../utils/billing.js';
 import { queryKeys } from '../utils/queryKeys.js';
@@ -855,7 +855,7 @@ export default function SubscriptionsPage() {
                               <TableRow key={invoice.id} hover>
                                 <TableCell>{invoice.number || invoice.id.slice(-8)}</TableCell>
                                 <TableCell>
-                                  {new Date(invoice.created * 1000).toLocaleDateString()}
+                                  {formatDate(new Date(invoice.created * 1000))}
                                 </TableCell>
                                 <TableCell>{invoice.description}</TableCell>
                                 <TableCell align="right">

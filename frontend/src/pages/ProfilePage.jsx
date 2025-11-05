@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { useCurrentUser } from '../context/UserContext';
 import { apiClient } from '../api/client.js';
 import { queryKeys } from '../utils/queryKeys.js';
+import { formatDate } from '../utils/date';
 
 export default function ProfilePage() {
   const { user: currentUser } = useCurrentUser();
@@ -340,7 +341,7 @@ export default function ProfilePage() {
             {profile.trialEndDate && (
               <Grid item xs={12}>
                 <Alert severity="info">
-                  Trial ends on {new Date(profile.trialEndDate).toLocaleDateString()}
+                  Trial ends on {formatDate(profile.trialEndDate)}
                 </Alert>
               </Grid>
             )}

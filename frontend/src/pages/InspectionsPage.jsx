@@ -31,6 +31,7 @@ import DataState from '../components/DataState';
 import InspectionForm from '../components/InspectionForm';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
+import { formatDateTime } from '../utils/date';
 
 const InspectionsPage = () => {
   const navigate = useNavigate();
@@ -354,7 +355,7 @@ const InspectionsPage = () => {
                         Scheduled Date
                       </Typography>
                       <Typography variant="body2">
-                        {new Date(inspection.scheduledDate).toLocaleString()}
+                        {formatDateTime(inspection.scheduledDate)}
                       </Typography>
                     </Box>
 
@@ -375,7 +376,7 @@ const InspectionsPage = () => {
                           Completed Date
                         </Typography>
                         <Typography variant="body2">
-                          {new Date(inspection.completedDate).toLocaleString()}
+                          {formatDateTime(inspection.completedDate)}
                         </Typography>
                       </Box>
                     )}

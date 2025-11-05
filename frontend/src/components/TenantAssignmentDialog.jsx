@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import toast from 'react-hot-toast';
 import { queryKeys } from '../utils/queryKeys.js';
+import { toISOString } from '../utils/date';
 
 export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }) {
   const queryClient = useQueryClient();
@@ -142,8 +143,8 @@ export default function TenantAssignmentDialog({ open, onClose, unitId, tenant }
     }
 
     const payload = {
-      leaseStart: formData.leaseStart?.toISOString(),
-      leaseEnd: formData.leaseEnd?.toISOString(),
+      leaseStart: toISOString(formData.leaseStart),
+      leaseEnd: toISOString(formData.leaseEnd),
       rentAmount: parseFloat(formData.rentAmount),
       depositAmount: formData.depositAmount ? parseFloat(formData.depositAmount) : undefined,
     };

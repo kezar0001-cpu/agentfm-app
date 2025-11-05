@@ -33,6 +33,7 @@ import ServiceRequestDetailModal from '../components/ServiceRequestDetailModal';
 import { CircularProgress } from '@mui/material';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
+import { formatDate } from '../utils/date';
 import GradientButton from '../components/GradientButton';
 
 const ServiceRequestsPage = () => {
@@ -413,7 +414,7 @@ const ServiceRequestsPage = () => {
                         Submitted
                       </Typography>
                       <Typography variant="body2">
-                        {new Date(request.createdAt).toLocaleDateString()}
+                        {formatDate(request.createdAt)}
                       </Typography>
                     </Box>
 
