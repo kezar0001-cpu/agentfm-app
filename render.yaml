@@ -28,6 +28,10 @@ services:
         value: https://www.buildstate.com.au
       - key: APP_URL
         value: https://www.buildstate.com.au
+      # Increase Prisma migration lock timeout from default 10s to 60s
+      # to prevent timeout errors during deployment
+      - key: PRISMA_SCHEMA_ENGINE_LOCK_TIMEOUT
+        value: 60000
 
   # -----------------------------
   # Frontend (Vite static site)
