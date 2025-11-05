@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from '../config/prismaClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import { notifyInspectionCompleted } from '../utils/notificationService.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -377,18 +378,18 @@ async function ensureInspectionAccess(req, res, next) {
     });
 
     if (!inspection) {
-      return res.status(404).json({ success: false, message: 'Inspection not found' });
+      return sendError(res, 404, 'Inspection not found', ErrorCodes.RES_INSPECTION_NOT_FOUND);
     }
 
     if (!canAccessInspection(req.user, inspection)) {
-      return res.status(403).json({ success: false, message: 'Forbidden' });
+      return sendError(res, 403, 'Forbidden', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     req.inspection = inspection;
     next();
   } catch (error) {
     console.error('Failed to check inspection access', error);
-    res.status(500).json({ success: false, message: 'Failed to verify permissions' });
+    sendError(res, 500, 'Failed to verify permissions', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 }
 
@@ -424,7 +425,7 @@ async function sendReminderNotifications({ inspection, reminder, recipients, not
 const hydrateInspectionUser = async (req, res, next) => {
   try {
     if (!req.user?.id) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return sendError(res, 401, 'Unauthorized', ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     const user = await prisma.user.findUnique({
@@ -437,14 +438,14 @@ const hydrateInspectionUser = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return sendError(res, 401, 'User not found', ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     req.user = augmentUser(user);
     next();
   } catch (error) {
     console.error('Failed to hydrate inspection user', error);
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
+    return sendError(res, 401, 'Unauthorized', ErrorCodes.AUTH_UNAUTHORIZED);
   }
 };
 
@@ -461,7 +462,7 @@ router.get('/inspectors', async (req, res) => {
     res.json({ inspectors });
   } catch (error) {
     console.error('Failed to fetch inspectors', error);
-    res.status(500).json({ success: false, message: 'Failed to load inspectors' });
+    sendError(res, 500, 'Failed to load inspectors', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -481,7 +482,7 @@ router.get('/tags', async (req, res) => {
     res.json({ tags: Array.from(tagSet).sort((a, b) => a.localeCompare(b)) });
   } catch (error) {
     console.error('Failed to fetch tags', error);
-    res.status(500).json({ success: false, message: 'Failed to load tags' });
+    sendError(res, 500, 'Failed to load tags', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -579,7 +580,7 @@ router.get('/analytics', async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to build inspection analytics', error);
-    res.status(500).json({ success: false, message: 'Failed to load analytics' });
+    sendError(res, 500, 'Failed to load analytics', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -621,7 +622,7 @@ router.get('/calendar', async (req, res) => {
     res.json({ events });
   } catch (error) {
     console.error('Failed to fetch calendar inspections', error);
-    res.status(500).json({ success: false, message: 'Failed to load calendar data' });
+    sendError(res, 500, 'Failed to load calendar data', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -659,7 +660,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to fetch inspections', error);
-    res.status(500).json({ success: false, message: 'Failed to load inspections' });
+    sendError(res, 500, 'Failed to load inspections', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -682,10 +683,10 @@ router.post('/', requireAuth, requireRole(ROLE_MANAGER), requireActiveSubscripti
     res.status(201).json(inspection);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to create inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to create inspection' });
+    sendError(res, 500, 'Failed to create inspection', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -703,13 +704,13 @@ router.get('/:id', ensureInspectionAccess, async (req, res) => {
     });
 
     if (!inspection) {
-      return res.status(404).json({ success: false, message: 'Inspection not found' });
+      return sendError(res, 404, 'Inspection not found', ErrorCodes.RES_INSPECTION_NOT_FOUND);
     }
 
     res.json(inspection);
   } catch (error) {
     console.error('Failed to load inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to load inspection' });
+    sendError(res, 500, 'Failed to load inspection', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -737,10 +738,10 @@ router.patch(
     res.json(inspection);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to update inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to update inspection' });
+    sendError(res, 500, 'Failed to update inspection', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -752,7 +753,7 @@ router.delete('/:id', requireRole(ROLE_MANAGER, ROLE_MANAGER), ensureInspectionA
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to delete inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to delete inspection' });
+    sendError(res, 500, 'Failed to delete inspection', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -812,7 +813,7 @@ router.post(
     });
 
     if (!before) {
-      return res.status(404).json({ success: false, message: 'Inspection not found' });
+      return sendError(res, 404, 'Inspection not found', ErrorCodes.RES_INSPECTION_NOT_FOUND);
     }
 
     // Parse findings to identify high-priority issues
@@ -910,10 +911,10 @@ router.post(
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to complete inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to complete inspection' });
+    sendError(res, 500, 'Failed to complete inspection', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -947,10 +948,10 @@ router.post(
     res.status(201).json({ attachments: created });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to add attachments', error);
-    res.status(500).json({ success: false, message: 'Failed to add attachments' });
+    sendError(res, 500, 'Failed to add attachments', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -981,10 +982,10 @@ router.patch(
     res.json({ attachment });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to update attachment', error);
-    res.status(500).json({ success: false, message: 'Failed to update attachment' });
+    sendError(res, 500, 'Failed to update attachment', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -1000,7 +1001,7 @@ router.delete(
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to remove attachment', error);
-    res.status(500).json({ success: false, message: 'Failed to remove attachment' });
+    sendError(res, 500, 'Failed to remove attachment', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -1041,10 +1042,10 @@ router.post(
     res.status(201).json({ reminder });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to create reminder', error);
-    res.status(500).json({ success: false, message: 'Failed to create reminder' });
+    sendError(res, 500, 'Failed to create reminder', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -1078,10 +1079,10 @@ router.patch(
     res.json(inspection);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to reschedule inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to update schedule' });
+    sendError(res, 500, 'Failed to update schedule', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -1104,7 +1105,7 @@ router.post(
     });
 
     if (!inspection) {
-      return res.status(404).json({ success: false, message: 'Inspection not found' });
+      return sendError(res, 404, 'Inspection not found', ErrorCodes.RES_INSPECTION_NOT_FOUND);
     }
 
     const job = await prisma.job.create({
@@ -1125,10 +1126,10 @@ router.post(
     res.status(201).json({ job });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation failed', issues: error.issues });
+      return sendError(res, 400, 'Validation failed', ErrorCodes.VAL_VALIDATION_ERROR, error.issues);
     }
     console.error('Failed to create job from inspection', error);
-    res.status(500).json({ success: false, message: 'Failed to create job' });
+    sendError(res, 500, 'Failed to create job', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );
@@ -1149,7 +1150,7 @@ router.get(
     res.json({ logs });
   } catch (error) {
     console.error('Failed to load audit history', error);
-    res.status(500).json({ success: false, message: 'Failed to load audit logs' });
+    sendError(res, 500, 'Failed to load audit logs', ErrorCodes.ERR_INTERNAL_SERVER);
   }
   },
 );

@@ -1,6 +1,7 @@
 import express from 'express';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth } from '../middleware/auth.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 
@@ -46,10 +47,7 @@ router.get('/', requireAuth, async (req, res) => {
       };
     } else {
       // Tenants and other roles have no access to recommendations
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied. You do not have permission to view recommendations.' 
-      });
+      return sendError(res, 403, 'Access denied. You do not have permission to view recommendations.', ErrorCodes.ACC_ACCESS_DENIED);
     }
     
     const recommendations = await prisma.recommendation.findMany({
@@ -94,7 +92,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json(recommendations);
   } catch (error) {
     console.error('Error fetching recommendations:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch recommendations' });
+    return sendError(res, 500, 'Failed to fetch recommendations', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -131,13 +129,13 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
     });
 
     if (!recommendation) {
-      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+      return sendError(res, 404, 'Recommendation not found', ErrorCodes.RES_NOT_FOUND);
     }
 
     // Access control: Only property managers and owners can approve recommendations
     const property = recommendation.report?.inspection?.property;
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Associated property not found' });
+      return sendError(res, 404, 'Associated property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
 
     let hasAccess = false;
@@ -148,10 +146,7 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
     }
 
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not have permission to approve this recommendation.'
-      });
+      return sendError(res, 403, 'Access denied. You do not have permission to approve this recommendation.', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     // Check property manager's subscription
@@ -161,13 +156,10 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
       (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
 
     if (!isManagerSubscriptionActive) {
-      return res.status(403).json({
-        success: false,
-        message: req.user.role === 'PROPERTY_MANAGER'
-          ? 'Your trial period has expired. Please upgrade your plan to continue.'
-          : 'This property\'s subscription has expired. Please contact your property manager.',
-        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
-      });
+      const message = req.user.role === 'PROPERTY_MANAGER'
+        ? 'Your trial period has expired. Please upgrade your plan to continue.'
+        : 'This property\'s subscription has expired. Please contact your property manager.';
+      return sendError(res, 403, message, ErrorCodes.SUB_MANAGER_SUBSCRIPTION_REQUIRED);
     }
     
     const updated = await prisma.recommendation.update({
@@ -192,7 +184,7 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Error approving recommendation:', error);
-    res.status(500).json({ success: false, message: 'Failed to approve recommendation' });
+    return sendError(res, 500, 'Failed to approve recommendation', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -230,13 +222,13 @@ router.post('/:id/reject', requireAuth, async (req, res) => {
     });
 
     if (!recommendation) {
-      return res.status(404).json({ success: false, message: 'Recommendation not found' });
+      return sendError(res, 404, 'Recommendation not found', ErrorCodes.RES_NOT_FOUND);
     }
 
     // Access control: Only property managers and owners can reject recommendations
     const property = recommendation.report?.inspection?.property;
     if (!property) {
-      return res.status(404).json({ success: false, message: 'Associated property not found' });
+      return sendError(res, 404, 'Associated property not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
 
     let hasAccess = false;
@@ -247,10 +239,7 @@ router.post('/:id/reject', requireAuth, async (req, res) => {
     }
 
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not have permission to reject this recommendation.'
-      });
+      return sendError(res, 403, 'Access denied. You do not have permission to reject this recommendation.', ErrorCodes.ACC_ACCESS_DENIED);
     }
 
     // Check property manager's subscription
@@ -260,13 +249,10 @@ router.post('/:id/reject', requireAuth, async (req, res) => {
       (manager.subscriptionStatus === 'TRIAL' && manager.trialEndDate && new Date(manager.trialEndDate) > new Date());
 
     if (!isManagerSubscriptionActive) {
-      return res.status(403).json({
-        success: false,
-        message: req.user.role === 'PROPERTY_MANAGER'
-          ? 'Your trial period has expired. Please upgrade your plan to continue.'
-          : 'This property\'s subscription has expired. Please contact your property manager.',
-        code: 'MANAGER_SUBSCRIPTION_REQUIRED',
-      });
+      const message = req.user.role === 'PROPERTY_MANAGER'
+        ? 'Your trial period has expired. Please upgrade your plan to continue.'
+        : 'This property\'s subscription has expired. Please contact your property manager.';
+      return sendError(res, 403, message, ErrorCodes.SUB_MANAGER_SUBSCRIPTION_REQUIRED);
     }
     
     const updated = await prisma.recommendation.update({
@@ -280,7 +266,7 @@ router.post('/:id/reject', requireAuth, async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Error rejecting recommendation:', error);
-    res.status(500).json({ success: false, message: 'Failed to reject recommendation' });
+    return sendError(res, 500, 'Failed to reject recommendation', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

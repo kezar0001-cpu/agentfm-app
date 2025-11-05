@@ -1,5 +1,6 @@
 import prisma from '../config/prismaClient.js';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 /**
  * Middleware to require authentication
@@ -9,7 +10,7 @@ export const requireAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || '';
     if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
+      return sendError(res, 401, 'No token provided', ErrorCodes.AUTH_NO_TOKEN);
     }
 
     const token = authHeader.slice('Bearer '.length).trim();
@@ -19,24 +20,27 @@ export const requireAuth = async (req, res, next) => {
       decoded = verifyAccessToken(token);
     } catch (err) {
       console.error('JWT verify error:', err?.name, err?.message);
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      const errorCode = err?.name === 'TokenExpiredError'
+        ? ErrorCodes.AUTH_TOKEN_EXPIRED
+        : ErrorCodes.AUTH_INVALID_TOKEN;
+      return sendError(res, 401, 'Invalid or expired token', errorCode);
     }
 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return sendError(res, 401, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
     }
 
     // Check if user is active
     if (!user.isActive) {
-      return res.status(403).json({ success: false, message: 'Account is inactive' });
+      return sendError(res, 403, 'Account is inactive', ErrorCodes.AUTH_ACCOUNT_INACTIVE);
     }
 
     req.user = user;
     return next();
   } catch (err) {
     console.error('Auth middleware error:', err);
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
+    return sendError(res, 401, 'Unauthorized', ErrorCodes.AUTH_UNAUTHORIZED);
   }
 };
 
@@ -49,14 +53,16 @@ export const requireAuth = async (req, res, next) => {
 export const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
-      });
+      return sendError(
+        res,
+        403,
+        `Access denied. Required role: ${allowedRoles.join(' or ')}`,
+        ErrorCodes.ACC_ROLE_REQUIRED
+      );
     }
 
     next();
@@ -71,13 +77,13 @@ export const requireRole = (...allowedRoles) => {
 export const requirePropertyAccess = async (req, res, next) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     const propertyId = req.params.propertyId || req.params.id || req.body.propertyId;
-    
+
     if (!propertyId) {
-      return res.status(400).json({ success: false, message: 'Property ID required' });
+      return sendError(res, 400, 'Property ID required', ErrorCodes.VAL_MISSING_FIELD);
     }
 
     // Property managers can access properties they manage
@@ -131,10 +137,10 @@ export const requirePropertyAccess = async (req, res, next) => {
       }
     }
 
-    return res.status(403).json({ success: false, message: 'Access denied to this property' });
+    return sendError(res, 403, 'Access denied to this property', ErrorCodes.ACC_PROPERTY_ACCESS_DENIED);
   } catch (error) {
     console.error('Property access check error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to verify property access' });
+    return sendError(res, 500, 'Failed to verify property access', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 };
 
@@ -145,7 +151,7 @@ export const requirePropertyAccess = async (req, res, next) => {
  */
 export const requireActiveSubscription = (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ success: false, message: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
   }
 
   const { subscriptionStatus, trialEndDate } = req.user;
@@ -160,19 +166,21 @@ export const requireActiveSubscription = (req, res, next) => {
     if (trialEndDate && new Date(trialEndDate) > new Date()) {
       return next();
     }
-    return res.status(403).json({
-      success: false,
-      message: 'Your trial period has expired. Please upgrade your plan to continue.',
-      code: 'TRIAL_EXPIRED',
-    });
+    return sendError(
+      res,
+      403,
+      'Your trial period has expired. Please upgrade your plan to continue.',
+      ErrorCodes.SUB_TRIAL_EXPIRED
+    );
   }
 
   // All other statuses are blocked
-  return res.status(403).json({
-    success: false,
-    message: 'Active subscription required. Please upgrade your plan to access this feature.',
-    code: 'SUBSCRIPTION_REQUIRED',
-  });
+  return sendError(
+    res,
+    403,
+    'Active subscription required. Please upgrade your plan to access this feature.',
+    ErrorCodes.SUB_SUBSCRIPTION_REQUIRED
+  );
 };
 
 /**
@@ -209,7 +217,7 @@ export const isSubscriptionActive = (user) => {
 export const requirePropertyManagerSubscription = async (req, res, next) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
     }
 
     // If user is a property manager, check their own subscription
@@ -217,11 +225,12 @@ export const requirePropertyManagerSubscription = async (req, res, next) => {
       if (isSubscriptionActive(req.user)) {
         return next();
       }
-      return res.status(403).json({
-        success: false,
-        message: 'Your trial period has expired. Please upgrade your plan to continue.',
-        code: 'TRIAL_EXPIRED',
-      });
+      return sendError(
+        res,
+        403,
+        'Your trial period has expired. Please upgrade your plan to continue.',
+        ErrorCodes.SUB_TRIAL_EXPIRED
+      );
     }
 
     // For other roles (TENANT, OWNER, TECHNICIAN), check the property manager's subscription
@@ -262,16 +271,14 @@ export const requirePropertyManagerSubscription = async (req, res, next) => {
     }
 
     // Property manager's subscription is not active
-    return res.status(403).json({
-      success: false,
-      message: 'This property\'s subscription has expired. Please contact your property manager.',
-      code: 'MANAGER_SUBSCRIPTION_REQUIRED',
-    });
+    return sendError(
+      res,
+      403,
+      'This property\'s subscription has expired. Please contact your property manager.',
+      ErrorCodes.SUB_MANAGER_SUBSCRIPTION_REQUIRED
+    );
   } catch (error) {
     console.error('Property manager subscription check error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to verify subscription status'
-    });
+    return sendError(res, 500, 'Failed to verify subscription status', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 };

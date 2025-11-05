@@ -12,6 +12,7 @@ import {
   verifyRefreshToken,
 } from '../utils/jwt.js';
 import { validatePassword, getPasswordErrorMessage } from '../utils/passwordValidation.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const TRIAL_PERIOD_DAYS = 14;
 const REFRESH_COOKIE_NAME = 'refreshToken';
@@ -100,7 +101,7 @@ const router = Router();
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'No token provided' });
+    return sendError(res, 401, 'No token provided', ErrorCodes.AUTH_NO_TOKEN);
   }
 
   const token = authHeader.split(' ')[1];
@@ -117,7 +118,7 @@ const requireAuth = (req, res, next) => {
     };
     next();
   } catch {
-    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return sendError(res, 401, 'Invalid or expired token', ErrorCodes.AUTH_INVALID_TOKEN);
   }
 };
 
@@ -156,16 +157,18 @@ router.post('/register', async (req, res) => {
     // Validate password strength and requirements
     const passwordValidation = validatePassword(password, [email, firstName, lastName]);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: getPasswordErrorMessage(passwordValidation),
-        passwordRequirements: passwordValidation.requirements,
-      });
+      return sendError(
+        res,
+        400,
+        getPasswordErrorMessage(passwordValidation),
+        ErrorCodes.VAL_PASSWORD_WEAK,
+        passwordValidation.requirements
+      );
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Email already registered' });
+      return sendError(res, 400, 'Email already registered', ErrorCodes.BIZ_EMAIL_ALREADY_REGISTERED);
     }
 
     let userRole = 'PROPERTY_MANAGER'; // Default role for direct signup
@@ -176,10 +179,12 @@ router.post('/register', async (req, res) => {
     const requestedRole = role || 'PROPERTY_MANAGER';
 
     if (requestedRole !== 'PROPERTY_MANAGER' && !inviteToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Only Property Managers can sign up directly. Other roles require an invitation.'
-      });
+      return sendError(
+        res,
+        400,
+        'Only Property Managers can sign up directly. Other roles require an invitation.',
+        ErrorCodes.AUTH_INSUFFICIENT_PERMISSIONS
+      );
     }
 
     // If registering via invite, verify the invite
@@ -193,19 +198,19 @@ router.post('/register', async (req, res) => {
       });
 
       if (!invite) {
-        return res.status(400).json({ success: false, message: 'Invalid invite token' });
+        return sendError(res, 400, 'Invalid invite token', ErrorCodes.RES_INVITE_NOT_FOUND);
       }
 
       if (invite.status !== 'PENDING') {
-        return res.status(400).json({ success: false, message: 'Invite has already been used' });
+        return sendError(res, 400, 'Invite has already been used', ErrorCodes.BIZ_INVITE_ALREADY_ACCEPTED);
       }
 
       if (new Date() > new Date(invite.expiresAt)) {
-        return res.status(400).json({ success: false, message: 'Invite has expired' });
+        return sendError(res, 400, 'Invite has expired', ErrorCodes.BIZ_INVITE_EXPIRED);
       }
 
       if (invite.email !== email) {
-        return res.status(400).json({ success: false, message: 'Email does not match invite' });
+        return sendError(res, 400, 'Email does not match invite', ErrorCodes.VAL_INVALID_EMAIL);
       }
 
       userRole = invite.role;
@@ -284,10 +289,10 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
     console.error('Registration error:', error);
-    res.status(500).json({ success: false, message: 'Registration failed' });
+    return sendError(res, 500, 'Registration failed', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -305,16 +310,16 @@ router.post('/login', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return sendError(res, 401, 'Invalid email or password', ErrorCodes.AUTH_INVALID_CREDENTIALS);
     }
 
     if (!user.passwordHash) {
-      return res.status(401).json({ success: false, message: 'Please login with Google' });
+      return sendError(res, 401, 'Please login with Google', ErrorCodes.AUTH_INVALID_CREDENTIALS);
     }
 
     const validPassword = await bcrypt.compare(password, user.passwordHash);
     if (!validPassword) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return sendError(res, 401, 'Invalid email or password', ErrorCodes.AUTH_INVALID_CREDENTIALS);
     }
 
     // ❌ Removed: subscription checks (not on User in this schema)
@@ -328,10 +333,10 @@ router.post('/login', async (req, res) => {
     res.json({ success: true, token: accessToken, accessToken, refreshToken, user: userWithoutPassword });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.errors });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
     console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Login failed' });
+    return sendError(res, 500, 'Login failed', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -345,7 +350,7 @@ router.post('/refresh', async (req, res) => {
     const refreshToken = bodyToken || cookieToken;
 
     if (!refreshToken) {
-      return res.status(401).json({ success: false, message: 'Refresh token is required' });
+      return sendError(res, 401, 'Refresh token is required', ErrorCodes.AUTH_NO_TOKEN);
     }
 
     let decoded;
@@ -355,11 +360,14 @@ router.post('/refresh', async (req, res) => {
       const message = error?.name === 'TokenExpiredError'
         ? 'Refresh token expired'
         : 'Invalid refresh token';
-      return res.status(401).json({ success: false, message });
+      const code = error?.name === 'TokenExpiredError'
+        ? ErrorCodes.AUTH_TOKEN_EXPIRED
+        : ErrorCodes.AUTH_INVALID_TOKEN;
+      return sendError(res, 401, message, code);
     }
 
     if (decoded.tokenType !== 'refresh') {
-      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return sendError(res, 401, 'Invalid refresh token', ErrorCodes.AUTH_INVALID_TOKEN);
     }
 
     const user = await prisma.user.findUnique({
@@ -368,7 +376,7 @@ router.post('/refresh', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return sendError(res, 401, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
     }
 
     const { accessToken, refreshToken: newRefreshToken } = issueAuthTokens(user, res);
@@ -376,7 +384,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ success: true, token: accessToken, accessToken, refreshToken: newRefreshToken });
   } catch (error) {
     console.error('Refresh token error:', error);
-    res.status(500).json({ success: false, message: 'Failed to refresh token' });
+    return sendError(res, 500, 'Failed to refresh token', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -385,11 +393,11 @@ router.post('/refresh', async (req, res) => {
 // ========================================
 router.get('/google', (req, res, next) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.status(503).json({ success: false, message: 'Google OAuth is not configured. Please use email/password signup.' });
+    return sendError(res, 503, 'Google OAuth is not configured. Please use email/password signup.', ErrorCodes.EXT_SERVICE_UNAVAILABLE);
   }
   const { role = 'PROPERTY_MANAGER' } = req.query;
   if (!['PROPERTY_MANAGER'].includes(role)) {
-    return res.status(400).json({ success: false, message: 'Google signup is only available for Property Managers' });
+    return sendError(res, 400, 'Google signup is only available for Property Managers', ErrorCodes.AUTH_INSUFFICIENT_PERMISSIONS);
   }
   passport.authenticate('google', { scope: ['openid', 'profile', 'email'], state: role })(req, res, next);
 });
@@ -459,14 +467,14 @@ router.get('/me', requireAuth, async (req, res) => {
       },
     });
 
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) return sendError(res, 404, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
 
     user = await ensureTrialState(user);
 
     res.json({ success: true, user });
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get user' });
+    return sendError(res, 500, 'Failed to get user', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -475,7 +483,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // ========================================
 router.post('/logout', (req, res) => {
   req.logout((err) => {
-    if (err) return res.status(500).json({ success: false, message: 'Logout failed' });
+    if (err) return sendError(res, 500, 'Logout failed', ErrorCodes.ERR_INTERNAL_SERVER);
     res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
     res.json({ success: true, message: 'Logged out successfully' });
   });
@@ -487,12 +495,12 @@ router.post('/logout', (req, res) => {
 router.post('/verify-email', async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ success: false, message: 'Verification token is required' });
+    if (!token) return sendError(res, 400, 'Verification token is required', ErrorCodes.VAL_MISSING_FIELD);
     // Placeholder
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (error) {
     console.error('Email verification error:', error);
-    res.status(500).json({ success: false, message: 'Email verification failed' });
+    return sendError(res, 500, 'Email verification failed', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -578,17 +586,10 @@ router.post('/forgot-password', async (req, res) => {
     res.json(genericResponse);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: error.errors,
-      });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
     console.error('Forgot password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred. Please try again.',
-    });
+    return sendError(res, 500, 'An error occurred. Please try again.', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -601,10 +602,7 @@ router.get('/reset-password/validate', async (req, res) => {
     const { selector, token } = req.query;
 
     if (!selector || !token) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset link',
-      });
+      return sendError(res, 400, 'Invalid reset link', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Find the password reset record by selector
@@ -615,36 +613,24 @@ router.get('/reset-password/validate', async (req, res) => {
 
     // Validate token
     if (!passwordReset) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired reset link',
-      });
+      return sendError(res, 400, 'Invalid or expired reset link', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Check if token has already been used
     if (passwordReset.usedAt) {
-      return res.status(400).json({
-        success: false,
-        message: 'This reset link has already been used',
-      });
+      return sendError(res, 400, 'This reset link has already been used', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Check if token has expired
     if (new Date() > new Date(passwordReset.expiresAt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'This reset link has expired',
-      });
+      return sendError(res, 400, 'This reset link has expired', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Verify the token against stored hashed verifier
     const isValidToken = await bcrypt.compare(String(token), passwordReset.verifier);
 
     if (!isValidToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset link',
-      });
+      return sendError(res, 400, 'Invalid reset link', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Token is valid
@@ -655,10 +641,7 @@ router.get('/reset-password/validate', async (req, res) => {
     });
   } catch (error) {
     console.error('Token validation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred. Please try again.',
-    });
+    return sendError(res, 500, 'An error occurred. Please try again.', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -678,10 +661,7 @@ router.post('/reset-password', async (req, res) => {
 
     // Validate token exists
     if (!passwordReset) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired reset link',
-      });
+      return sendError(res, 400, 'Invalid or expired reset link', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Validate password strength and requirements
@@ -691,37 +671,30 @@ router.post('/reset-password', async (req, res) => {
       passwordReset.user.lastName,
     ]);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: getPasswordErrorMessage(passwordValidation),
-        passwordRequirements: passwordValidation.requirements,
-      });
+      return sendError(
+        res,
+        400,
+        getPasswordErrorMessage(passwordValidation),
+        ErrorCodes.VAL_PASSWORD_WEAK,
+        passwordValidation.requirements
+      );
     }
 
     // Check if token has already been used
     if (passwordReset.usedAt) {
-      return res.status(400).json({
-        success: false,
-        message: 'This reset link has already been used',
-      });
+      return sendError(res, 400, 'This reset link has already been used', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Check if token has expired
     if (new Date() > new Date(passwordReset.expiresAt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'This reset link has expired. Please request a new password reset.',
-      });
+      return sendError(res, 400, 'This reset link has expired. Please request a new password reset.', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Verify the token against stored hashed verifier
     const isValidToken = await bcrypt.compare(token, passwordReset.verifier);
 
     if (!isValidToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset link',
-      });
+      return sendError(res, 400, 'Invalid reset link', ErrorCodes.VAL_INVALID_REQUEST);
     }
 
     // Hash the new password
@@ -755,17 +728,10 @@ router.post('/reset-password', async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: error.errors,
-      });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
     console.error('Reset password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred. Please try again.',
-    });
+    return sendError(res, 500, 'An error occurred. Please try again.', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

@@ -6,6 +6,7 @@ import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import unitsRouter from './units.js';
 import { cacheMiddleware, invalidate } from '../utils/cache.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -207,10 +208,12 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
 
     // Technicians and tenants should not access this route
     if (req.user.role === 'TECHNICIAN' || req.user.role === 'TENANT') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. This endpoint is for property managers and owners only.'
-      });
+      return sendError(
+        res,
+        403,
+        'Access denied. This endpoint is for property managers and owners only.',
+        ErrorCodes.ACC_ACCESS_DENIED
+      );
     }
 
     // Parse pagination parameters
@@ -268,7 +271,7 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
       meta: error?.meta,
       stack: error?.stack,
     });
-    res.status(500).json({ success: false, message: 'Failed to fetch properties' });
+    return sendError(res, 500, 'Failed to fetch properties', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -303,7 +306,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     res.status(201).json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
 
     console.error('Create property error:', {
@@ -311,7 +314,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       code: error?.code,
       meta: error?.meta,
     });
-    res.status(500).json({ success: false, message: 'Failed to create property' });
+    return sendError(res, 500, 'Failed to create property', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -349,7 +352,8 @@ router.get('/:id', async (req, res) => {
 
     const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
-      return res.status(access.status).json({ success: false, message: access.reason });
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
     }
 
     res.json({ success: true, property: toPublicProperty(property) });
@@ -359,7 +363,7 @@ router.get('/:id', async (req, res) => {
       code: error?.code,
       meta: error?.meta,
     });
-    res.status(500).json({ success: false, message: 'Failed to fetch property' });
+    return sendError(res, 500, 'Failed to fetch property', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -376,7 +380,8 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     });
     const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
-      return res.status(access.status).json({ success: false, message: access.reason });
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
     }
 
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
@@ -408,7 +413,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     res.json({ success: true, property: toPublicProperty(updated) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, message: 'Validation error', errors: error.flatten() });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
 
     console.error('Update property error:', {
@@ -416,7 +421,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       code: error?.code,
       meta: error?.meta,
     });
-    res.status(500).json({ success: false, message: 'Failed to update property' });
+    return sendError(res, 500, 'Failed to update property', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -433,7 +438,8 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     });
     const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
-      return res.status(access.status).json({ success: false, message: access.reason });
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
     }
 
     await prisma.property.delete({ where: { id: property.id } });
@@ -448,7 +454,7 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       code: error?.code,
       meta: error?.meta,
     });
-    res.status(500).json({ success: false, message: 'Failed to delete property' });
+    return sendError(res, 500, 'Failed to delete property', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -465,7 +471,8 @@ router.get('/:id/activity', async (req, res) => {
     });
     const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
-      return res.status(access.status).json({ success: false, message: access.reason });
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
     }
 
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
@@ -553,7 +560,7 @@ router.get('/:id/activity', async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Get property activity error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch property activity' });
+    return sendError(res, 500, 'Failed to fetch property activity', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

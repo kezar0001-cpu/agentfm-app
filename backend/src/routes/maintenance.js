@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/prismaClient.js';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
+      return sendError(res, 401, 'No token provided', ErrorCodes.AUTH_NO_TOKEN);
     }
 
     const token = authHeader.split(' ')[1];
@@ -22,13 +23,13 @@ const authenticate = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return sendError(res, 401, 'User not found', ErrorCodes.RES_USER_NOT_FOUND);
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
+    return sendError(res, 401, 'Invalid token', ErrorCodes.AUTH_INVALID_TOKEN);
   }
 };
 
@@ -102,10 +103,7 @@ router.get('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get maintenance requests error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch maintenance requests'
-    });
+    return sendError(res, 500, 'Failed to fetch maintenance requests', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -129,10 +127,7 @@ router.post('/', authenticate, async (req, res) => {
     });
 
     if (!unit) {
-      return res.status(404).json({
-        success: false,
-        message: 'Unit not found or access denied'
-      });
+      return sendError(res, 404, 'Unit not found or access denied', ErrorCodes.RES_UNIT_NOT_FOUND);
     }
 
     const request = await prisma.maintenanceRequest.create({
@@ -173,18 +168,11 @@ router.post('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: error.errors
-      });
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
     }
 
     console.error('Create maintenance request error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create maintenance request'
-    });
+    return sendError(res, 500, 'Failed to create maintenance request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -228,10 +216,7 @@ router.get('/:id', authenticate, async (req, res) => {
     });
 
     if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Maintenance request not found'
-      });
+      return sendError(res, 404, 'Maintenance request not found', ErrorCodes.RES_MAINTENANCE_NOT_FOUND);
     }
 
     res.json({
@@ -240,10 +225,7 @@ router.get('/:id', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get maintenance request error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch maintenance request'
-    });
+    return sendError(res, 500, 'Failed to fetch maintenance request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -262,10 +244,7 @@ router.patch('/:id', authenticate, async (req, res) => {
     });
 
     if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Maintenance request not found'
-      });
+      return sendError(res, 404, 'Maintenance request not found', ErrorCodes.RES_MAINTENANCE_NOT_FOUND);
     }
 
     const updateData = {};
@@ -310,10 +289,7 @@ router.patch('/:id', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Update maintenance request error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update maintenance request'
-    });
+    return sendError(res, 500, 'Failed to update maintenance request', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -323,10 +299,7 @@ router.post('/:id/messages', authenticate, async (req, res) => {
     const { message, attachments } = req.body;
 
     if (!message) {
-      return res.status(400).json({
-        success: false,
-        message: 'Message is required'
-      });
+      return sendError(res, 400, 'Message is required', ErrorCodes.VAL_MISSING_FIELD);
     }
 
     const request = await prisma.maintenanceRequest.findFirst({
@@ -339,10 +312,7 @@ router.post('/:id/messages', authenticate, async (req, res) => {
     });
 
     if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Maintenance request not found'
-      });
+      return sendError(res, 404, 'Maintenance request not found', ErrorCodes.RES_MAINTENANCE_NOT_FOUND);
     }
 
     const newMessage = await prisma.requestMessage.create({
@@ -371,10 +341,7 @@ router.post('/:id/messages', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Add message error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to add message'
-    });
+    return sendError(res, 500, 'Failed to add message', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

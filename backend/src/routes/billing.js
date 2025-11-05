@@ -7,6 +7,7 @@ import {
 } from '../utils/stripeClient.js';
 import { sendEmail } from '../utils/email.js';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = express.Router();
 const stripe = createStripeClient();
@@ -80,24 +81,24 @@ router.post('/checkout', async (req, res) => {
   try {
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'No token' });
+    if (!token) return sendError(res, 401, 'No token', ErrorCodes.AUTH_NO_TOKEN);
 
     let user;
     try {
       user = verifyAccessToken(token);
     } catch {
-      return res.status(401).json({ error: 'Invalid token' });
+      return sendError(res, 401, 'Invalid token', ErrorCodes.AUTH_INVALID_TOKEN);
     }
 
     const { plan = 'STARTER', successUrl, cancelUrl } = req.body || {};
     const normalisedPlan = normalisePlan(plan) || 'STARTER';
 
     if (!stripeAvailable) {
-      return res.status(503).json({ error: 'Stripe is not configured' });
+      return sendError(res, 503, 'Stripe is not configured', ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
 
     const priceId = PLAN_PRICE_MAP[normalisedPlan];
-    if (!priceId) return res.status(400).json({ error: `Unknown plan or missing price id: ${plan}` });
+    if (!priceId) return sendError(res, 400, `Unknown plan or missing price id: ${plan}`, ErrorCodes.VAL_INVALID_REQUEST);
 
     const defaultSuccess = `${process.env.FRONTEND_URL}/subscriptions?success=1`;
     const baseSuccess = (successUrl || process.env.STRIPE_SUCCESS_URL || defaultSuccess);
@@ -127,10 +128,10 @@ router.post('/checkout', async (req, res) => {
     return res.json({ id: session.id, url: session.url });
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
-      return res.status(503).json({ error: err.message });
+      return sendError(res, 503, err.message, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('Stripe checkout error:', err);
-    return res.status(500).json({ error: 'Checkout failed' });
+    return sendError(res, 500, 'Checkout failed', ErrorCodes.EXT_STRIPE_ERROR);
   }
 });
 
@@ -138,21 +139,21 @@ router.post('/checkout', async (req, res) => {
 router.post('/confirm', async (req, res) => {
   try {
     if (!stripeAvailable) {
-      return res.status(503).json({ error: 'Stripe is not configured' });
+      return sendError(res, 503, 'Stripe is not configured', ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
 
     const { sessionId } = req.body || {};
-    if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+    if (!sessionId) return sendError(res, 400, 'sessionId required', ErrorCodes.VAL_MISSING_FIELD);
 
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription.items.data.price'],
     });
 
     if (session.mode !== 'subscription') {
-      return res.status(400).json({ error: 'Not a subscription session' });
+      return sendError(res, 400, 'Not a subscription session', ErrorCodes.VAL_INVALID_REQUEST);
     }
     const isComplete = session.status === 'complete' || session.payment_status === 'paid';
-    if (!isComplete) return res.status(400).json({ error: 'Session not complete' });
+    if (!isComplete) return sendError(res, 400, 'Session not complete', ErrorCodes.ERR_BAD_REQUEST);
 
     const userId = session.metadata?.userId;
     const orgId = session.metadata?.orgId || session.client_reference_id;
@@ -178,10 +179,10 @@ router.post('/confirm', async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
-      return res.status(503).json({ error: err.message });
+      return sendError(res, 503, err.message, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('Stripe confirm error:', err);
-    return res.status(500).json({ error: 'Confirm failed' });
+    return sendError(res, 500, 'Confirm failed', ErrorCodes.EXT_STRIPE_ERROR);
   }
 });
 
@@ -202,10 +203,10 @@ async function authenticateRequest(req) {
 router.get('/invoices', async (req, res) => {
   try {
     const user = await authenticateRequest(req);
-    if (!user) return res.status(401).json({ error: 'Authentication required' });
+    if (!user) return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
 
     if (!stripeAvailable) {
-      return res.status(503).json({ error: 'Stripe is not configured' });
+      return sendError(res, 503, 'Stripe is not configured', ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
 
     // Find user's Stripe customer ID
@@ -251,10 +252,10 @@ router.get('/invoices', async (req, res) => {
     return res.json({ invoices: formattedInvoices });
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
-      return res.status(503).json({ error: err.message });
+      return sendError(res, 503, err.message, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('Stripe invoices error:', err);
-    return res.status(500).json({ error: 'Failed to fetch invoices' });
+    return sendError(res, 500, 'Failed to fetch invoices', ErrorCodes.EXT_STRIPE_ERROR);
   }
 });
 
@@ -262,10 +263,10 @@ router.get('/invoices', async (req, res) => {
 router.post('/payment-method', async (req, res) => {
   try {
     const user = await authenticateRequest(req);
-    if (!user) return res.status(401).json({ error: 'Authentication required' });
+    if (!user) return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
 
     if (!stripeAvailable) {
-      return res.status(503).json({ error: 'Stripe is not configured' });
+      return sendError(res, 503, 'Stripe is not configured', ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
 
     // Find user's Stripe customer ID
@@ -283,7 +284,7 @@ router.post('/payment-method', async (req, res) => {
     });
 
     if (!dbUser || !dbUser.subscriptions[0]?.stripeCustomerId) {
-      return res.status(404).json({ error: 'No active subscription found' });
+      return sendError(res, 404, 'No active subscription found', ErrorCodes.RES_NOT_FOUND);
     }
 
     const stripeCustomerId = dbUser.subscriptions[0].stripeCustomerId;
@@ -297,10 +298,10 @@ router.post('/payment-method', async (req, res) => {
     return res.json({ url: portalSession.url });
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
-      return res.status(503).json({ error: err.message });
+      return sendError(res, 503, err.message, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('Stripe payment method error:', err);
-    return res.status(500).json({ error: 'Failed to update payment method' });
+    return sendError(res, 500, 'Failed to update payment method', ErrorCodes.EXT_STRIPE_ERROR);
   }
 });
 
@@ -308,10 +309,10 @@ router.post('/payment-method', async (req, res) => {
 router.post('/cancel', async (req, res) => {
   try {
     const user = await authenticateRequest(req);
-    if (!user) return res.status(401).json({ error: 'Authentication required' });
+    if (!user) return sendError(res, 401, 'Authentication required', ErrorCodes.AUTH_UNAUTHORIZED);
 
     if (!stripeAvailable) {
-      return res.status(503).json({ error: 'Stripe is not configured' });
+      return sendError(res, 503, 'Stripe is not configured', ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
 
     const { immediate = false } = req.body || {};
@@ -332,7 +333,7 @@ router.post('/cancel', async (req, res) => {
     });
 
     if (!dbUser || !dbUser.subscriptions[0]?.stripeSubscriptionId) {
-      return res.status(404).json({ error: 'No active subscription found' });
+      return sendError(res, 404, 'No active subscription found', ErrorCodes.RES_NOT_FOUND);
     }
 
     const subscription = dbUser.subscriptions[0];
@@ -367,10 +368,10 @@ router.post('/cancel', async (req, res) => {
     });
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
-      return res.status(503).json({ error: err.message });
+      return sendError(res, 503, err.message, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('Stripe cancel error:', err);
-    return res.status(500).json({ error: 'Failed to cancel subscription' });
+    return sendError(res, 500, 'Failed to cancel subscription', ErrorCodes.EXT_STRIPE_ERROR);
   }
 });
 
@@ -603,10 +604,10 @@ export async function webhook(req, res) {
   } catch (err) {
     if (err instanceof StripeNotConfiguredError) {
       console.error('Stripe webhook received but Stripe is not configured.');
-      return res.status(503).send(`Stripe Error: ${err.message}`);
+      return sendError(res, 503, `Stripe Error: ${err.message}`, ErrorCodes.EXT_STRIPE_NOT_CONFIGURED);
     }
     console.error('❌ Webhook signature verify failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return sendError(res, 400, `Webhook Error: ${err.message}`, ErrorCodes.EXT_STRIPE_ERROR);
   }
 
   try {
@@ -934,7 +935,7 @@ export async function webhook(req, res) {
     res.json({ received: true });
   } catch (err) {
     console.error('⚠️ Webhook handler error:', err);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    return sendError(res, 500, 'Webhook processing failed', ErrorCodes.EXT_STRIPE_ERROR);
   }
 }
 
