@@ -1,8 +1,13 @@
 import { Controller } from 'react-hook-form';
 import { TextField } from '@mui/material';
+import { formatDateForInput } from '../../utils/date';
 
 /**
  * FormDatePicker - A reusable date picker component integrated with React Hook Form
+ *
+ * Uses HTML5 date input which internally uses yyyy-mm-dd format but displays
+ * according to user's locale. For display purposes elsewhere in the app,
+ * use formatDate() utility to show dates in dd-mm-yyyy format.
  *
  * @param {object} props
  * @param {string} props.name - Field name for form registration
@@ -23,30 +28,41 @@ export default function FormDatePicker({
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState: { error } }) => (
-        <TextField
-          {...field}
-          {...rest}
-          fullWidth
-          type="date"
-          label={label}
-          required={required}
-          error={!!error}
-          helperText={error?.message || helperText}
-          InputLabelProps={{
-            shrink: true,
-          }}
-          inputProps={{
-            'aria-invalid': !!error,
-            'aria-describedby': error ? `${name}-error` : undefined,
-          }}
-          FormHelperTextProps={{
-            id: error ? `${name}-error` : undefined,
-            role: error ? 'alert' : undefined,
-            'aria-live': error ? 'polite' : undefined,
-          }}
-        />
-      )}
+      render={({ field: { value, onChange, ...fieldProps }, fieldState: { error } }) => {
+        // Convert date value to yyyy-mm-dd format for HTML input
+        const inputValue = value ? formatDateForInput(value) : '';
+
+        return (
+          <TextField
+            {...fieldProps}
+            {...rest}
+            fullWidth
+            type="date"
+            label={label}
+            required={required}
+            error={!!error}
+            value={inputValue}
+            onChange={(e) => {
+              // Store the date as yyyy-mm-dd string (HTML5 date input format)
+              // The form will convert it to ISO string when submitting to the API
+              onChange(e.target.value);
+            }}
+            helperText={error?.message || helperText || 'Format: dd-mm-yyyy'}
+            InputLabelProps={{
+              shrink: true,
+            }}
+            inputProps={{
+              'aria-invalid': !!error,
+              'aria-describedby': error ? `${name}-error` : undefined,
+            }}
+            FormHelperTextProps={{
+              id: error ? `${name}-error` : undefined,
+              role: error ? 'alert' : undefined,
+              'aria-live': error ? 'polite' : undefined,
+            }}
+          />
+        );
+      }}
     />
   );
 }

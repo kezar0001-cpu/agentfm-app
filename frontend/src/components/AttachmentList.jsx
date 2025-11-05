@@ -18,6 +18,7 @@ import {
   Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import AttachmentPreview from './AttachmentPreview';
+import { formatDateTime } from '../utils/date';
 
 const formatFileSize = (bytes) => {
   if (!bytes && bytes !== 0) return 'Unknown size';
@@ -46,7 +47,7 @@ const AttachmentList = ({ attachments, canEdit, annotationDrafts, onAnnotationCh
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {formatFileSize(attachment.size)} • Uploaded{' '}
-                    {attachment.createdAt ? new Date(attachment.createdAt).toLocaleString() : 'recently'}
+                    {attachment.createdAt ? formatDateTime(attachment.createdAt) : 'recently'}
                   </Typography>
                   <TextField
                     label="Annotation"

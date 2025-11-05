@@ -39,6 +39,7 @@ import DataState from '../components/DataState';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 import GradientButton from '../components/GradientButton';
+import { formatDate } from '../utils/date';
 
 export default function TeamManagementPage() {
   const queryClient = useQueryClient();
@@ -249,7 +250,7 @@ export default function TeamManagementPage() {
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                    {new Date(invite.expiresAt).toLocaleDateString()}
+                    {formatDate(invite.expiresAt)}
                   </Typography>
                 </TableCell>
                 <TableCell align="right">

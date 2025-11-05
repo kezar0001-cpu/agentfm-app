@@ -20,6 +20,7 @@ import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 import { inspectionSchema, inspectionDefaultValues } from '../schemas/inspectionSchema';
 import { FormTextField, FormSelect } from './form';
+import { formatDateTimeForInput, toISOString } from '../utils/date';
 
 const INSPECTION_TYPE_OPTIONS = [
   { value: 'ROUTINE', label: 'Routine' },
@@ -100,7 +101,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
         title: inspection.title || '',
         type: inspection.type || 'ROUTINE',
         scheduledDate: inspection.scheduledDate
-          ? new Date(inspection.scheduledDate).toISOString().slice(0, 16)
+          ? formatDateTimeForInput(inspection.scheduledDate)
           : '',
         propertyId: inspection.propertyId || '',
         unitId: inspection.unitId || '',
@@ -144,7 +145,7 @@ const InspectionForm = ({ inspection, onSuccess, onCancel }) => {
     const payload = {
       title: data.title,
       type: data.type,
-      scheduledDate: new Date(data.scheduledDate).toISOString(),
+      scheduledDate: toISOString(data.scheduledDate),
       propertyId: data.propertyId,
       unitId: data.unitId || undefined,
       assignedToId: data.assignedToId || undefined,

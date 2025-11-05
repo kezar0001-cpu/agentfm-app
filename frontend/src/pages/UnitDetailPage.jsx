@@ -46,7 +46,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import UnitForm from '../components/UnitForm';
 import TenantAssignmentDialog from '../components/TenantAssignmentDialog';
-import { formatDateTime } from '../utils/date';
+import { formatDate, formatDateTime } from '../utils/date';
 import toast from 'react-hot-toast';
 import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
@@ -393,8 +393,7 @@ export default function UnitDetailPage() {
                               Lease Period
                             </Typography>
                             <Typography variant="body2">
-                              {formatDateTime(activeTenant.leaseStart, 'MMM D, YYYY')} -{' '}
-                              {formatDateTime(activeTenant.leaseEnd, 'MMM D, YYYY')}
+                              {formatDate(activeTenant.leaseStart)} - {formatDate(activeTenant.leaseEnd)}
                             </Typography>
                           </Box>
 
@@ -588,7 +587,7 @@ export default function UnitDetailPage() {
                                   secondary={
                                     <>
                                       <Typography variant="body2" color="text.secondary">
-                                        {formatDateTime(inspection.scheduledDate, 'MMM D, YYYY')}
+                                        {formatDateTime(inspection.scheduledDate)}
                                       </Typography>
                                       <Box sx={{ mt: 0.5 }}>
                                         <Chip
