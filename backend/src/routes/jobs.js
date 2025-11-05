@@ -365,6 +365,29 @@ router.post(
       );
 
       try {
+        // Batch fetch all previous technicians to avoid N+1 queries
+        const previousTechnicianIds = new Set();
+        updatedJobs.forEach((updatedJob) => {
+          const previousJob = jobMap.get(updatedJob.id);
+          if (previousJob?.assignedToId &&
+              previousJob.assignedToId !== technicianId &&
+              !previousJob.assignedTo) {
+            previousTechnicianIds.add(previousJob.assignedToId);
+          }
+        });
+
+        // Fetch all previous technicians in a single query
+        const previousTechniciansMap = new Map();
+        if (previousTechnicianIds.size > 0) {
+          const previousTechnicians = await prisma.user.findMany({
+            where: { id: { in: Array.from(previousTechnicianIds) } },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+          previousTechnicians.forEach((tech) => {
+            previousTechniciansMap.set(tech.id, tech);
+          });
+        }
+
         await Promise.all(
           updatedJobs.map(async (updatedJob) => {
             const previousJob = jobMap.get(updatedJob.id);
@@ -375,14 +398,9 @@ router.post(
             }
 
             if (previousJob.assignedToId) {
-              let previousTechnician = previousJob.assignedTo;
-
-              if (!previousTechnician) {
-                previousTechnician = await prisma.user.findUnique({
-                  where: { id: previousJob.assignedToId },
-                  select: { id: true, firstName: true, lastName: true, email: true },
-                });
-              }
+              // Use cached assignedTo or look up from batch-fetched map
+              let previousTechnician = previousJob.assignedTo ||
+                previousTechniciansMap.get(previousJob.assignedToId);
 
               if (previousTechnician && updatedJob.assignedTo) {
                 await notifyJobReassigned(updatedJob, previousTechnician, updatedJob.assignedTo, updatedJob.property);
