@@ -314,6 +314,112 @@ export async function notifyInspectionCompleted(inspection, technician, property
 }
 
 /**
+ * Send notification to Owner when Property Manager adds cost estimate
+ */
+export async function notifyOwnerCostEstimateReady(serviceRequest, owner, manager, property) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return sendNotification(
+    owner.id,
+    'SERVICE_REQUEST_UPDATE',
+    'Cost Estimate Ready for Approval',
+    `${manager.firstName} ${manager.lastName} has added a cost estimate of $${serviceRequest.managerEstimatedCost} for "${serviceRequest.title}"`,
+    {
+      entityType: 'serviceRequest',
+      entityId: serviceRequest.id,
+      emailData: {
+        ownerName: `${owner.firstName} ${owner.lastName}`,
+        requestTitle: serviceRequest.title,
+        propertyName: property.name,
+        managerName: `${manager.firstName} ${manager.lastName}`,
+        estimatedCost: serviceRequest.managerEstimatedCost,
+        costBreakdown: serviceRequest.costBreakdownNotes,
+        requestUrl: `${frontendUrl}/owner/dashboard`,
+      },
+    }
+  );
+}
+
+/**
+ * Send notification to Property Manager when Owner approves service request
+ */
+export async function notifyManagerOwnerApproved(serviceRequest, manager, owner, property) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return sendNotification(
+    manager.id,
+    'SERVICE_REQUEST_UPDATE',
+    'Service Request Approved by Owner',
+    `${owner.firstName} ${owner.lastName} approved the service request "${serviceRequest.title}" with a budget of $${serviceRequest.approvedBudget}`,
+    {
+      entityType: 'serviceRequest',
+      entityId: serviceRequest.id,
+      emailData: {
+        managerName: `${manager.firstName} ${manager.lastName}`,
+        ownerName: `${owner.firstName} ${owner.lastName}`,
+        requestTitle: serviceRequest.title,
+        propertyName: property.name,
+        approvedBudget: serviceRequest.approvedBudget,
+        requestUrl: `${frontendUrl}/service-requests/${serviceRequest.id}`,
+      },
+    }
+  );
+}
+
+/**
+ * Send notification to Property Manager when Owner rejects service request
+ */
+export async function notifyManagerOwnerRejected(serviceRequest, manager, owner, property, rejectionReason) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return sendNotification(
+    manager.id,
+    'SERVICE_REQUEST_UPDATE',
+    'Service Request Rejected by Owner',
+    `${owner.firstName} ${owner.lastName} rejected the service request "${serviceRequest.title}"`,
+    {
+      entityType: 'serviceRequest',
+      entityId: serviceRequest.id,
+      emailData: {
+        managerName: `${manager.firstName} ${manager.lastName}`,
+        ownerName: `${owner.firstName} ${owner.lastName}`,
+        requestTitle: serviceRequest.title,
+        propertyName: property.name,
+        rejectionReason: rejectionReason || 'No reason provided',
+        requestUrl: `${frontendUrl}/service-requests/${serviceRequest.id}`,
+      },
+    }
+  );
+}
+
+/**
+ * Send notification to Owner when service request is converted to job
+ */
+export async function notifyOwnerJobCreated(serviceRequest, job, owner, property) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return sendNotification(
+    owner.id,
+    'SERVICE_REQUEST_UPDATE',
+    'Service Request Converted to Job',
+    `Your service request "${serviceRequest.title}" has been converted to a job and work will begin soon`,
+    {
+      entityType: 'job',
+      entityId: job.id,
+      emailData: {
+        ownerName: `${owner.firstName} ${owner.lastName}`,
+        requestTitle: serviceRequest.title,
+        jobTitle: job.title,
+        propertyName: property.name,
+        scheduledDate: job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString() : 'Not scheduled yet',
+        estimatedCost: job.estimatedCost,
+        jobUrl: `${frontendUrl}/jobs/${job.id}`,
+      },
+    }
+  );
+}
+
+/**
  * Map notification type to email template key
  */
 function getTemplateKeyFromType(type) {
@@ -332,9 +438,16 @@ export default {
   sendNotification,
   notifyJobAssigned,
   notifyJobCompleted,
+  notifyJobStarted,
+  notifyJobReassigned,
   notifyInspectionReminder,
   notifyInspectionCompleted,
   notifyServiceRequestUpdate,
   notifyTrialExpiring,
   sendWelcomeEmail,
+  // New approval workflow notifications
+  notifyOwnerCostEstimateReady,
+  notifyManagerOwnerApproved,
+  notifyManagerOwnerRejected,
+  notifyOwnerJobCreated,
 };
