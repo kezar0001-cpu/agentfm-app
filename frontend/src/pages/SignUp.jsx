@@ -39,12 +39,13 @@ export default function SignUp() {
       try {
         const response = await apiClient.get(`/invites/${inviteToken}`);
         const res = response?.data ?? response;
-        setInviteData(res);
+        const inviteDetails = res.invite || res;
+        setInviteData(inviteDetails);
         // Pre-fill email and role from invite
         setFormData(prev => ({
           ...prev,
-          email: res.email || prev.email,
-          role: res.role || prev.role
+          email: inviteDetails.email || prev.email,
+          role: inviteDetails.role || prev.role
         }));
       } catch (err) {
         setError('Invalid or expired invitation link');
