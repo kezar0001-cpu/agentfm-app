@@ -503,6 +503,85 @@ async function sendPaymentFailureNotification(userEmail, userName, invoiceUrl) {
 }
 
 /**
+ * Helper function to upsert Subscription record
+ */
+async function upsertSubscription({
+  userId,
+  orgId,
+  stripeCustomerId,
+  stripeSubscriptionId,
+  status,
+  plan,
+  currentPeriodEnd,
+  cancelledAt,
+}) {
+  if (!userId && !orgId) {
+    console.warn('No userId or orgId provided for subscription upsert');
+    return;
+  }
+
+  try {
+    // Find the user(s) to update
+    let userIds = [];
+    if (userId) {
+      userIds = [userId];
+    } else if (orgId) {
+      const orgUsers = await prisma.user.findMany({
+        where: { orgId },
+        select: { id: true },
+      });
+      userIds = orgUsers.map(u => u.id);
+    }
+
+    // For each user, upsert their subscription
+    for (const uid of userIds) {
+      const existingSubscription = await prisma.subscription.findFirst({
+        where: {
+          userId: uid,
+          OR: [
+            { stripeSubscriptionId },
+            { stripeCustomerId },
+            // If no Stripe IDs, find the most recent one
+            ...(!stripeSubscriptionId && !stripeCustomerId ? [{ userId: uid }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const subscriptionData = {
+        userId: uid,
+        planId: plan || 'STARTER',
+        planName: plan || 'STARTER',
+        status: status || 'PENDING',
+        ...(stripeCustomerId && { stripeCustomerId }),
+        ...(stripeSubscriptionId && { stripeSubscriptionId }),
+        ...(currentPeriodEnd && { stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000) }),
+        ...(cancelledAt && { cancelledAt: new Date(cancelledAt * 1000) }),
+        ...(status === 'CANCELLED' && !cancelledAt && { cancelledAt: new Date() }),
+      };
+
+      if (existingSubscription) {
+        // Update existing subscription
+        await prisma.subscription.update({
+          where: { id: existingSubscription.id },
+          data: subscriptionData,
+        });
+        console.log(`Updated subscription ${existingSubscription.id} for user ${uid}`);
+      } else if (stripeSubscriptionId || stripeCustomerId) {
+        // Only create new subscription if we have Stripe IDs
+        await prisma.subscription.create({
+          data: subscriptionData,
+        });
+        console.log(`Created new subscription for user ${uid}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error upserting subscription:', error);
+    throw error;
+  }
+}
+
+/**
  * Stripe Webhook (This must be exported to be used in index.js)
  */
 export async function webhook(req, res) {
@@ -533,10 +612,12 @@ export async function webhook(req, res) {
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
+        console.log('Processing checkout.session.completed');
         const session = event.data.object;
         const userId = session.metadata?.userId;
         const orgId  = session.metadata?.orgId || session.client_reference_id;
         const subscriptionId = session.subscription;
+        const customerId = session.customer;
         let subscription;
 
         if (session.mode === 'subscription' && subscriptionId) {
@@ -553,6 +634,7 @@ export async function webhook(req, res) {
         const plan = resolvePlanFromPriceId(priceId, session.metadata?.plan || 'STARTER');
         const status = mapStripeStatusToAppStatus(subscription?.status, 'ACTIVE');
 
+        // Update User model
         const update = {
           subscriptionStatus: status,
         };
@@ -566,28 +648,65 @@ export async function webhook(req, res) {
         }
 
         await applySubscriptionUpdate({ userId, orgId, data: update });
+
+        // Create/Update Subscription record
+        if (subscription && customerId) {
+          await upsertSubscription({
+            userId,
+            orgId,
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscriptionId,
+            status,
+            plan,
+            currentPeriodEnd: subscription.current_period_end,
+          });
+        }
+
+        console.log(`Checkout completed: ${subscriptionId} for user ${userId || orgId}`);
         break;
       }
       case 'customer.subscription.updated': {
+        console.log('Processing customer.subscription.updated');
         const subscription = event.data.object;
         const userId = subscription.metadata?.userId;
         const orgId = subscription.metadata?.orgId;
+        const customerId = subscription.customer;
+        const subscriptionId = subscription.id;
         const priceId = subscription.items?.data?.[0]?.price?.id;
         const plan = resolvePlanFromPriceId(priceId, subscription.metadata?.plan);
         const newStatus = mapStripeStatusToAppStatus(subscription.status);
 
+        // Update User model
         const data = { subscriptionStatus: newStatus };
         if (plan) data.subscriptionPlan = plan;
         if (newStatus === 'ACTIVE') data.trialEndDate = null;
 
         await applySubscriptionUpdate({ userId, orgId, data });
+
+        // Update Subscription record
+        await upsertSubscription({
+          userId,
+          orgId,
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscriptionId,
+          status: newStatus,
+          plan,
+          currentPeriodEnd: subscription.current_period_end,
+          cancelledAt: subscription.canceled_at,
+        });
+
+        console.log(`Subscription updated: ${subscriptionId}, status: ${newStatus}`);
         break;
       }
       case 'customer.subscription.deleted': {
+        console.log('Processing customer.subscription.deleted');
         const subscription = event.data.object;
         const userId = subscription.metadata?.userId;
         const orgId = subscription.metadata?.orgId;
+        const customerId = subscription.customer;
+        const subscriptionId = subscription.id;
 
+        // Update User model
         await applySubscriptionUpdate({
           userId,
           orgId,
@@ -597,18 +716,33 @@ export async function webhook(req, res) {
             trialEndDate: null,
           },
         });
+
+        // Update Subscription record
+        await upsertSubscription({
+          userId,
+          orgId,
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscriptionId,
+          status: 'CANCELLED',
+          plan: 'FREE_TRIAL',
+          cancelledAt: subscription.canceled_at || Date.now() / 1000,
+        });
+
+        console.log(`Subscription deleted: ${subscriptionId}`);
         break;
       }
       case 'invoice.payment_failed': {
+        console.log('Processing invoice.payment_failed');
         const invoice = event.data.object;
         const customerId = invoice.customer;
+        const subscriptionId = invoice.subscription;
 
         try {
           // Fetch customer details from Stripe
           const customer = await stripe.customers.retrieve(customerId);
 
-          // Get user from database
-          const dbUser = await prisma.user.findFirst({
+          // Get user from database via Subscription record
+          let dbUser = await prisma.user.findFirst({
             where: {
               subscriptions: {
                 some: {
@@ -617,6 +751,19 @@ export async function webhook(req, res) {
               },
             },
           });
+
+          // Fallback: try to find by stripeSubscriptionId
+          if (!dbUser && subscriptionId) {
+            dbUser = await prisma.user.findFirst({
+              where: {
+                subscriptions: {
+                  some: {
+                    stripeSubscriptionId: subscriptionId,
+                  },
+                },
+              },
+            });
+          }
 
           if (dbUser && customer.email) {
             const userName = dbUser.firstName || 'Customer';
@@ -625,7 +772,7 @@ export async function webhook(req, res) {
             // Send payment failure notification
             await sendPaymentFailureNotification(customer.email, userName, invoiceUrl);
 
-            // Update subscription status to SUSPENDED
+            // Update User model to SUSPENDED
             await applySubscriptionUpdate({
               userId: dbUser.id,
               orgId: dbUser.orgId,
@@ -634,7 +781,18 @@ export async function webhook(req, res) {
               },
             });
 
+            // Update Subscription record
+            await upsertSubscription({
+              userId: dbUser.id,
+              orgId: dbUser.orgId,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionId,
+              status: 'SUSPENDED',
+            });
+
             console.log(`Payment failure processed for customer ${customerId}`);
+          } else {
+            console.warn(`Could not find user for customer ${customerId}`);
           }
         } catch (error) {
           console.error('Error handling payment failure:', error);
@@ -642,13 +800,14 @@ export async function webhook(req, res) {
         break;
       }
       case 'invoice.payment_succeeded': {
+        console.log('Processing invoice.payment_succeeded');
         const invoice = event.data.object;
         const customerId = invoice.customer;
         const subscriptionId = invoice.subscription;
 
         try {
           // Get user from database
-          const dbUser = await prisma.user.findFirst({
+          let dbUser = await prisma.user.findFirst({
             where: {
               subscriptions: {
                 some: {
@@ -658,24 +817,113 @@ export async function webhook(req, res) {
             },
           });
 
+          // Fallback: try to find by stripeSubscriptionId
+          if (!dbUser && subscriptionId) {
+            dbUser = await prisma.user.findFirst({
+              where: {
+                subscriptions: {
+                  some: {
+                    stripeSubscriptionId: subscriptionId,
+                  },
+                },
+              },
+            });
+          }
+
           if (dbUser && subscriptionId) {
             // Fetch subscription to get the current status
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
             const newStatus = mapStripeStatusToAppStatus(subscription.status);
+            const priceId = subscription.items?.data?.[0]?.price?.id;
+            const plan = resolvePlanFromPriceId(priceId, subscription.metadata?.plan);
 
-            // Update subscription status (e.g., from SUSPENDED back to ACTIVE)
+            // Update User model (e.g., from SUSPENDED back to ACTIVE)
+            const updateData = {
+              subscriptionStatus: newStatus,
+            };
+            if (plan) updateData.subscriptionPlan = plan;
+            if (newStatus === 'ACTIVE') updateData.trialEndDate = null;
+
             await applySubscriptionUpdate({
               userId: dbUser.id,
               orgId: dbUser.orgId,
-              data: {
-                subscriptionStatus: newStatus,
-              },
+              data: updateData,
+            });
+
+            // Update Subscription record
+            await upsertSubscription({
+              userId: dbUser.id,
+              orgId: dbUser.orgId,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionId,
+              status: newStatus,
+              plan,
+              currentPeriodEnd: subscription.current_period_end,
             });
 
             console.log(`Payment succeeded for customer ${customerId}, status updated to ${newStatus}`);
           }
         } catch (error) {
           console.error('Error handling payment success:', error);
+        }
+        break;
+      }
+      case 'customer.subscription.schedule.created': {
+        console.log('Processing customer.subscription.schedule.created');
+        const schedule = event.data.object;
+        const customerId = schedule.customer;
+        const subscriptionId = schedule.subscription;
+
+        try {
+          // Get user from database
+          let dbUser = null;
+          if (subscriptionId) {
+            dbUser = await prisma.user.findFirst({
+              where: {
+                subscriptions: {
+                  some: {
+                    stripeSubscriptionId: subscriptionId,
+                  },
+                },
+              },
+            });
+          }
+
+          // Fallback: find by customer ID
+          if (!dbUser && customerId) {
+            dbUser = await prisma.user.findFirst({
+              where: {
+                subscriptions: {
+                  some: {
+                    stripeCustomerId: customerId,
+                  },
+                },
+              },
+            });
+          }
+
+          if (dbUser) {
+            // Extract the upcoming phase details
+            const phases = schedule.phases || [];
+            const nextPhase = phases.find(p => p.start_date > Date.now() / 1000);
+
+            if (nextPhase) {
+              const priceId = nextPhase.items?.[0]?.price;
+              const plan = priceId ? resolvePlanFromPriceId(priceId) : null;
+
+              console.log(`Subscription schedule created for user ${dbUser.id}, next phase starts at ${new Date(nextPhase.start_date * 1000).toISOString()}`);
+
+              // Log for future reference, but don't update the subscription yet
+              // The actual changes will be applied when the schedule executes
+              if (plan) {
+                console.log(`Scheduled plan change to ${plan} on ${new Date(nextPhase.start_date * 1000).toISOString()}`);
+              }
+            }
+          } else {
+            console.warn(`Could not find user for subscription schedule with customer ${customerId}`);
+          }
+        } catch (error) {
+          console.error('Error handling subscription schedule creation:', error);
         }
         break;
       }
