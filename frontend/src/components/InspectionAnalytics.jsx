@@ -99,9 +99,9 @@ const InspectionAnalytics = ({ metrics, charts }) => {
                 points={trendPoints}
                 style={{ color: '#1976d2' }}
               />
-              {charts.monthlyCompletion.map((item, index) => {
-                const x = (index / (charts.monthlyCompletion.length - 1 || 1)) * 100;
-                const y = 100 - (item.completed / (Math.max(...charts.monthlyCompletion.map((entry) => entry.completed)) || 1)) * 100;
+              {charts?.monthlyCompletion?.map((item, index) => {
+                const x = (index / ((charts?.monthlyCompletion?.length || 1) - 1 || 1)) * 100;
+                const y = 100 - (item.completed / (Math.max(...(charts?.monthlyCompletion?.map((entry) => entry.completed) || [])) || 1)) * 100;
                 return <circle key={item.month} cx={x} cy={y} r={2} fill="#1976d2" />;
               })}
             </Box>
@@ -142,7 +142,7 @@ const InspectionAnalytics = ({ metrics, charts }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {charts.recurringIssues.map((issue) => (
+                {charts?.recurringIssues?.map((issue) => (
                   <TableRow key={issue.label}>
                     <TableCell>{issue.label}</TableCell>
                     <TableCell align="right">{issue.count}</TableCell>
