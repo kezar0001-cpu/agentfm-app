@@ -53,12 +53,27 @@ const dynamicOriginMatchers = [
 
 const corsOptions = {
   origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowlist.has(origin)) return cb(null, true);
-    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+    // No origin (same-origin requests, Postman, etc.)
+    if (!origin) {
+      logger.debug('CORS: No origin header, allowing request');
       return cb(null, true);
     }
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
+
+    // Check allowlist
+    if (allowlist.has(origin)) {
+      logger.debug(`CORS: Origin ${origin} found in allowlist`);
+      return cb(null, true);
+    }
+
+    // Check dynamic matchers (e.g., *.vercel.app)
+    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+      logger.debug(`CORS: Origin ${origin} matched dynamic pattern`);
+      return cb(null, true);
+    }
+
+    // Reject origin (but don't throw error - this ensures CORS headers are still sent)
+    logger.warn(`CORS: Blocked origin: ${origin}`);
+    return cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -69,6 +84,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Explicit OPTIONS handler for all routes to ensure preflight requests work
+app.options('*', cors(corsOptions));
 
 // ---- Security Middleware
 // Helmet helps secure Express apps by setting various HTTP headers
