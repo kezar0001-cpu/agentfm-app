@@ -56,6 +56,7 @@ export const queryKeys = {
   dashboard: {
     stats: () => ['dashboard', 'stats'],
     activity: () => ['dashboard', 'activity'],
+    analytics: (params) => ['dashboard', 'analytics', params],
     technician: () => ['dashboard', 'technician'],
     owner: () => ['dashboard', 'owner'],
     ownerProperties: () => ['dashboard', 'ownerProperties'],
