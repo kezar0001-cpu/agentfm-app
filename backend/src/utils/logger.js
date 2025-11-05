@@ -1,4 +1,5 @@
 import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
@@ -7,9 +8,45 @@ const consoleFormat = printf(({ level, message, timestamp, stack }) => {
   return `${timestamp} [${level}]: ${stack || message}`;
 });
 
+// Daily rotation transport for error logs
+const errorRotateTransport = new DailyRotateFile({
+  filename: 'logs/error-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  level: 'error',
+  maxSize: '20m',
+  maxFiles: '30d', // Keep logs for 30 days
+  zippedArchive: true, // Compress archived logs
+});
+
+// Daily rotation transport for combined logs
+const combinedRotateTransport = new DailyRotateFile({
+  filename: 'logs/combined-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '20m',
+  maxFiles: '30d', // Keep logs for 30 days
+  zippedArchive: true, // Compress archived logs
+});
+
+// Daily rotation transport for HTTP request logs
+const httpRotateTransport = new DailyRotateFile({
+  filename: 'logs/http-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  level: 'http',
+  maxSize: '20m',
+  maxFiles: '30d', // Keep logs for 30 days
+  zippedArchive: true, // Compress archived logs
+});
+
 // Create logger instance
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
+  levels: {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    debug: 4,
+  },
   format: combine(
     errors({ stack: true }),
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -17,19 +54,9 @@ export const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'agentfm-backend' },
   transports: [
-    // Write all logs with importance level of `error` or less to `error.log`
-    new winston.transports.File({ 
-      filename: 'logs/error.log', 
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5
-    }),
-    // Write all logs to `combined.log`
-    new winston.transports.File({ 
-      filename: 'logs/combined.log',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5
-    })
+    errorRotateTransport,
+    combinedRotateTransport,
+    httpRotateTransport,
   ]
 });
 

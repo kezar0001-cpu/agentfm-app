@@ -33,6 +33,7 @@
     "resend": "^6.4.0",
     "stripe": "^19.2.0",
     "winston": "^3.18.3",
+    "winston-daily-rotate-file": "^5.0.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

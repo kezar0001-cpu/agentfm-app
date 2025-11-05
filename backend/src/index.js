@@ -150,6 +150,9 @@ import './config/passport.js';
 app.use(passport.initialize());
 app.use(passport.session());
 
+// ---- Middleware
+import requestLogger from './middleware/logger.js';
+
 // ---- Routes (Import all route handlers)
 import authRoutes from './routes/auth.js';
 import billingRoutes, { webhook as stripeWebhook } from './routes/billing.js';
@@ -183,7 +186,10 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stri
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ---- Mount routes (MUST come AFTER body parsers)
+// ---- Request/Response Logging (MUST come AFTER body parsers but BEFORE routes)
+app.use(requestLogger);
+
+// ---- Mount routes (MUST come AFTER body parsers and logging middleware)
 app.use('/api/auth', authRoutes);
 app.use('/api/billing', billingRoutes); // This will now correctly ignore the webhook path
 app.use('/api/properties', propertiesRoutes);
