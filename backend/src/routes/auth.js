@@ -553,7 +553,7 @@ router.post('/forgot-password', async (req, res) => {
     });
 
     // Generate reset URL with selector and unhashed verifier
-    const appUrl = process.env.APP_URL || 'https://buildtstate.com.au';
+    const appUrl = process.env.APP_URL || 'https://www.buildstate.com.au';
     const resetUrl = `${appUrl}/reset-password?selector=${selector}&token=${verifier}`;
 
     // Send password reset email

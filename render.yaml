@@ -25,7 +25,9 @@ services:
       # Optional: if your backend enforces CORS against a specific origin,
       # set it explicitly (no fromService:url on Free).
       - key: FRONTEND_URL
-        value: https://agentfm-frontend.onrender.com
+        value: https://www.buildstate.com.au
+      - key: APP_URL
+        value: https://www.buildstate.com.au
 
   # -----------------------------
   # Frontend (Vite static site)
