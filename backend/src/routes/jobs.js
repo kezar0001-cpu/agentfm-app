@@ -201,6 +201,7 @@ router.post('/', requireAuth, requireRole('PROPERTY_MANAGER'), requireActiveSubs
         propertyId,
         unitId: unitId || null,
         assignedToId: assignedToId || null,
+        createdById: req.user.id,
         scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
         estimatedCost: estimatedCost || null,
         notes: notes || null,

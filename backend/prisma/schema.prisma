@@ -33,6 +33,7 @@ model User {
   sentInvites             Invite[]                @relation("InvitedBy")
   receivedInvite          Invite?                 @relation("InvitedUser")
   assignedJobs            Job[]                   @relation("AssignedTechnician")
+  createdJobs             Job[]                   @relation("CreatedJobs")
   jobComments             JobComment[]
   notifications           Notification[]
   OwnerProfile            OwnerProfile?
@@ -41,13 +42,17 @@ model User {
   ownedProperties         PropertyOwner[]
   approvedRecommendations Recommendation[]        @relation("ApprovedBy")
   createdRecommendations  Recommendation[]        @relation("CreatedBy")
-  serviceRequests         ServiceRequest[]
+  requestedServiceRequests ServiceRequest[]       @relation("RequestedBy")
+  approvedServiceRequests  ServiceRequest[]       @relation("ApprovedRequests")
+  rejectedServiceRequests  ServiceRequest[]       @relation("RejectedRequests")
+  reviewedServiceRequests  ServiceRequest[]       @relation("ReviewedRequests")
   subscriptions           Subscription[]
   TechnicianProfile       TechnicianProfile?
   TenantProfile           TenantProfile?
   tenantUnits             UnitTenant[]
   reportRequests          ReportRequest[]         @relation("ReportRequestsCreated")
   passwordResets          PasswordReset[]
+  auditLogs               AuditLog[]
   Org                     Org?                    @relation(fields: [orgId], references: [id])
 
   @@index([email])
@@ -251,17 +256,21 @@ model Job {
   propertyId        String?
   unitId            String?
   assignedToId      String?
+  createdById       String
   serviceRequestId  String?
   maintenancePlanId String?
   inspectionId      String?
   scheduledDate     DateTime?
+  startedAt         DateTime?
   completedDate     DateTime?
   estimatedCost     Float?
   actualCost        Float?
   evidence          Json?
   notes             String?
+  technicianNotes   String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  createdBy         User             @relation("CreatedJobs", fields: [createdById], references: [id])
   assignedTo        User?            @relation("AssignedTechnician", fields: [assignedToId], references: [id])
   Inspection        Inspection?      @relation(fields: [inspectionId], references: [id])
   maintenancePlan   MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id])
@@ -273,6 +282,7 @@ model Job {
   @@index([propertyId])
   @@index([unitId])
   @@index([assignedToId])
+  @@index([createdById])
   @@index([status])
   @@index([priority])
   @@index([scheduledDate])
@@ -300,28 +310,50 @@ model MaintenancePlan {
 }
 
 model ServiceRequest {
-  id            String                 @id @default(cuid())
-  title         String
-  description   String
-  category      ServiceRequestCategory
-  priority      JobPriority            @default(MEDIUM)
-  status        ServiceRequestStatus   @default(SUBMITTED)
-  propertyId    String
-  unitId        String?
-  requestedById String
-  photos        String[]               @default([])
-  reviewNotes   String?
-  reviewedAt    DateTime?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  jobs          Job[]
-  property      Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  requestedBy   User                   @relation(fields: [requestedById], references: [id], onDelete: Cascade)
-  unit          Unit?                  @relation(fields: [unitId], references: [id])
+  id                     String                 @id @default(cuid())
+  title                  String
+  description            String
+  category               ServiceRequestCategory
+  priority               JobPriority            @default(MEDIUM)
+  status                 ServiceRequestStatus   @default(SUBMITTED)
+  propertyId             String
+  unitId                 String?
+  requestedById          String
+  photos                 String[]               @default([])
+  reviewNotes            String?
+  reviewedAt             DateTime?
+
+  // New fields for budget and approval workflow
+  ownerEstimatedBudget   Float?
+  managerEstimatedCost   Float?
+  approvedBudget         Float?
+  costBreakdownNotes     String?
+
+  approvedById           String?
+  approvedAt             DateTime?
+  rejectedById           String?
+  rejectedAt             DateTime?
+  rejectionReason        String?
+
+  lastReviewedById       String?
+  lastReviewedAt         DateTime?
+
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  jobs                   Job[]
+  property               Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestedBy            User                   @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy             User?                  @relation("ApprovedRequests", fields: [approvedById], references: [id])
+  rejectedBy             User?                  @relation("RejectedRequests", fields: [rejectedById], references: [id])
+  lastReviewedBy         User?                  @relation("ReviewedRequests", fields: [lastReviewedById], references: [id])
+  unit                   Unit?                  @relation(fields: [unitId], references: [id])
 
   @@index([propertyId])
   @@index([unitId])
   @@index([requestedById])
+  @@index([approvedById])
+  @@index([rejectedById])
   @@index([status])
   @@index([category])
 }
@@ -564,6 +596,10 @@ enum ServiceRequestStatus {
   CONVERTED_TO_JOB
   REJECTED
   COMPLETED
+  PENDING_MANAGER_REVIEW
+  PENDING_OWNER_APPROVAL
+  APPROVED_BY_OWNER
+  REJECTED_BY_OWNER
 }
 
 enum ServiceRequestCategory {
@@ -612,11 +648,31 @@ model JobComment {
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
-  
+
   @@index([jobId])
   @@index([userId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  userId     String
+  changes    Json?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
   @@index([createdAt])
 }

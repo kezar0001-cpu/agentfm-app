@@ -4,6 +4,13 @@ import validate from '../middleware/validate.js';
 import { prisma } from '../config/prismaClient.js';
 import { requireAuth, requireRole, isSubscriptionActive } from '../middleware/auth.js';
 import { redisDel } from '../config/redisClient.js';
+import { logAudit } from '../utils/auditLog.js';
+import {
+  notifyOwnerCostEstimateReady,
+  notifyManagerOwnerApproved,
+  notifyManagerOwnerRejected,
+  notifyOwnerJobCreated,
+} from '../utils/notificationService.js';
 
 const router = express.Router();
 
@@ -20,6 +27,7 @@ const requestSchema = z.object({
   category: z.enum(CATEGORIES),
   priority: z.enum(PRIORITIES).optional().default('MEDIUM'),
   photos: z.array(z.string()).optional(),
+  ownerEstimatedBudget: z.number().positive().optional(),
 });
 
 const requestUpdateSchema = z.object({
@@ -212,7 +220,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
   try {
-    const { propertyId, unitId, title, description, category, priority, photos } = req.body;
+    const { propertyId, unitId, title, description, category, priority, photos, ownerEstimatedBudget } = req.body;
 
     // Verify property exists and user has access
     const property = await prisma.property.findUnique({
@@ -303,6 +311,14 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
       }
     }
 
+    // Determine initial status based on user role
+    // OWNER with budget estimate → PENDING_MANAGER_REVIEW
+    // OWNER without budget OR TENANT/PM → SUBMITTED
+    let initialStatus = 'SUBMITTED';
+    if (req.user.role === 'OWNER' && ownerEstimatedBudget) {
+      initialStatus = 'PENDING_MANAGER_REVIEW';
+    }
+
     // Create service request
     const request = await prisma.serviceRequest.create({
       data: {
@@ -310,11 +326,12 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
         description,
         category,
         priority: priority || 'MEDIUM',
-        status: 'SUBMITTED',
+        status: initialStatus,
         propertyId,
         unitId: unitId || null,
         requestedById: req.user.id,
         photos: photos || [],
+        ownerEstimatedBudget: ownerEstimatedBudget || null,
       },
       include: {
         property: {
@@ -332,7 +349,21 @@ router.post('/', requireAuth, validate(requestSchema), async (req, res) => {
         },
       },
     });
-    
+
+    // Log audit
+    await logAudit({
+      entityType: 'ServiceRequest',
+      entityId: request.id,
+      action: 'CREATED',
+      userId: req.user.id,
+      metadata: {
+        role: req.user.role,
+        status: initialStatus,
+        hasOwnerBudget: !!ownerEstimatedBudget,
+      },
+      req
+    });
+
     res.status(201).json(request);
   } catch (error) {
     console.error('Error creating service request:', error);
@@ -449,6 +480,347 @@ router.patch('/:id', requireAuth, validate(requestUpdateSchema), async (req, res
   }
 });
 
+// Property Manager adds cost estimate to owner-initiated request
+router.post('/:id/estimate', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { managerEstimatedCost, costBreakdownNotes } = req.body;
+
+    if (!managerEstimatedCost || managerEstimatedCost <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid estimated cost is required'
+      });
+    }
+
+    // Get service request
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        property: {
+          include: {
+            manager: true,
+            owners: {
+              include: {
+                owner: true
+              }
+            }
+          }
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            role: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+
+    // Verify it's the property manager
+    if (serviceRequest.property.managerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the property manager can add cost estimates'
+      });
+    }
+
+    // Verify it's in the correct status
+    if (serviceRequest.status !== 'PENDING_MANAGER_REVIEW') {
+      return res.status(400).json({
+        success: false,
+        message: 'Service request must be in PENDING_MANAGER_REVIEW status'
+      });
+    }
+
+    // Update service request with cost estimate
+    const updatedRequest = await prisma.serviceRequest.update({
+      where: { id },
+      data: {
+        managerEstimatedCost,
+        costBreakdownNotes,
+        status: 'PENDING_OWNER_APPROVAL',
+        lastReviewedById: req.user.id,
+        lastReviewedAt: new Date(),
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true
+          }
+        },
+        requestedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    // Log audit
+    await logAudit({
+      entityType: 'ServiceRequest',
+      entityId: id,
+      action: 'ESTIMATE_ADDED',
+      userId: req.user.id,
+      changes: {
+        managerEstimatedCost,
+        costBreakdownNotes,
+        status: { before: 'PENDING_MANAGER_REVIEW', after: 'PENDING_OWNER_APPROVAL' }
+      },
+      req
+    });
+
+    // Send notification to owner (requestedBy should be the owner)
+    if (serviceRequest.requestedBy.role === 'OWNER') {
+      try {
+        await notifyOwnerCostEstimateReady(
+          updatedRequest,
+          serviceRequest.requestedBy,
+          req.user,
+          updatedRequest.property
+        );
+      } catch (notifError) {
+        console.error('Failed to send cost estimate notification:', notifError);
+      }
+    }
+
+    res.json({ success: true, request: updatedRequest });
+  } catch (error) {
+    console.error('Error adding cost estimate:', error);
+    res.status(500).json({ success: false, message: 'Failed to add cost estimate' });
+  }
+});
+
+// Owner approves service request
+router.post('/:id/approve', requireAuth, requireRole('OWNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approvedBudget } = req.body;
+
+    // Get service request
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        property: {
+          include: {
+            manager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            },
+            owners: {
+              select: {
+                ownerId: true
+              }
+            }
+          }
+        }
+      },
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+
+    // Verify owner has access
+    const isOwner = serviceRequest.property.owners.some(o => o.ownerId === req.user.id);
+    if (!isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only property owners can approve service requests'
+      });
+    }
+
+    // Verify it's in the correct status
+    if (serviceRequest.status !== 'PENDING_OWNER_APPROVAL') {
+      return res.status(400).json({
+        success: false,
+        message: 'Service request must be in PENDING_OWNER_APPROVAL status'
+      });
+    }
+
+    // Update service request to approved
+    const updatedRequest = await prisma.serviceRequest.update({
+      where: { id },
+      data: {
+        status: 'APPROVED_BY_OWNER',
+        approvedBudget: approvedBudget || serviceRequest.managerEstimatedCost,
+        approvedById: req.user.id,
+        approvedAt: new Date(),
+        lastReviewedById: req.user.id,
+        lastReviewedAt: new Date(),
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true
+          }
+        }
+      }
+    });
+
+    // Log audit
+    await logAudit({
+      entityType: 'ServiceRequest',
+      entityId: id,
+      action: 'APPROVED_BY_OWNER',
+      userId: req.user.id,
+      changes: {
+        approvedBudget: approvedBudget || serviceRequest.managerEstimatedCost,
+        status: { before: 'PENDING_OWNER_APPROVAL', after: 'APPROVED_BY_OWNER' }
+      },
+      req
+    });
+
+    // Send notification to property manager
+    try {
+      await notifyManagerOwnerApproved(
+        updatedRequest,
+        serviceRequest.property.manager,
+        req.user,
+        updatedRequest.property
+      );
+    } catch (notifError) {
+      console.error('Failed to send approval notification:', notifError);
+    }
+
+    res.json({ success: true, request: updatedRequest });
+  } catch (error) {
+    console.error('Error approving service request:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve service request' });
+  }
+});
+
+// Owner rejects service request
+router.post('/:id/reject', requireAuth, requireRole('OWNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason || rejectionReason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required'
+      });
+    }
+
+    // Get service request
+    const serviceRequest = await prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        property: {
+          include: {
+            manager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            },
+            owners: {
+              select: {
+                ownerId: true
+              }
+            }
+          }
+        }
+      },
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ success: false, message: 'Service request not found' });
+    }
+
+    // Verify owner has access
+    const isOwner = serviceRequest.property.owners.some(o => o.ownerId === req.user.id);
+    if (!isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only property owners can reject service requests'
+      });
+    }
+
+    // Verify it's in the correct status
+    if (serviceRequest.status !== 'PENDING_OWNER_APPROVAL') {
+      return res.status(400).json({
+        success: false,
+        message: 'Service request must be in PENDING_OWNER_APPROVAL status'
+      });
+    }
+
+    // Update service request to rejected
+    const updatedRequest = await prisma.serviceRequest.update({
+      where: { id },
+      data: {
+        status: 'REJECTED_BY_OWNER',
+        rejectedById: req.user.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+        lastReviewedById: req.user.id,
+        lastReviewedAt: new Date(),
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true
+          }
+        }
+      }
+    });
+
+    // Log audit
+    await logAudit({
+      entityType: 'ServiceRequest',
+      entityId: id,
+      action: 'REJECTED_BY_OWNER',
+      userId: req.user.id,
+      changes: {
+        rejectionReason,
+        status: { before: 'PENDING_OWNER_APPROVAL', after: 'REJECTED_BY_OWNER' }
+      },
+      req
+    });
+
+    // Send notification to property manager
+    try {
+      await notifyManagerOwnerRejected(
+        updatedRequest,
+        serviceRequest.property.manager,
+        req.user,
+        updatedRequest.property,
+        rejectionReason
+      );
+    } catch (notifError) {
+      console.error('Failed to send rejection notification:', notifError);
+    }
+
+    res.json({ success: true, request: updatedRequest });
+  } catch (error) {
+    console.error('Error rejecting service request:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject service request' });
+  }
+});
+
 // Convert service request to job (PROPERTY_MANAGER only)
 router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
@@ -479,9 +851,20 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
       }
     }
     
+    // Check if service request is approved (for owner-initiated requests)
+    if (serviceRequest.status === 'PENDING_MANAGER_REVIEW' || serviceRequest.status === 'PENDING_OWNER_APPROVAL') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot convert service request that is still pending approval'
+      });
+    }
+
+    // Use approved budget if available, otherwise use provided or existing estimated cost
+    const jobEstimatedCost = serviceRequest.approvedBudget || estimatedCost || serviceRequest.managerEstimatedCost || null;
+
     // Determine job status based on assignment
     const jobStatus = assignedToId ? 'ASSIGNED' : 'OPEN';
-    
+
     // Create job from service request
     const [job, updatedRequest] = await prisma.$transaction(async (tx) => {
       const createdJob = await tx.job.create({
@@ -494,7 +877,8 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
           propertyId: serviceRequest.propertyId,
           unitId: serviceRequest.unitId,
           assignedToId: assignedToId || null,
-          estimatedCost: estimatedCost || null,
+          createdById: req.user.id,
+          estimatedCost: jobEstimatedCost,
           notes: notes || `Converted from service request #${serviceRequest.id}`,
           serviceRequestId: serviceRequest.id,
         },
@@ -546,6 +930,28 @@ router.post('/:id/convert-to-job', requireAuth, requireRole('PROPERTY_MANAGER'),
 
       return [createdJob, updatedServiceRequest];
     });
+
+    // Log audit
+    await logAudit({
+      entityType: 'ServiceRequest',
+      entityId: serviceRequest.id,
+      action: 'CONVERTED_TO_JOB',
+      userId: req.user.id,
+      metadata: {
+        jobId: job.id,
+        approvedBudget: serviceRequest.approvedBudget,
+      },
+      req
+    });
+
+    // Notify owner if this was an owner-initiated request
+    if (serviceRequest.requestedBy && serviceRequest.requestedBy.role === 'OWNER') {
+      try {
+        await notifyOwnerJobCreated(serviceRequest, job, serviceRequest.requestedBy, job.property);
+      } catch (notifError) {
+        console.error('Failed to send job creation notification to owner:', notifError);
+      }
+    }
 
     // Invalidate cached property activity snapshots (best-effort)
     if (serviceRequest.propertyId) {
