@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Grid } from '@mui/material';
-import { FormSelect } from './form';
+import { FormSelect } from '../form';
 
 const JobAssignment = ({ control, technicianOptions }) => (
   <Grid item xs={12}>

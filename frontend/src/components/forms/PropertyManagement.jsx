@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Grid } from '@mui/material';
-import { FormTextField } from './form';
+import { FormTextField } from '../form';
 
 const PropertyManagement = ({ control }) => (
   <Grid container spacing={2}>

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Grid } from '@mui/material';
-import { FormTextField, FormSelect } from './form';
+import { FormTextField, FormSelect } from '../form';
 
 const PROPERTY_TYPES = [
   'Residential',

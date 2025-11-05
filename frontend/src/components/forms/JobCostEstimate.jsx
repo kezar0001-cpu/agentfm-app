@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Grid } from '@mui/material';
-import { FormTextField } from './form';
+import { FormTextField } from '../form';
 
 const JobCostEstimate = ({ control }) => (
   <Grid item xs={12} sm={6}>
