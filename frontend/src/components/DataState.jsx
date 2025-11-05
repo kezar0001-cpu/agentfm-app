@@ -4,9 +4,9 @@ import InboxIcon from '@mui/icons-material/Inbox';
 
 /**
  * DataState Component
- * 
+ *
  * Handles loading, error, and empty states consistently across the app
- * 
+ *
  * @param {boolean} isLoading - Show loading state
  * @param {boolean} isError - Show error state
  * @param {Error} error - Error object with message
@@ -14,6 +14,7 @@ import InboxIcon from '@mui/icons-material/Inbox';
  * @param {string} emptyMessage - Message to show when empty
  * @param {function} onRetry - Function to call when retry button clicked
  * @param {ReactNode} children - Content to show when data is loaded
+ * @param {ReactNode} skeleton - Optional skeleton component to show during loading (replaces CircularProgress)
  */
 export default function DataState({
   isLoading,
@@ -23,9 +24,28 @@ export default function DataState({
   emptyMessage = 'No data available',
   onRetry,
   children,
+  skeleton,
 }) {
   // Loading State
   if (isLoading) {
+    // Use skeleton loader if provided, otherwise fall back to CircularProgress
+    if (skeleton) {
+      return (
+        <Box
+          sx={{
+            animation: 'fadeIn 0.3s ease-out',
+            '@keyframes fadeIn': {
+              '0%': { opacity: 0 },
+              '100%': { opacity: 1 },
+            },
+          }}
+        >
+          {skeleton}
+        </Box>
+      );
+    }
+
+    // Fallback to CircularProgress for backward compatibility
     return (
       <Box
         sx={{
@@ -175,6 +195,24 @@ export default function DataState({
     );
   }
 
-  // Success State - Show Children
-  return <>{children}</>;
+  // Success State - Show Children with smooth transition
+  return (
+    <Box
+      sx={{
+        animation: 'fadeInUp 0.4s ease-out',
+        '@keyframes fadeInUp': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(10px)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
+      }}
+    >
+      {children}
+    </Box>
+  );
 }
