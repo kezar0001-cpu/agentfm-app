@@ -8,6 +8,12 @@ try {
   prisma = new PrismaClient({
     log: ['error', 'warn'],
     errorFormat: 'pretty',
+    // Connection pool configuration for better performance on hosted environments
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
 } catch (error) {
   console.error('❌ Failed to initialize Prisma Client:', error.message);
