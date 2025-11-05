@@ -44,9 +44,10 @@ import { useNotification } from '../hooks/useNotification.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_ACCESS_LEVELS } from '../schemas/propertySchema.js';
 
 const getDocumentIcon = (mimeType) => {
-  if (mimeType.includes('pdf')) return <PdfIcon />;
-  if (mimeType.includes('image')) return <ImageIcon />;
-  if (mimeType.includes('text')) return <ArticleIcon />;
+  const type = mimeType || '';
+  if (type.includes('pdf')) return <PdfIcon />;
+  if (type.includes('image')) return <ImageIcon />;
+  if (type.includes('text')) return <ArticleIcon />;
   return <FileIcon />;
 };
 
