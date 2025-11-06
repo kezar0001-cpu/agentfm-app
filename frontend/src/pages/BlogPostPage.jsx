@@ -19,6 +19,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { format } from 'date-fns';
 import { getBlogPost } from '../api/blog';
 import SEO from '../components/SEO';
+import BlogLayout from '../components/BlogLayout';
 import toast from 'react-hot-toast';
 
 const BlogPostPage = () => {
@@ -51,20 +52,28 @@ const BlogPostPage = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <CircularProgress size={60} />
-      </Box>
+      <BlogLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <CircularProgress size={60} />
+        </Box>
+      </BlogLayout>
     );
   }
 
   if (!post) {
-    return null;
+    return (
+      <BlogLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <Typography>Post not found</Typography>
+        </Box>
+      </BlogLayout>
+    );
   }
 
   const authorName = `${post.author?.firstName || ''} ${post.author?.lastName || ''}`.trim();
 
   return (
-    <>
+    <BlogLayout>
       <SEO
         title={post.metaTitle || post.title}
         description={post.metaDescription || post.excerpt}
@@ -377,7 +386,7 @@ const BlogPostPage = () => {
           </Card>
         </Container>
       </Box>
-    </>
+    </BlogLayout>
   );
 };
 

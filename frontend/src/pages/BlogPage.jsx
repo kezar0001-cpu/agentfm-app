@@ -25,6 +25,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import { format } from 'date-fns';
 import { getBlogPosts, getBlogCategories, getBlogTags } from '../api/blog';
 import SEO from '../components/SEO';
+import BlogLayout from '../components/BlogLayout';
 import toast from 'react-hot-toast';
 
 const BlogPage = () => {
@@ -142,7 +143,7 @@ const BlogPage = () => {
   const hasActiveFilters = categoryFilter || tagFilter || searchFilter;
 
   return (
-    <>
+    <BlogLayout>
       <SEO
         title="Blog"
         description="Read the latest insights, updates, and resources about property management from AgentFM"
@@ -421,7 +422,7 @@ const BlogPage = () => {
           )}
         </Container>
       </Box>
-    </>
+    </BlogLayout>
   );
 };
 
