@@ -22,7 +22,6 @@ import {
   TableHead,
   TableRow,
   InputAdornment,
-  Tooltip,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -372,21 +371,49 @@ export default function PlansPage() {
               onChange={handleViewChange}
               fullWidth
               size="small"
+              aria-label="maintenance plan view toggle"
+              sx={{
+                backgroundColor: 'background.paper',
+                borderRadius: 999,
+                boxShadow: 1,
+                p: 0.5,
+                '& .MuiToggleButton-root': {
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1,
+                  minHeight: { xs: 42, md: 40 },
+                  border: 'none',
+                  borderRadius: '999px !important',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: { xs: 1.5, md: 1.75 },
+                  py: { xs: 1, md: 0.75 },
+                },
+                '& .Mui-selected': {
+                  color: 'primary.main',
+                  backgroundColor: 'rgba(185, 28, 28, 0.08)',
+                },
+              }}
             >
               <ToggleButton value="card">
-                <Tooltip title="Card View">
-                  <ViewModuleIcon />
-                </Tooltip>
+                <ViewModuleIcon fontSize="small" />
+                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  Card
+                </Typography>
               </ToggleButton>
               <ToggleButton value="table">
-                <Tooltip title="Table View">
-                  <ViewListIcon />
-                </Tooltip>
+                <ViewListIcon fontSize="small" />
+                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  Table
+                </Typography>
               </ToggleButton>
               <ToggleButton value="calendar">
-                <Tooltip title="Calendar View">
-                  <CalendarMonthIcon />
-                </Tooltip>
+                <CalendarMonthIcon fontSize="small" />
+                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  Calendar
+                </Typography>
               </ToggleButton>
             </ToggleButtonGroup>
           </Grid>

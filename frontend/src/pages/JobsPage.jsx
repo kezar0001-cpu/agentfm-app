@@ -431,21 +431,50 @@ const JobsPage = () => {
           aria-label="view toggle"
           size="small"
           sx={{
-            flexWrap: 'wrap',
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            width: { xs: '100%', md: 'auto' },
+            backgroundColor: 'background.paper',
+            borderRadius: 999,
+            boxShadow: 1,
+            p: 0.5,
             '& .MuiToggleButton-root': {
-              minWidth: { xs: 48, md: 'auto' },
-              minHeight: { xs: 48, md: 'auto' }
-            }
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              minWidth: { xs: 'auto', sm: 110 },
+              minHeight: { xs: 42, md: 40 },
+              border: 'none',
+              borderRadius: '999px !important',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 1, sm: 0.75 },
+            },
+            '& .Mui-selected': {
+              color: 'primary.main',
+              backgroundColor: 'rgba(185, 28, 28, 0.08)',
+            },
           }}
         >
           <ToggleButton value="card" aria-label="card view">
-            <ViewModuleIcon />
+            <ViewModuleIcon fontSize="small" />
+            <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+              Card
+            </Typography>
           </ToggleButton>
           <ToggleButton value="kanban" aria-label="kanban view">
-            <ViewKanbanIcon />
+            <ViewKanbanIcon fontSize="small" />
+            <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+              Kanban
+            </Typography>
           </ToggleButton>
           <ToggleButton value="calendar" aria-label="calendar view">
-            <CalendarTodayIcon />
+            <CalendarTodayIcon fontSize="small" />
+            <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+              Calendar
+            </Typography>
           </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
