@@ -91,5 +91,8 @@ test('toPublicProperty returns legacy aliases for compatibility', () => {
   const publicRecord = toPublicProperty(record);
   assert.equal(publicRecord.postcode, '94105');
   assert.equal(publicRecord.type, 'Residential');
-  assert.deepEqual(publicRecord.images, ['https://example.com/image.png']);
+  assert.equal(Array.isArray(publicRecord.images), true);
+  assert.equal(publicRecord.images.length, 1);
+  assert.equal(publicRecord.images[0].imageUrl, 'https://example.com/image.png');
+  assert.equal(publicRecord.images[0].isPrimary, true);
 });

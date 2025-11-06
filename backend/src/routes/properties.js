@@ -43,6 +43,10 @@ router.use(requireAuth);
 // Nested units routes
 router.use('/:id/units', unitsRouter);
 
+// Nested property image routes (defined later)
+const propertyImagesRouter = Router({ mergeParams: true });
+router.use('/:id/images', propertyImagesRouter);
+
 // ---------------------------------------------------------------------------
 // Zod helpers
 // ---------------------------------------------------------------------------
@@ -64,6 +68,12 @@ const optionalUrl = () =>
     .preprocess((value) => trimToNull(value), z.string().url({ message: 'Must be a valid URL' }))
     .nullable()
     .optional();
+
+const requiredUrl = (message) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim() : value),
+    z.string().url({ message: message || 'Must be a valid URL' })
+  );
 
 const optionalInt = (opts = {}) =>
   z
@@ -142,6 +152,25 @@ const unitSchema = z.object({
   address: optionalString(),
   bedrooms: optionalInt({ min: 0, minMessage: 'Bedrooms cannot be negative' }),
   status: optionalString(),
+});
+
+const propertyImageCreateSchema = z.object({
+  imageUrl: requiredUrl('Image URL is required'),
+  caption: optionalString(),
+  isPrimary: z.boolean().optional(),
+});
+
+const propertyImageUpdateSchema = z
+  .object({
+    caption: optionalString(),
+    isPrimary: z.boolean().optional(),
+  })
+  .refine((data) => data.caption !== undefined || data.isPrimary !== undefined, {
+    message: 'No updates provided',
+  });
+
+const propertyImageReorderSchema = z.object({
+  orderedImageIds: z.array(z.string().min(1)).min(1, 'At least one image id is required'),
 });
 
 // ---------------------------------------------------------------------------
@@ -223,15 +252,64 @@ const applyLegacyAliases = (input = {}) => {
   return data;
 };
 
+const normalizePropertyImages = (property) => {
+  if (!property) return [];
+
+  const records = Array.isArray(property.propertyImages) ? property.propertyImages : [];
+
+  if (!records.length) {
+    if (property.imageUrl) {
+      return [
+        {
+          id: `${property.id}:primary`,
+          propertyId: property.id,
+          imageUrl: property.imageUrl,
+          caption: null,
+          isPrimary: true,
+          displayOrder: 0,
+          uploadedById: property.managerId ?? null,
+          createdAt: property.createdAt ?? null,
+          updatedAt: property.updatedAt ?? null,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  return records
+    .slice()
+    .sort((a, b) => {
+      const orderDiff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return aDate - bDate;
+    })
+    .map((image) => ({
+      id: image.id,
+      propertyId: image.propertyId,
+      imageUrl: image.imageUrl,
+      caption: image.caption ?? null,
+      isPrimary: Boolean(image.isPrimary),
+      displayOrder: image.displayOrder ?? 0,
+      uploadedById: image.uploadedById ?? null,
+      createdAt: image.createdAt ?? null,
+      updatedAt: image.updatedAt ?? null,
+    }));
+};
+
 const toPublicProperty = (property) => {
   if (!property) return property;
 
+  const { propertyImages, ...rest } = property;
+
   return {
-    ...property,
+    ...rest,
     postcode: property.postcode ?? property.zipCode ?? null,
     type: property.type ?? property.propertyType ?? null,
     coverImage: property.coverImage ?? property.imageUrl ?? null,
-    images: property.images ?? (property.imageUrl ? [property.imageUrl] : []),
+    images: normalizePropertyImages(property),
   };
 };
 
@@ -404,6 +482,12 @@ router.get('/:id', async (req, res) => {
             },
           },
         },
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        },
       },
     });
 
@@ -486,7 +570,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 // DELETE /:id - Delete property (PROPERTY_MANAGER only, must be property manager)
 router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ 
+    const property = await prisma.property.findUnique({
       where: { id: req.params.id },
       include: {
         owners: {
@@ -514,6 +598,292 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       meta: error?.meta,
     });
     return sendError(res, 500, 'Failed to delete property', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property image routes
+// ---------------------------------------------------------------------------
+
+propertyImagesRouter.get('/', async (req, res) => {
+  const propertyId = req.params.id;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const images = await prisma.propertyImage.findMany({
+      where: { propertyId },
+      orderBy: [
+        { displayOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    res.json({ success: true, images: normalizePropertyImages({ ...property, propertyImages: images }) });
+  } catch (error) {
+    console.error('Get property images error:', error);
+    return sendError(res, 500, 'Failed to fetch property images', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const propertyId = req.params.id;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const parsed = propertyImageCreateSchema.parse(req.body ?? {});
+
+    const existingImages = await prisma.propertyImage.findMany({
+      where: { propertyId },
+      orderBy: { displayOrder: 'desc' },
+      take: 1,
+    });
+
+    const nextDisplayOrder = existingImages.length ? (existingImages[0].displayOrder ?? 0) + 1 : 0;
+    const shouldBePrimary = parsed.isPrimary ?? existingImages.length === 0;
+
+    const createdImage = await prisma.$transaction(async (tx) => {
+      const image = await tx.propertyImage.create({
+        data: {
+          propertyId,
+          imageUrl: parsed.imageUrl,
+          caption: parsed.caption ?? null,
+          isPrimary: shouldBePrimary,
+          displayOrder: nextDisplayOrder,
+          uploadedById: req.user.id,
+        },
+      });
+
+      if (shouldBePrimary) {
+        await tx.propertyImage.updateMany({
+          where: {
+            propertyId,
+            NOT: { id: image.id },
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      return image;
+    });
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.status(201).json({ success: true, image: normalizePropertyImages({ ...property, propertyImages: [createdImage] })[0] });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Create property image error:', error);
+    return sendError(res, 500, 'Failed to add property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+propertyImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const propertyId = req.params.id;
+  const imageId = req.params.imageId;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const parsed = propertyImageUpdateSchema.parse(req.body ?? {});
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.propertyImage.findUnique({ where: { id: imageId } });
+      if (!existing || existing.propertyId !== propertyId) {
+        return null;
+      }
+
+      const updateData = {};
+      if (parsed.caption !== undefined) updateData.caption = parsed.caption ?? null;
+      if (parsed.isPrimary !== undefined) updateData.isPrimary = parsed.isPrimary;
+
+      const result = await tx.propertyImage.update({
+        where: { id: imageId },
+        data: updateData,
+      });
+
+      if (parsed.isPrimary) {
+        await tx.propertyImage.updateMany({
+          where: {
+            propertyId,
+            NOT: { id: imageId },
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      return result;
+    });
+
+    if (!updated) {
+      return sendError(res, 404, 'Property image not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
+    }
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.json({ success: true, image: normalizePropertyImages({ ...property, propertyImages: [updated] })[0] });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Update property image error:', error);
+    return sendError(res, 500, 'Failed to update property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const propertyId = req.params.id;
+  const imageId = req.params.imageId;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const deleted = await prisma.$transaction(async (tx) => {
+      const existing = await tx.propertyImage.findUnique({ where: { id: imageId } });
+      if (!existing || existing.propertyId !== propertyId) {
+        return null;
+      }
+
+      await tx.propertyImage.delete({ where: { id: imageId } });
+
+      if (existing.isPrimary) {
+        const nextPrimary = await tx.propertyImage.findFirst({
+          where: { propertyId },
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        });
+
+        if (nextPrimary) {
+          await tx.propertyImage.update({
+            where: { id: nextPrimary.id },
+            data: { isPrimary: true },
+          });
+        }
+      }
+
+      return existing;
+    });
+
+    if (!deleted) {
+      return sendError(res, 404, 'Property image not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
+    }
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete property image error:', error);
+    return sendError(res, 500, 'Failed to delete property image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const propertyId = req.params.id;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const parsed = propertyImageReorderSchema.parse(req.body ?? {});
+
+    const existingImages = await prisma.propertyImage.findMany({
+      where: { propertyId },
+      orderBy: [
+        { displayOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    const existingIds = existingImages.map((img) => img.id);
+    const providedIds = parsed.orderedImageIds;
+
+    if (existingIds.length !== providedIds.length || !providedIds.every((id) => existingIds.includes(id))) {
+      return sendError(res, 400, 'Ordered image ids do not match existing images', ErrorCodes.VAL_VALIDATION_ERROR);
+    }
+
+    await prisma.$transaction(
+      providedIds.map((id, index) =>
+        prisma.propertyImage.update({
+          where: { id },
+          data: { displayOrder: index },
+        })
+      )
+    );
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Reorder property images error:', error);
+    return sendError(res, 500, 'Failed to reorder property images', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -627,12 +997,17 @@ router._test = {
   propertySchema,
   propertyUpdateSchema,
   unitSchema,
+  propertyImageCreateSchema,
+  propertyImageUpdateSchema,
+  propertyImageReorderSchema,
   applyLegacyAliases,
   toPublicProperty,
+  normalizePropertyImages,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
   collectPropertyCacheUserIds,
+  propertyImagesRouter,
 };
 
 export default router;
