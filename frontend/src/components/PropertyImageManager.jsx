@@ -179,11 +179,11 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
     reorderedImages.splice(dropIndex, 0, draggedImage);
 
     // Create the ordered array of image IDs
-    const orderedImageIds = reorderedImages.map(img => img.id);
+    const imageIds = reorderedImages.map((img) => img.id);
 
     try {
       await reorderImagesMutation.mutateAsync({
-        data: { orderedImageIds },
+        data: { imageIds },
       });
     } catch (error) {
       showError(error.response?.data?.message || 'Failed to reorder images');
