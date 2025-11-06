@@ -38,6 +38,7 @@ const NOTIFICATION_TYPE_COLORS = {
 export default function NotificationBell() {
   const [anchorEl, setAnchorEl] = useState(null);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
+  const [forcePollingTransport, setForcePollingTransport] = useState(false);
   const queryClient = useQueryClient();
   const socketRef = useRef(null);
 
@@ -71,11 +72,13 @@ export default function NotificationBell() {
     console.log('[NotificationBell] Connecting to WebSocket:', wsUrl);
 
     // Initialize Socket.IO client
+    const transports = forcePollingTransport ? ['polling'] : ['polling', 'websocket'];
+
     const socket = io(wsUrl, {
       auth: {
         token,
       },
-      transports: ['websocket', 'polling'], // Try WebSocket first, fall back to polling
+      transports,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -98,6 +101,11 @@ export default function NotificationBell() {
     socket.on('connect_error', (error) => {
       console.error('[NotificationBell] WebSocket connection error:', error.message);
       setIsWebSocketConnected(false);
+
+      if (!forcePollingTransport && error?.message === 'websocket error') {
+        console.warn('[NotificationBell] Falling back to HTTP polling transport for notifications');
+        setForcePollingTransport(true);
+      }
     });
 
     // Listen for new notifications
@@ -128,7 +136,7 @@ export default function NotificationBell() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [queryClient]);
+  }, [queryClient, forcePollingTransport]);
 
   // Fetch notifications
   const { data: notifications = [], isLoading } = useQuery({
