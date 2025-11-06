@@ -132,6 +132,7 @@ model Property {
   status          PropertyStatus    @default(ACTIVE)
   description     String?
   imageUrl        String?
+  propertyImages  PropertyImage[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   managerId       String
@@ -148,6 +149,23 @@ model Property {
   @@index([managerId])
   @@index([status])
   @@index([city, state])
+}
+
+model PropertyImage {
+  id           String   @id @default(cuid())
+  propertyId   String
+  imageUrl     String
+  caption      String?
+  isPrimary    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([displayOrder])
 }
 
 model PropertyOwner {
