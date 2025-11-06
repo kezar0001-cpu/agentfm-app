@@ -1,11 +1,40 @@
 // frontend/src/hooks/useApiMutation.js
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client.js';
 
 export default function useApiMutation({ url, method = 'post', invalidateKeys = [], onSuccess }) {
   const [isPending, setIsPending] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+
+  const invalidateProvidedKeys = async () => {
+    if (!Array.isArray(invalidateKeys) || invalidateKeys.length === 0) {
+      return;
+    }
+
+    const tasks = invalidateKeys
+      .map((key) => {
+        const resolvedKey = typeof key === 'function' ? key() : key;
+        if (!resolvedKey) return null;
+
+        if (Array.isArray(resolvedKey) || typeof resolvedKey === 'string') {
+          return queryClient.invalidateQueries({ queryKey: resolvedKey });
+        }
+
+        if (resolvedKey?.queryKey) {
+          return queryClient.invalidateQueries(resolvedKey);
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    if (tasks.length > 0) {
+      await Promise.allSettled(tasks);
+    }
+  };
 
   const mutateAsync = async (variables = {}) => {
     setIsPending(true);
@@ -23,7 +52,10 @@ export default function useApiMutation({ url, method = 'post', invalidateKeys = 
         withCredentials: variables.withCredentials,
       });
 
-      if (onSuccess) onSuccess(resp, variables);
+      if (onSuccess) {
+        await Promise.resolve(onSuccess(resp, variables));
+      }
+      await invalidateProvidedKeys();
       return resp;
     } catch (err) {
       console.error('useApiMutation error:', err);
