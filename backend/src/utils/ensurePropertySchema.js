@@ -6,6 +6,8 @@ import prisma from '../config/prismaClient.js';
 
 export const PROPERTY_SCHEMA_STATEMENTS = [
   'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]',
+  'ALTER TABLE "Property" ALTER COLUMN "state" DROP NOT NULL',
+  'ALTER TABLE "Property" ALTER COLUMN "zipCode" DROP NOT NULL',
   "ALTER TABLE \"Property\" ALTER COLUMN \"status\" SET DEFAULT 'Active'",
 ];
 
