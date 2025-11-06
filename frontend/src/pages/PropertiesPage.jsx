@@ -20,10 +20,18 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,  // Add this
-  InputLabel,   // Add this
-  Select,       // Add this
+  FormControl,
+  InputLabel,
+  Select,
   CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -36,6 +44,7 @@ import {
   Delete as DeleteIcon,
   ViewModule as ViewModuleIcon,
   ViewList as ViewListIcon,
+  TableChart as TableChartIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +67,7 @@ export default function PropertiesPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'table'
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -141,6 +150,12 @@ export default function PropertiesPage() {
     handleMenuClose();
   };
 
+  const handleViewModeChange = (_event, nextView) => {
+    if (nextView !== null) {
+      setViewMode(nextView);
+    }
+  };
+
   const handleEdit = () => {
     setEditMode(true);
     setDialogOpen(true);
@@ -211,49 +226,7 @@ export default function PropertiesPage() {
               Manage your property portfolio
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Paper
-              sx={{
-                display: 'flex',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                overflow: 'hidden',
-              }}
-              role="group"
-              aria-label="View mode toggle"
-            >
-              <IconButton
-                onClick={() => setViewMode('grid')}
-                sx={{
-                  borderRadius: 0,
-                  bgcolor: viewMode === 'grid' ? 'action.selected' : 'transparent',
-                  '&:hover': {
-                    bgcolor: viewMode === 'grid' ? 'action.selected' : 'action.hover',
-                  },
-                }}
-                aria-label="Grid view"
-                aria-pressed={viewMode === 'grid'}
-                title="Switch to grid view"
-              >
-                <ViewModuleIcon />
-              </IconButton>
-              <IconButton
-                onClick={() => setViewMode('list')}
-                sx={{
-                  borderRadius: 0,
-                  bgcolor: viewMode === 'list' ? 'action.selected' : 'transparent',
-                  '&:hover': {
-                    bgcolor: viewMode === 'list' ? 'action.selected' : 'action.hover',
-                  },
-                }}
-                aria-label="List view"
-                aria-pressed={viewMode === 'list'}
-                title="Switch to list view"
-              >
-                <ViewListIcon />
-              </IconButton>
-            </Paper>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -286,8 +259,8 @@ export default function PropertiesPage() {
             animation: 'fade-in-up 0.6s ease-out',
           }}
         >
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={8}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 id="properties-search-term"
@@ -320,6 +293,51 @@ export default function PropertiesPage() {
                   <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+            <Grid
+              item
+              xs={12}
+              md={2}
+              sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-end' } }}
+            >
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                aria-label="View mode toggle"
+                size="small"
+                sx={{
+                  display: 'inline-flex',
+                  backgroundColor: 'background.paper',
+                  borderRadius: 999,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '& .MuiToggleButtonGroup-grouped': {
+                    minWidth: 0,
+                    px: 1,
+                    py: 0.5,
+                    border: 'none',
+                  },
+                  '& .MuiToggleButton-root': {
+                    borderRadius: '8px !important',
+                    color: 'text.secondary',
+                  },
+                  '& .Mui-selected': {
+                    color: 'primary.main',
+                    backgroundColor: 'action.selected',
+                  },
+                }}
+              >
+                <ToggleButton value="grid" aria-label="grid view">
+                  <ViewModuleIcon fontSize="small" />
+                </ToggleButton>
+                <ToggleButton value="list" aria-label="list view">
+                  <ViewListIcon fontSize="small" />
+                </ToggleButton>
+                <ToggleButton value="table" aria-label="table view">
+                  <TableChartIcon fontSize="small" />
+                </ToggleButton>
+              </ToggleButtonGroup>
             </Grid>
           </Grid>
         </Paper>
@@ -642,6 +660,81 @@ export default function PropertiesPage() {
                     </Card>
                   ))}
                 </Stack>
+              )}
+
+              {/* Table View */}
+              {viewMode === 'table' && (
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <Table size="small" aria-label="properties table view">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Property</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                          Units
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                          Jobs
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                          Inspections
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredProperties.map((property) => {
+                        const totalUnits = property.totalUnits ?? property._count?.units ?? 0;
+                        const jobsCount = property._count?.jobs ?? 0;
+                        const inspectionsCount = property._count?.inspections ?? 0;
+
+                        return (
+                          <TableRow
+                            key={property.id}
+                            hover
+                            sx={{ cursor: 'pointer' }}
+                            onClick={() => handleCardClick(property.id)}
+                          >
+                            <TableCell>
+                              <Stack spacing={0.5}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                  {property.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {property.propertyType || '—'}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">
+                                {formatPropertyAddressLine(property) || '—'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight={600}>
+                                {totalUnits}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2">{jobsCount}</Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2">{inspectionsCount}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                size="small"
+                                label={property.status?.replace('_', ' ') || 'Unknown'}
+                                color={getStatusColor(property.status || '')}
+                                sx={{ textTransform: 'capitalize' }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
 
               {/* Load More Button */}
