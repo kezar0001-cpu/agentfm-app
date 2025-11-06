@@ -69,11 +69,17 @@ const PropertyFinancials = ({
 
     // Call onChange with processed values
     if (onChange) {
+      const parsePurchasePrice = parseFloat(updatedFinancials.purchasePrice);
+      const parseMarketValue = parseFloat(updatedFinancials.currentMarketValue);
+      const parsePropertyTax = parseFloat(updatedFinancials.annualPropertyTax);
+      const parseInsurance = parseFloat(updatedFinancials.annualInsurance);
+      const parseHOA = parseFloat(updatedFinancials.monthlyHOA);
+
       const processedData = {
         purchasePrice:
           updatedFinancials.purchasePrice === ''
             ? null
-            : parseFloat(updatedFinancials.purchasePrice) || null,
+            : Number.isNaN(parsePurchasePrice) ? null : parsePurchasePrice,
         purchaseDate:
           updatedFinancials.purchaseDate === ''
             ? null
@@ -81,19 +87,19 @@ const PropertyFinancials = ({
         currentMarketValue:
           updatedFinancials.currentMarketValue === ''
             ? null
-            : parseFloat(updatedFinancials.currentMarketValue) || null,
+            : Number.isNaN(parseMarketValue) ? null : parseMarketValue,
         annualPropertyTax:
           updatedFinancials.annualPropertyTax === ''
             ? null
-            : parseFloat(updatedFinancials.annualPropertyTax) || null,
+            : Number.isNaN(parsePropertyTax) ? null : parsePropertyTax,
         annualInsurance:
           updatedFinancials.annualInsurance === ''
             ? null
-            : parseFloat(updatedFinancials.annualInsurance) || null,
+            : Number.isNaN(parseInsurance) ? null : parseInsurance,
         monthlyHOA:
           updatedFinancials.monthlyHOA === ''
             ? null
-            : parseFloat(updatedFinancials.monthlyHOA) || null,
+            : Number.isNaN(parseHOA) ? null : parseHOA,
       };
       onChange(processedData);
     }
