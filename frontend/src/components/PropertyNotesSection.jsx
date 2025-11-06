@@ -37,7 +37,7 @@ import {
   useUpdatePropertyNote,
   useDeletePropertyNote,
 } from '../hooks/usePropertyNotes';
-import { useAuth } from '../contexts/AuthContext';
+import { getCurrentUser } from '../lib/auth';
 import useNotification from '../hooks/useNotification';
 
 /**
@@ -46,7 +46,7 @@ import useNotification from '../hooks/useNotification';
  * @param {boolean} canEdit - Whether user can add notes
  */
 const PropertyNotesSection = ({ propertyId, canEdit = false }) => {
-  const { user } = useAuth();
+  const user = getCurrentUser();
   const { showNotification } = useNotification();
 
   // Query for notes
