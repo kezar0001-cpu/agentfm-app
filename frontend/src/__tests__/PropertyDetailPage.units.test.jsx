@@ -118,4 +118,19 @@ describe('PropertyDetailPage unit rendering', () => {
 
     expect(await screen.findByText(/Unit 101/i)).toBeInTheDocument();
   });
+
+  it('calculates the next page offset correctly for paginated responses', () => {
+    render(
+      <MemoryRouter initialEntries={["/properties/property-1"]}>
+        <Routes>
+          <Route path="/properties/:id" element={<PropertyDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const queryOptions = mockUseInfiniteQuery.mock.calls[0][0];
+
+    expect(queryOptions.getNextPageParam({ page: 1, hasMore: true })).toBe(50);
+    expect(queryOptions.getNextPageParam({ page: 2, hasMore: true })).toBe(100);
+  });
 });

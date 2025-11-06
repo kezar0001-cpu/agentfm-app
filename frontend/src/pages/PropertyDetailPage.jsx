@@ -65,6 +65,8 @@ import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
 import { getCurrentUser } from '../lib/auth';
 
+const UNITS_PAGE_SIZE = 50;
+
 export default function PropertyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -98,7 +100,7 @@ export default function PropertyDetailPage() {
   const unitsQuery = useInfiniteQuery({
     queryKey: queryKeys.properties.units(id),
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await apiClient.get(`/units?propertyId=${id}&limit=50&offset=${pageParam}`);
+      const response = await apiClient.get(`/units?propertyId=${id}&limit=${UNITS_PAGE_SIZE}&offset=${pageParam}`);
       const data = response.data;
 
       if (Array.isArray(data)) {
@@ -140,14 +142,14 @@ export default function PropertyDetailPage() {
 
       if (lastPage.hasMore) {
         if (typeof lastPage.offset === 'number') {
-          return lastPage.offset + 50;
+          return lastPage.offset + UNITS_PAGE_SIZE;
         }
 
         if (typeof lastPage.page === 'number') {
-          return (lastPage.page + 1) * 50;
+          return lastPage.page * UNITS_PAGE_SIZE;
         }
 
-        return 50;
+        return UNITS_PAGE_SIZE;
       }
 
       return undefined;
