@@ -155,7 +155,6 @@ const DashboardPage = () => {
   }
   
   // Filter out the generic "no subscription" alert if we are handling it separately
-  const backendAlerts = Array.isArray(summary?.alerts) ? summary.alerts.filter(alert => alert.id !== 'no_subscription') : [];
   const activityItems = Array.isArray(activity) ? activity : [];
 
   return (
@@ -249,33 +248,6 @@ const DashboardPage = () => {
       )}
       {/* --- End Subscription Status Display --- */}
 
-
-      {/* Backend-driven Alerts Section */}
-      {backendAlerts.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          {backendAlerts.map((alert, index) => (
-            <Alert
-              key={index}
-              severity={alert.type}
-              action={
-                alert.action && (
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={() => navigate(alert.action.link)}
-                  >
-                    {alert.action.label}
-                  </Button>
-                )
-              }
-              sx={{ mb: 2 }}
-            >
-              <AlertTitle>{alert.title}</AlertTitle>
-              {alert.message}
-            </Alert>
-          ))}
-        </Box>
-      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4, animation: 'fade-in-up 0.6s ease-out' }}>
