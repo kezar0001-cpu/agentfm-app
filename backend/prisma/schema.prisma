@@ -54,6 +54,7 @@ model User {
   passwordResets          PasswordReset[]
   auditLogs               AuditLog[]
   Org                     Org?                    @relation(fields: [orgId], references: [id])
+  blogPosts               BlogPost[]
 
   @@index([email])
   @@index([role])
@@ -546,6 +547,7 @@ enum Role {
   OWNER
   TENANT
   TECHNICIAN
+  ADMIN
 }
 
 enum SubscriptionStatus {
@@ -693,4 +695,121 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+model BlogPost {
+  id              String              @id @default(cuid())
+  title           String
+  slug            String              @unique
+  excerpt         String?             @db.Text
+  content         String              @db.Text
+  htmlContent     String?             @db.Text
+  coverImage      String?
+  authorId        String
+  status          BlogPostStatus      @default(DRAFT)
+  featured        Boolean             @default(false)
+  viewCount       Int                 @default(0)
+
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?             @db.Text
+  metaKeywords    String[]            @default([])
+  ogImage         String?
+
+  publishedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  author          User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categories      BlogPostCategory[]
+  tags            BlogPostTag[]
+  media           BlogMedia[]
+
+  @@index([slug])
+  @@index([authorId])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([featured])
+}
+
+model BlogCategory {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  slug        String              @unique
+  description String?             @db.Text
+  color       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  posts       BlogPostCategory[]
+
+  @@index([slug])
+}
+
+model BlogTag {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  slug        String              @unique
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  posts       BlogPostTag[]
+
+  @@index([slug])
+}
+
+model BlogPostCategory {
+  id         String        @id @default(cuid())
+  postId     String
+  categoryId String
+
+  post       BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   BlogCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, categoryId])
+  @@index([postId])
+  @@index([categoryId])
+}
+
+model BlogPostTag {
+  id     String   @id @default(cuid())
+  postId String
+  tagId  String
+
+  post   BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    BlogTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@index([postId])
+  @@index([tagId])
+}
+
+model BlogMedia {
+  id        String      @id @default(cuid())
+  postId    String
+  url       String
+  type      MediaType
+  caption   String?
+  altText   String?
+  size      Int?
+  mimeType  String?
+  order     Int         @default(0)
+  createdAt DateTime    @default(now())
+
+  post      BlogPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([order])
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  EMBED
 }

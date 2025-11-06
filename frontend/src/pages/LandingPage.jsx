@@ -160,6 +160,7 @@ export default function LandingPage() {
             <a href="#features">Platform</a>
             <a href="#workflow">How it works</a>
             <a href="#roles">Solutions</a>
+            <Link to="/blog">Blog</Link>
             <a href="#faqs">FAQ</a>
           </div>
           <div className="landing-nav-cta">
