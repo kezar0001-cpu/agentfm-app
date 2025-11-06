@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   IconButton,
   Badge,
@@ -23,6 +23,7 @@ import ensureArray from '../utils/ensureArray';
 import { queryKeys } from '../utils/queryKeys.js';
 import io from 'socket.io-client';
 import { getAuthToken } from '../lib/auth';
+import { useNavigate } from 'react-router-dom';
 
 const NOTIFICATION_TYPE_COLORS = {
   INSPECTION_SCHEDULED: 'info',
@@ -41,6 +42,7 @@ export default function NotificationBell() {
   const [forcePollingTransport, setForcePollingTransport] = useState(false);
   const queryClient = useQueryClient();
   const socketRef = useRef(null);
+  const navigate = useNavigate();
 
   // Fetch unread count
   const { data: countData } = useQuery({
@@ -148,6 +150,19 @@ export default function NotificationBell() {
     enabled: Boolean(anchorEl), // Only fetch when menu is open
   });
 
+  const {
+    data: dashboardAlerts = [],
+    isLoading: isDashboardAlertsLoading,
+  } = useQuery({
+    queryKey: queryKeys.dashboard.alerts(),
+    queryFn: async () => {
+      const response = await apiClient.get('/dashboard/summary');
+      const summary = response.data?.summary || response.data;
+      return ensureArray(summary?.alerts).filter((alert) => alert.id !== 'no_subscription');
+    },
+    enabled: Boolean(anchorEl),
+  });
+
   // Mark as read mutation
   const markReadMutation = useMutation({
     mutationFn: async (id) => {
@@ -203,6 +218,57 @@ export default function NotificationBell() {
     markAllReadMutation.mutate();
   };
 
+  const handleNavigate = (path, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (!path) {
+      return;
+    }
+    handleClose();
+    navigate(path);
+  };
+
+  const normalizedDashboardAlerts = useMemo(
+    () =>
+      ensureArray(dashboardAlerts).map((alert, index) => ({
+        id: `dashboard-alert-${alert.id || index}`,
+        title: alert.title || 'Dashboard Alert',
+        message: alert.message || '',
+        type: (alert.type || 'system').toString().toUpperCase(),
+        createdAt: alert.createdAt || new Date().toISOString(),
+        action: alert.action,
+        source: 'dashboard-alert',
+      })),
+    [dashboardAlerts],
+  );
+
+  const combinedNotifications = useMemo(
+    () => [...ensureArray(notifications), ...normalizedDashboardAlerts],
+    [notifications, normalizedDashboardAlerts],
+  );
+
+  const resolveChipColor = (type) => {
+    if (!type) {
+      return 'default';
+    }
+    const normalizedType = type.toString();
+    if (NOTIFICATION_TYPE_COLORS[normalizedType]) {
+      return NOTIFICATION_TYPE_COLORS[normalizedType];
+    }
+    const upperType = normalizedType.toUpperCase();
+    if (NOTIFICATION_TYPE_COLORS[upperType]) {
+      return NOTIFICATION_TYPE_COLORS[upperType];
+    }
+    const fallbackMap = {
+      INFO: 'info',
+      WARNING: 'warning',
+      ERROR: 'error',
+      SUCCESS: 'success',
+    };
+    return fallbackMap[upperType] || 'default';
+  };
+
   const unreadCount = (countData && typeof countData === 'object' && 'count' in countData) ? countData.count : 0;
 
   return (
@@ -238,7 +304,7 @@ export default function NotificationBell() {
         </Box>
         <Divider />
 
-        {isLoading && (
+        {(isLoading || isDashboardAlertsLoading) && (
           <Box sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               Loading...
@@ -246,7 +312,7 @@ export default function NotificationBell() {
           </Box>
         )}
 
-        {!isLoading && notifications.length === 0 && (
+        {!isLoading && !isDashboardAlertsLoading && combinedNotifications.length === 0 && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               No notifications
@@ -254,67 +320,88 @@ export default function NotificationBell() {
           </Box>
         )}
 
-        {!isLoading && notifications.map((notification) => (
-          <MenuItem
-            key={notification.id}
-            sx={{
-              py: 1.5,
-              px: 2,
-              bgcolor: notification.isRead ? 'transparent' : 'action.hover',
-              '&:hover': {
-                bgcolor: 'action.selected',
-              },
-            }}
-            onClick={() => {
-              if (!notification.isRead) {
-                markReadMutation.mutate(notification.id);
-              }
-            }}
-          >
-            <Stack spacing={1} sx={{ width: '100%' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {notification.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                    {notification.message}
-                  </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip
-                      label={notification.type.replace(/_/g, ' ')}
-                      size="small"
-                      color={NOTIFICATION_TYPE_COLORS[notification.type]}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {format(new Date(notification.createdAt), 'MMM dd, HH:mm')}
+        {!isLoading && !isDashboardAlertsLoading && combinedNotifications.map((notification) => {
+          const isDashboardAlert = notification.source === 'dashboard-alert';
+          const chipColor = resolveChipColor(notification.type);
+
+          return (
+            <MenuItem
+              key={notification.id}
+              sx={{
+                py: 1.5,
+                px: 2,
+                bgcolor: notification.isRead && !isDashboardAlert ? 'transparent' : 'action.hover',
+                '&:hover': {
+                  bgcolor: 'action.selected',
+                },
+              }}
+              onClick={() => {
+                if (!isDashboardAlert && !notification.isRead) {
+                  markReadMutation.mutate(notification.id);
+                }
+                if (isDashboardAlert && notification.action?.link) {
+                  handleNavigate(notification.action.link);
+                }
+              }}
+            >
+              <Stack spacing={1} sx={{ width: '100%' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      {notification.title}
                     </Typography>
-                  </Stack>
-                </Box>
-                <Stack direction="row" spacing={0.5}>
-                  {!notification.isRead && (
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMarkRead(notification.id, e)}
-                      title="Mark as read"
-                    >
-                      <CheckCircleIcon fontSize="small" />
-                    </IconButton>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      {notification.message}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip
+                        label={(notification.type || 'ALERT').replace(/_/g, ' ')}
+                        size="small"
+                        color={chipColor}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {format(new Date(notification.createdAt), 'MMM dd, HH:mm')}
+                      </Typography>
+                    </Stack>
+                    {notification.action?.label && notification.action?.link && (
+                      <Box sx={{ mt: 1 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(event) => handleNavigate(notification.action.link, event)}
+                        >
+                          {notification.action.label}
+                        </Button>
+                      </Box>
+                    )}
+                  </Box>
+                  {!isDashboardAlert && (
+                    <Stack direction="row" spacing={0.5}>
+                      {!notification.isRead && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMarkRead(notification.id, e)}
+                          title="Mark as read"
+                        >
+                          <CheckCircleIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleDelete(notification.id, e)}
+                        title="Delete"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   )}
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleDelete(notification.id, e)}
-                    title="Delete"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
                 </Stack>
               </Stack>
-            </Stack>
-          </MenuItem>
-        ))}
+            </MenuItem>
+          );
+        })}
 
-        {!isLoading && notifications.length > 0 && (
+        {!isLoading && !isDashboardAlertsLoading && combinedNotifications.length > 0 && (
           <>
             <Divider />
             <Box sx={{ p: 1, textAlign: 'center' }}>

@@ -62,6 +62,7 @@ export const queryKeys = {
     ownerProperties: () => ['dashboard', 'ownerProperties'],
     tenant: () => ['dashboard', 'tenant'],
     tenantUnits: () => ['dashboard', 'tenantUnits'],
+    alerts: () => ['dashboard', 'alerts'],
   },
   notifications: {
     all: () => ['notifications'],
