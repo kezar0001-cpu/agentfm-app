@@ -10,6 +10,33 @@ import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
 
+const propertyListSelect = {
+  id: true,
+  name: true,
+  address: true,
+  city: true,
+  state: true,
+  zipCode: true,
+  country: true,
+  propertyType: true,
+  status: true,
+  description: true,
+  imageUrl: true,
+  totalUnits: true,
+  totalArea: true,
+  yearBuilt: true,
+  managerId: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: {
+      units: true,
+      jobs: true,
+      inspections: true,
+    },
+  },
+};
+
 // All property routes require authentication
 router.use(requireAuth);
 
@@ -228,26 +255,7 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
-    const select = {
-      id: true,
-      name: true,
-      address: true,
-      city: true,
-      state: true,
-      zipCode: true,
-      country: true,
-      propertyType: true,
-      status: true,
-      description: true,
-      imageUrl: true,
-      totalUnits: true,
-      totalArea: true,
-      yearBuilt: true,
-      managerId: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: { select: { units: true } },
-    };
+    const select = propertyListSelect;
 
     // Fetch properties and total count in parallel
     const [properties, total] = await Promise.all([
@@ -580,6 +588,7 @@ router._test = {
   toPublicProperty,
   STATUS_VALUES,
   invalidatePropertyCaches,
+  propertyListSelect,
 };
 
 export default router;
