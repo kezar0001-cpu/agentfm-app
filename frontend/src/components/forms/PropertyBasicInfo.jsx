@@ -2,6 +2,7 @@
 import React from 'react';
 import { Grid, Typography, Divider, Box } from '@mui/material';
 import { FormTextField, FormSelect } from '../form';
+import { PROPERTY_STATUS_OPTIONS } from '../../constants/propertyStatus';
 
 const PROPERTY_TYPES = [
   'Residential',
@@ -12,17 +13,7 @@ const PROPERTY_TYPES = [
   'Office',
 ];
 
-const PROPERTY_STATUSES = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-  { value: 'FOR_SALE', label: 'For Sale' },
-  { value: 'FOR_RENT', label: 'For Rent' },
-  { value: 'UNDER_CONTRACT', label: 'Under Contract' },
-  { value: 'SOLD', label: 'Sold' },
-  { value: 'RENTED', label: 'Rented' },
-  { value: 'UNDER_RENOVATION', label: 'Under Renovation' },
-  { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
-];
+const PROPERTY_STATUSES = PROPERTY_STATUS_OPTIONS;
 
 const CONSTRUCTION_TYPES = [
   'Wood Frame',

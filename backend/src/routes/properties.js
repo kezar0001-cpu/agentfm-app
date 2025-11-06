@@ -570,6 +570,7 @@ router._test = {
   unitSchema,
   applyLegacyAliases,
   toPublicProperty,
+  STATUS_VALUES,
 };
 
 export default router;

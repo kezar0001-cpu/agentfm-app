@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PROPERTY_STATUS_VALUES } from '../constants/propertyStatus';
 
 const currentYear = new Date().getFullYear();
 
@@ -44,7 +45,7 @@ export const propertySchema = z.object({
     .refine((val) => val === null || !isNaN(val), {
       message: 'Must be a valid number',
     }),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE']).default('ACTIVE'),
+  status: z.enum(PROPERTY_STATUS_VALUES).default('ACTIVE'),
   description: z.string().trim().optional().nullable(),
   imageUrl: z.string().trim().optional().nullable(),
 });
