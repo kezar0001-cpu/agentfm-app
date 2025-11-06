@@ -153,8 +153,36 @@ export async function redisDel(key) {
   }
 }
 
+export async function redisDelPattern(pattern) {
+  const client = ensureConnected();
+  if (!client?.isOpen) return;
+
+  try {
+    if (typeof client.scanIterator === 'function') {
+      const deletions = [];
+      for await (const key of client.scanIterator({ MATCH: pattern })) {
+        deletions.push(client.del(key));
+      }
+      if (deletions.length) {
+        await Promise.allSettled(deletions);
+      }
+      return;
+    }
+
+    if (typeof client.keys === 'function') {
+      const keys = await client.keys(pattern);
+      if (Array.isArray(keys) && keys.length) {
+        await client.del(keys);
+      }
+    }
+  } catch (error) {
+    console.warn('[Redis] Failed to delete keys for pattern', pattern, error.message);
+  }
+}
+
 export default {
   get: redisGet,
   set: redisSet,
   del: redisDel,
+  delPattern: redisDelPattern,
 };

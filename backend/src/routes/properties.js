@@ -5,7 +5,7 @@ import prisma from '../config/prismaClient.js';
 import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
 import unitsRouter from './units.js';
-import { cacheMiddleware, invalidate } from '../utils/cache.js';
+import { cacheMiddleware, invalidate, invalidatePattern } from '../utils/cache.js';
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
@@ -121,13 +121,21 @@ const unitSchema = z.object({
 // Helpers
 // ---------------------------------------------------------------------------
 // Helper to invalidate property-related caches
-const invalidatePropertyCaches = async (userId) => {
+const invalidatePropertyCaches = async (userId, helpers = {}) => {
+  if (!userId) return;
+
+  const { invalidateFn = invalidate, invalidatePatternFn = invalidatePattern } = helpers;
+
+  const propertyPattern = `cache:/api/properties*user:${userId}`;
   const cacheKeys = [
     `cache:/api/properties:user:${userId}`,
     `cache:/api/dashboard/summary:user:${userId}`,
   ];
 
-  await Promise.all(cacheKeys.map(key => invalidate(key)));
+  await Promise.all([
+    invalidatePatternFn(propertyPattern),
+    ...cacheKeys.map((key) => invalidateFn(key)),
+  ]);
 };
 
 const applyLegacyAliases = (input = {}) => {
@@ -571,6 +579,7 @@ router._test = {
   applyLegacyAliases,
   toPublicProperty,
   STATUS_VALUES,
+  invalidatePropertyCaches,
 };
 
 export default router;
