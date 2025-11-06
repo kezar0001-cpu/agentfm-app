@@ -227,59 +227,6 @@ export default function PropertiesPage() {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={handleViewModeChange}
-              aria-label="View mode toggle"
-              size="small"
-              sx={{
-                flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                width: { xs: '100%', md: 'auto' },
-                backgroundColor: 'background.paper',
-                borderRadius: 999,
-                boxShadow: 1,
-                p: 0.5,
-                '& .MuiToggleButton-root': {
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 1,
-                  minWidth: { xs: 'auto', sm: 110 },
-                  minHeight: { xs: 42, md: 40 },
-                  border: 'none',
-                  borderRadius: '999px !important',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: { xs: 1.5, sm: 2 },
-                  py: { xs: 1, sm: 0.75 },
-                },
-                '& .Mui-selected': {
-                  color: 'primary.main',
-                  backgroundColor: 'rgba(185, 28, 28, 0.08)',
-                },
-              }}
-            >
-              <ToggleButton value="grid" aria-label="grid view">
-                <ViewModuleIcon fontSize="small" />
-                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                  Grid
-                </Typography>
-              </ToggleButton>
-              <ToggleButton value="list" aria-label="list view">
-                <ViewListIcon fontSize="small" />
-                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                  List
-                </Typography>
-              </ToggleButton>
-              <ToggleButton value="table" aria-label="table view">
-                <TableChartIcon fontSize="small" />
-                <Typography variant="button" sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                  Table
-                </Typography>
-              </ToggleButton>
-            </ToggleButtonGroup>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -312,8 +259,8 @@ export default function PropertiesPage() {
             animation: 'fade-in-up 0.6s ease-out',
           }}
         >
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={8}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 id="properties-search-term"
@@ -346,6 +293,51 @@ export default function PropertiesPage() {
                   <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+            <Grid
+              item
+              xs={12}
+              md={2}
+              sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-end' } }}
+            >
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                aria-label="View mode toggle"
+                size="small"
+                sx={{
+                  display: 'inline-flex',
+                  backgroundColor: 'background.paper',
+                  borderRadius: 999,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '& .MuiToggleButtonGroup-grouped': {
+                    minWidth: 0,
+                    px: 1,
+                    py: 0.5,
+                    border: 'none',
+                  },
+                  '& .MuiToggleButton-root': {
+                    borderRadius: '8px !important',
+                    color: 'text.secondary',
+                  },
+                  '& .Mui-selected': {
+                    color: 'primary.main',
+                    backgroundColor: 'action.selected',
+                  },
+                }}
+              >
+                <ToggleButton value="grid" aria-label="grid view">
+                  <ViewModuleIcon fontSize="small" />
+                </ToggleButton>
+                <ToggleButton value="list" aria-label="list view">
+                  <ViewListIcon fontSize="small" />
+                </ToggleButton>
+                <ToggleButton value="table" aria-label="table view">
+                  <TableChartIcon fontSize="small" />
+                </ToggleButton>
+              </ToggleButtonGroup>
             </Grid>
           </Grid>
         </Paper>
