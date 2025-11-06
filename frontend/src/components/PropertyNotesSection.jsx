@@ -85,7 +85,7 @@ const PropertyNotesSection = ({ propertyId, canEdit = false }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
 
-  const notes = notesData?.data || notesData || [];
+  const notes = notesData?.notes || [];
 
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) {
