@@ -167,7 +167,12 @@ export default function PropertyDetailPage() {
   // Delete unit mutation
   const deleteUnitMutation = useApiMutation({
     method: 'delete',
-    invalidateKeys: [['units', id], ['property', id]],
+    invalidateKeys: [
+      queryKeys.properties.units(id),
+      queryKeys.properties.detail(id),
+      queryKeys.units.listByProperty(id),
+      queryKeys.units.list(id),
+    ],
   });
 
   const property = propertyQuery.data?.property ?? null;

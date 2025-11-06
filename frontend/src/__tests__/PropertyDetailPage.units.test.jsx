@@ -133,4 +133,26 @@ describe('PropertyDetailPage unit rendering', () => {
     expect(queryOptions.getNextPageParam({ page: 1, hasMore: true })).toBe(50);
     expect(queryOptions.getNextPageParam({ page: 2, hasMore: true })).toBe(100);
   });
+
+  it('invalidates the correct queries when deleting a unit', () => {
+    render(
+      <MemoryRouter initialEntries={["/properties/property-1"]}>
+        <Routes>
+          <Route path="/properties/:id" element={<PropertyDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const mutationOptions = mockUseApiMutation.mock.calls[0][0];
+
+    expect(mutationOptions).toMatchObject({
+      method: 'delete',
+      invalidateKeys: [
+        ['properties', 'property-1', 'units'],
+        ['properties', 'property-1'],
+        ['units', 'listByProperty', 'property-1'],
+        ['units', 'list', 'property-1'],
+      ],
+    });
+  });
 });
