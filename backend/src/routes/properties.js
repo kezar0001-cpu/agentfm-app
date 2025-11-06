@@ -148,21 +148,61 @@ const unitSchema = z.object({
 // Helpers
 // ---------------------------------------------------------------------------
 // Helper to invalidate property-related caches
-const invalidatePropertyCaches = async (userId, helpers = {}) => {
-  if (!userId) return;
+const toArray = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value == null) {
+    return [];
+  }
+  return [value];
+};
+
+const collectPropertyCacheUserIds = (property, currentUserId) => {
+  const uniqueIds = new Set();
+
+  toArray(currentUserId).forEach((id) => {
+    if (id) uniqueIds.add(id);
+  });
+
+  if (property) {
+    if (property.managerId) {
+      uniqueIds.add(property.managerId);
+    }
+
+    if (Array.isArray(property.owners)) {
+      property.owners.forEach((ownerRecord) => {
+        const ownerId = ownerRecord?.ownerId || ownerRecord?.owner?.id;
+        if (ownerId) {
+          uniqueIds.add(ownerId);
+        }
+      });
+    }
+  }
+
+  return Array.from(uniqueIds);
+};
+
+const invalidatePropertyCaches = async (userIdentifiers, helpers = {}) => {
+  const userIds = toArray(userIdentifiers).filter(Boolean);
+  if (!userIds.length) return;
 
   const { invalidateFn = invalidate, invalidatePatternFn = invalidatePattern } = helpers;
 
-  const propertyPattern = `cache:/api/properties*user:${userId}`;
-  const cacheKeys = [
-    `cache:/api/properties:user:${userId}`,
-    `cache:/api/dashboard/summary:user:${userId}`,
-  ];
+  const tasks = userIds.map((userId) => {
+    const propertyPattern = `cache:/api/properties*user:${userId}`;
+    const cacheKeys = [
+      `cache:/api/properties:user:${userId}`,
+      `cache:/api/dashboard/summary:user:${userId}`,
+    ];
 
-  await Promise.all([
-    invalidatePatternFn(propertyPattern),
-    ...cacheKeys.map((key) => invalidateFn(key)),
-  ]);
+    return Promise.all([
+      invalidatePatternFn(propertyPattern),
+      ...cacheKeys.map((key) => invalidateFn(key)),
+    ]);
+  });
+
+  await Promise.all(tasks);
 };
 
 const applyLegacyAliases = (input = {}) => {
@@ -316,8 +356,9 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       data: propertyData,
     });
 
-    // Invalidate property and dashboard caches
-    await invalidatePropertyCaches(req.user.id);
+    // Invalidate property and dashboard caches for all affected users
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
 
     res.status(201).json({ success: true, property: toPublicProperty(property) });
   } catch (error) {
@@ -423,8 +464,9 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       data: updateData,
     });
 
-    // Invalidate property and dashboard caches
-    await invalidatePropertyCaches(req.user.id);
+    // Invalidate property and dashboard caches for all affected users
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
 
     res.json({ success: true, property: toPublicProperty(updated) });
   } catch (error) {
@@ -460,8 +502,9 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     await prisma.property.delete({ where: { id: property.id } });
 
-    // Invalidate property and dashboard caches
-    await invalidatePropertyCaches(req.user.id);
+    // Invalidate property and dashboard caches for all affected users
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
 
     res.json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
@@ -589,6 +632,7 @@ router._test = {
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
+  collectPropertyCacheUserIds,
 };
 
 export default router;
