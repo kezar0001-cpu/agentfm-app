@@ -34,6 +34,8 @@ import {
   Apartment as ApartmentIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  ViewModule as ViewModuleIcon,
+  ViewList as ViewListIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +45,7 @@ import DataState from '../components/DataState';
 import EmptyState from '../components/EmptyState';
 import PropertyForm from '../components/PropertyForm';
 import PropertyOnboardingWizard from '../components/PropertyOnboardingWizard';
+import PropertyOccupancyWidget from '../components/PropertyOccupancyWidget';
 import { normaliseArray } from '../utils/error';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 import { queryKeys } from '../utils/queryKeys.js';
@@ -55,6 +58,7 @@ export default function PropertiesPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -207,24 +211,68 @@ export default function PropertiesPage() {
               Manage your property portfolio
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-            size="large"
-            fullWidth
-            sx={{
-              maxWidth: { xs: '100%', md: 'none' },
-              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-              boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-                boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
-              },
-            }}
-          >
-            Add Property
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Paper
+              sx={{
+                display: 'flex',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                overflow: 'hidden',
+              }}
+              role="group"
+              aria-label="View mode toggle"
+            >
+              <IconButton
+                onClick={() => setViewMode('grid')}
+                sx={{
+                  borderRadius: 0,
+                  bgcolor: viewMode === 'grid' ? 'action.selected' : 'transparent',
+                  '&:hover': {
+                    bgcolor: viewMode === 'grid' ? 'action.selected' : 'action.hover',
+                  },
+                }}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
+                title="Switch to grid view"
+              >
+                <ViewModuleIcon />
+              </IconButton>
+              <IconButton
+                onClick={() => setViewMode('list')}
+                sx={{
+                  borderRadius: 0,
+                  bgcolor: viewMode === 'list' ? 'action.selected' : 'transparent',
+                  '&:hover': {
+                    bgcolor: viewMode === 'list' ? 'action.selected' : 'action.hover',
+                  },
+                }}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+                title="Switch to list view"
+              >
+                <ViewListIcon />
+              </IconButton>
+            </Paper>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreate}
+              size="large"
+              fullWidth
+              sx={{
+                maxWidth: { xs: '100%', md: 'none' },
+                background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                boxShadow: '0 4px 14px 0 rgb(185 28 28 / 0.3)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                  boxShadow: '0 6px 20px 0 rgb(185 28 28 / 0.4)',
+                },
+              }}
+            >
+              Add Property
+            </Button>
+          </Box>
         </Stack>
 
         {/* Search and Filter */}
@@ -304,9 +352,11 @@ export default function PropertiesPage() {
             />
           ) : (
             <Stack spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
-              <Grid container spacing={3}>
-                {filteredProperties.map((property) => (
-                <Grid item xs={12} sm={6} md={4} key={property.id}>
+              {/* Grid View */}
+              {viewMode === 'grid' && (
+                <Grid container spacing={3}>
+                  {filteredProperties.map((property) => (
+                  <Grid item xs={12} sm={6} md={4} key={property.id}>
                   <Card
                     sx={{
                       height: '100%',
@@ -439,6 +489,160 @@ export default function PropertiesPage() {
                 </Grid>
               ))}
             </Grid>
+              )}
+
+              {/* List View */}
+              {viewMode === 'list' && (
+                <Stack spacing={2}>
+                  {filteredProperties.map((property) => (
+                    <Card
+                      key={property.id}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        cursor: 'pointer',
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        overflow: 'hidden',
+                        '&:hover': {
+                          boxShadow: 3,
+                        },
+                      }}
+                      onClick={() => handleCardClick(property.id)}
+                    >
+                      {/* Property Image */}
+                      {property.imageUrl ? (
+                        <Box
+                          component="img"
+                          src={property.imageUrl}
+                          alt={property.name}
+                          sx={{
+                            width: { xs: '100%', md: 250 },
+                            height: { xs: 180, md: 'auto' },
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            width: { xs: '100%', md: 250 },
+                            height: { xs: 180, md: 'auto' },
+                            minHeight: { md: 200 },
+                            bgcolor: 'grey.100',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'grey.400',
+                          }}
+                        >
+                          <HomeIcon sx={{ fontSize: 64 }} />
+                        </Box>
+                      )}
+
+                      {/* Property Content */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          flexGrow: 1,
+                          p: 2,
+                        }}
+                      >
+                        {/* Header */}
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            mb: 1.5,
+                          }}
+                        >
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {property.name}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                              <LocationIcon fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary">
+                                {formatPropertyAddressLine(property)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, property)}
+                          >
+                            <MoreVertIcon />
+                          </IconButton>
+                        </Box>
+
+                        {/* Description */}
+                        {property.description && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mb: 2,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {property.description}
+                          </Typography>
+                        )}
+
+                        {/* Chips and Stats */}
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                          <Chip
+                            size="small"
+                            label={property.status?.replace('_', ' ') || ''}
+                            color={getStatusColor(property.status || '')}
+                          />
+                          <Chip
+                            size="small"
+                            icon={<ApartmentIcon />}
+                            label={`${property.totalUnits} units`}
+                            variant="outlined"
+                          />
+                          <Chip
+                            size="small"
+                            label={property.propertyType}
+                            variant="outlined"
+                          />
+                        </Box>
+
+                        {/* Footer Stats */}
+                        {property._count && (
+                          <Typography variant="caption" color="text.secondary">
+                            {property._count.jobs} active jobs • {property._count.inspections} inspections
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Occupancy Widget (List View Only) */}
+                      <Box
+                        sx={{
+                          display: { xs: 'none', lg: 'flex' },
+                          alignItems: 'center',
+                          p: 2,
+                          borderLeft: '1px solid',
+                          borderColor: 'divider',
+                          minWidth: 200,
+                        }}
+                      >
+                        <PropertyOccupancyWidget
+                          units={property.units || []}
+                          totalUnits={property.totalUnits}
+                          compact={true}
+                        />
+                      </Box>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
 
               {/* Load More Button */}
               {hasNextPage && (

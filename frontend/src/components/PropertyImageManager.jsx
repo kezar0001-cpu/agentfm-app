@@ -24,6 +24,7 @@ import {
   Edit as EditIcon,
   CloudUpload as CloudUploadIcon,
   Close as CloseIcon,
+  DragIndicator as DragIndicatorIcon,
 } from '@mui/icons-material';
 import {
   usePropertyImages,
@@ -50,6 +51,10 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
     showSuccess('Image deleted successfully');
     refetch();
   });
+  const reorderImagesMutation = useReorderPropertyImages(propertyId, () => {
+    showSuccess('Images reordered successfully');
+    refetch();
+  });
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -58,6 +63,8 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   const [imageUrl, setImageUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   const images = imagesData?.images || [];
 
@@ -142,6 +149,55 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
     setDeleteDialogOpen(true);
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Reorder the images array
+    const reorderedImages = [...images];
+    const [draggedImage] = reorderedImages.splice(draggedIndex, 1);
+    reorderedImages.splice(dropIndex, 0, draggedImage);
+
+    // Create the ordered array of image IDs
+    const orderedImageIds = reorderedImages.map(img => img.id);
+
+    try {
+      await reorderImagesMutation.mutateAsync({
+        data: { orderedImageIds },
+      });
+    } catch (error) {
+      showError(error.response?.data?.message || 'Failed to reorder images');
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" p={3}>
@@ -167,11 +223,39 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
       {images.length === 0 ? (
         <Alert severity="info">No images uploaded yet</Alert>
       ) : (
-        <Grid container spacing={2}>
-          {images.map((image) => (
-            <Grid item xs={12} sm={6} md={4} key={image.id}>
-              <Card>
-                <Box position="relative">
+        <>
+          {canEdit && images.length > 1 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <DragIndicatorIcon fontSize="small" />
+                <Typography variant="body2">
+                  Drag and drop images to reorder them
+                </Typography>
+              </Box>
+            </Alert>
+          )}
+          <Grid container spacing={2}>
+            {images.map((image, index) => (
+              <Grid item xs={12} sm={6} md={4} key={image.id}>
+                <Card
+                  draggable={canEdit}
+                  onDragStart={(e) => canEdit && handleDragStart(e, index)}
+                  onDragOver={(e) => canEdit && handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => canEdit && handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  sx={{
+                    cursor: canEdit ? 'move' : 'default',
+                    opacity: draggedIndex === index ? 0.5 : 1,
+                    border: dragOverIndex === index ? '2px dashed' : '1px solid',
+                    borderColor: dragOverIndex === index ? 'primary.main' : 'divider',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': canEdit ? {
+                      boxShadow: 3,
+                    } : {},
+                  }}
+                >
+                  <Box position="relative">
                   <CardMedia
                     component="img"
                     height="200"
@@ -191,6 +275,22 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
                         left: 8,
                       }}
                     />
+                  )}
+                  {canEdit && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        bgcolor: 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: 1,
+                        p: 0.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <DragIndicatorIcon sx={{ color: 'white', fontSize: 20 }} />
+                    </Box>
                   )}
                 </Box>
                 <CardContent>
@@ -229,6 +329,7 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
             </Grid>
           ))}
         </Grid>
+        </>
       )}
 
       {/* Upload Dialog */}
