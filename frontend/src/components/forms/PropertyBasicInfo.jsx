@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Grid } from '@mui/material';
+import { Grid, Typography, Divider, Box } from '@mui/material';
 import { FormTextField, FormSelect } from '../form';
 
 const PROPERTY_TYPES = [
@@ -15,11 +15,56 @@ const PROPERTY_TYPES = [
 const PROPERTY_STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'FOR_SALE', label: 'For Sale' },
+  { value: 'FOR_RENT', label: 'For Rent' },
+  { value: 'UNDER_CONTRACT', label: 'Under Contract' },
+  { value: 'SOLD', label: 'Sold' },
+  { value: 'RENTED', label: 'Rented' },
+  { value: 'UNDER_RENOVATION', label: 'Under Renovation' },
   { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
+];
+
+const CONSTRUCTION_TYPES = [
+  'Wood Frame',
+  'Concrete',
+  'Steel Frame',
+  'Brick',
+  'Stone',
+  'Mixed',
+  'Other',
+];
+
+const HEATING_SYSTEMS = [
+  'Central Heating',
+  'Forced Air',
+  'Radiant',
+  'Heat Pump',
+  'Baseboard',
+  'Geothermal',
+  'None',
+  'Other',
+];
+
+const COOLING_SYSTEMS = [
+  'Central Air',
+  'Window Units',
+  'Split System',
+  'Heat Pump',
+  'Evaporative',
+  'Geothermal',
+  'None',
+  'Other',
 ];
 
 const PropertyBasicInfo = ({ control }) => (
   <Grid container spacing={2}>
+    {/* Basic Information Section */}
+    <Grid item xs={12}>
+      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+        Basic Information
+      </Typography>
+    </Grid>
+
     <Grid item xs={12}>
       <FormTextField
         name="name"
@@ -45,12 +90,71 @@ const PropertyBasicInfo = ({ control }) => (
         options={PROPERTY_STATUSES}
       />
     </Grid>
+    <Grid item xs={12}>
+      <FormTextField
+        name="description"
+        control={control}
+        label="Description"
+        multiline
+        rows={3}
+      />
+    </Grid>
+
+    {/* Property Dimensions Section */}
+    <Grid item xs={12}>
+      <Box sx={{ mt: 2, mb: 1 }}>
+        <Divider />
+      </Box>
+      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+        Property Dimensions
+      </Typography>
+    </Grid>
+
+    <Grid item xs={12} sm={4}>
+      <FormTextField
+        name="totalArea"
+        control={control}
+        label="Total Area (sq ft)"
+        type="number"
+        helperText="Total square footage"
+      />
+    </Grid>
+    <Grid item xs={12} sm={4}>
+      <FormTextField
+        name="lotSize"
+        control={control}
+        label="Lot Size (sq ft)"
+        type="number"
+        helperText="Land area in square feet"
+      />
+    </Grid>
+    <Grid item xs={12} sm={4}>
+      <FormTextField
+        name="buildingSize"
+        control={control}
+        label="Building Size (sq ft)"
+        type="number"
+        helperText="Building square footage"
+      />
+    </Grid>
+
+    {/* Building Details Section */}
+    <Grid item xs={12}>
+      <Box sx={{ mt: 2, mb: 1 }}>
+        <Divider />
+      </Box>
+      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+        Building Details
+      </Typography>
+    </Grid>
+
     <Grid item xs={12} sm={4}>
       <FormTextField
         name="yearBuilt"
         control={control}
         label="Year Built"
         type="number"
+        helperText="Construction year"
       />
     </Grid>
     <Grid item xs={12} sm={4}>
@@ -59,23 +163,44 @@ const PropertyBasicInfo = ({ control }) => (
         control={control}
         label="Total Units"
         type="number"
+        helperText="Number of rentable units"
       />
     </Grid>
     <Grid item xs={12} sm={4}>
       <FormTextField
-        name="totalArea"
+        name="numberOfFloors"
         control={control}
-        label="Total Area"
+        label="Number of Floors"
         type="number"
+        helperText="Total floors in building"
       />
     </Grid>
-    <Grid item xs={12}>
-      <FormTextField
-        name="description"
+
+    <Grid item xs={12} sm={4}>
+      <FormSelect
+        name="constructionType"
         control={control}
-        label="Description"
-        multiline
-        rows={3}
+        label="Construction Type"
+        options={CONSTRUCTION_TYPES}
+        helperText="Primary construction material"
+      />
+    </Grid>
+    <Grid item xs={12} sm={4}>
+      <FormSelect
+        name="heatingSystem"
+        control={control}
+        label="Heating System"
+        options={HEATING_SYSTEMS}
+        helperText="Primary heating system"
+      />
+    </Grid>
+    <Grid item xs={12} sm={4}>
+      <FormSelect
+        name="coolingSystem"
+        control={control}
+        label="Cooling System"
+        options={COOLING_SYSTEMS}
+        helperText="Primary cooling system"
       />
     </Grid>
   </Grid>

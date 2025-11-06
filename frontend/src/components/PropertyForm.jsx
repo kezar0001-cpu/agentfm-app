@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
@@ -12,11 +12,23 @@ import {
   Box,
   useMediaQuery,
   useTheme,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Typography,
 } from '@mui/material';
+import {
+  ExpandMore as ExpandMoreIcon,
+  Home as HomeIcon,
+  AttachMoney as MoneyIcon,
+  Apartment as ApartmentIcon,
+} from '@mui/icons-material';
 import useApiMutation from '../hooks/useApiMutation';
 import PropertyBasicInfo from './forms/PropertyBasicInfo';
 import PropertyLocation from './forms/PropertyLocation';
 import PropertyManagement from './forms/PropertyManagement';
+import PropertyAmenitiesForm from './PropertyAmenitiesForm';
+import PropertyFinancials from './PropertyFinancials';
 import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
 import { queryKeys } from '../utils/queryKeys';
 
@@ -72,6 +84,21 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         status: property.status || 'ACTIVE',
         description: property.description || '',
         imageUrl: property.imageUrl || '',
+        // Enhanced property details
+        lotSize: property.lotSize?.toString() || '',
+        buildingSize: property.buildingSize?.toString() || '',
+        numberOfFloors: property.numberOfFloors?.toString() || '',
+        constructionType: property.constructionType || '',
+        heatingSystem: property.heatingSystem || '',
+        coolingSystem: property.coolingSystem || '',
+        amenities: property.amenities || null,
+        // Financial information
+        purchasePrice: property.purchasePrice?.toString() || '',
+        purchaseDate: property.purchaseDate || null,
+        currentMarketValue: property.currentMarketValue?.toString() || '',
+        annualPropertyTax: property.annualPropertyTax?.toString() || '',
+        annualInsurance: property.annualInsurance?.toString() || '',
+        monthlyHOA: property.monthlyHOA?.toString() || '',
       });
     } else {
       reset(propertyDefaultValues);
@@ -103,6 +130,21 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           status: data.status,
           description: data.description || null,
           imageUrl: data.imageUrl || null,
+          // Enhanced property details
+          lotSize: data.lotSize,
+          buildingSize: data.buildingSize,
+          numberOfFloors: data.numberOfFloors,
+          constructionType: data.constructionType || null,
+          heatingSystem: data.heatingSystem || null,
+          coolingSystem: data.coolingSystem || null,
+          amenities: data.amenities || null,
+          // Financial information
+          purchasePrice: data.purchasePrice,
+          purchaseDate: data.purchaseDate,
+          currentMarketValue: data.currentMarketValue,
+          annualPropertyTax: data.annualPropertyTax,
+          annualInsurance: data.annualInsurance,
+          monthlyHOA: data.monthlyHOA,
         },
       });
 
@@ -133,14 +175,126 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           )}
 
           <Grid container spacing={2}>
+            {/* Basic Information */}
             <Grid item xs={12}>
-              <PropertyBasicInfo control={control} />
+              <Accordion defaultExpanded>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <HomeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                    <Typography variant="h6">Property Information</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <PropertyBasicInfo control={control} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <PropertyLocation control={control} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <PropertyManagement control={control} />
+                    </Grid>
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
             </Grid>
+
+            {/* Amenities Section */}
             <Grid item xs={12}>
-              <PropertyLocation control={control} />
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ApartmentIcon sx={{ mr: 1, color: 'success.main' }} />
+                    <Typography variant="h6">Amenities & Features</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Controller
+                    name="amenities"
+                    control={control}
+                    render={({ field }) => (
+                      <PropertyAmenitiesForm
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isSubmitting || mutation.isPending}
+                      />
+                    )}
+                  />
+                </AccordionDetails>
+              </Accordion>
             </Grid>
+
+            {/* Financial Information Section */}
             <Grid item xs={12}>
-              <PropertyManagement control={control} />
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <MoneyIcon sx={{ mr: 1, color: 'warning.main' }} />
+                    <Typography variant="h6">Financial Information</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Controller
+                      name="purchasePrice"
+                      control={control}
+                      render={({ field: purchasePriceField }) => (
+                        <Controller
+                          name="purchaseDate"
+                          control={control}
+                          render={({ field: purchaseDateField }) => (
+                            <Controller
+                              name="currentMarketValue"
+                              control={control}
+                              render={({ field: currentMarketValueField }) => (
+                                <Controller
+                                  name="annualPropertyTax"
+                                  control={control}
+                                  render={({ field: annualPropertyTaxField }) => (
+                                    <Controller
+                                      name="annualInsurance"
+                                      control={control}
+                                      render={({ field: annualInsuranceField }) => (
+                                        <Controller
+                                          name="monthlyHOA"
+                                          control={control}
+                                          render={({ field: monthlyHOAField }) => (
+                                            <PropertyFinancials
+                                              value={{
+                                                purchasePrice: purchasePriceField.value,
+                                                purchaseDate: purchaseDateField.value,
+                                                currentMarketValue: currentMarketValueField.value,
+                                                annualPropertyTax: annualPropertyTaxField.value,
+                                                annualInsurance: annualInsuranceField.value,
+                                                monthlyHOA: monthlyHOAField.value,
+                                              }}
+                                              onChange={(financials) => {
+                                                purchasePriceField.onChange(financials.purchasePrice);
+                                                purchaseDateField.onChange(financials.purchaseDate);
+                                                currentMarketValueField.onChange(financials.currentMarketValue);
+                                                annualPropertyTaxField.onChange(financials.annualPropertyTax);
+                                                annualInsuranceField.onChange(financials.annualInsurance);
+                                                monthlyHOAField.onChange(financials.monthlyHOA);
+                                              }}
+                                              disabled={isSubmitting || mutation.isPending}
+                                              showPrivateInfo={true}
+                                            />
+                                          )}
+                                        />
+                                      )}
+                                    />
+                                  )}
+                                />
+                              )}
+                            />
+                          )}
+                        />
+                      )}
+                    />
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
             </Grid>
           </Grid>
         </Box>

@@ -54,6 +54,7 @@ import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
 import PropertyImageManager from '../components/PropertyImageManager';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
+import PropertyNotesSection from '../components/PropertyNotesSection';
 import { normaliseArray } from '../utils/error';
 import {
   formatPropertyAddressLine,
@@ -424,6 +425,7 @@ export default function PropertyDetailPage() {
                 <Tab label="Owners" />
                 <Tab label="Images" />
                 <Tab label="Documents" />
+                <Tab label="Notes" />
                 <Tab label="Activity" />
               </Tabs>
             </Paper>
@@ -743,8 +745,19 @@ export default function PropertyDetailPage() {
               </Paper>
             )}
 
-            {/* Activity Tab */}
+            {/* Notes Tab */}
             {currentTab === 5 && (
+              <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                  Property Notes
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <PropertyNotesSection propertyId={id} canEdit={canEdit} />
+              </Paper>
+            )}
+
+            {/* Activity Tab */}
+            {currentTab === 6 && (
               <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Recent Activity
