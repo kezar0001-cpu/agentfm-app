@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import propertiesRouter from '../src/routes/properties.js';
 
 /**
  * Comprehensive test suite for enhanced property features
@@ -285,43 +286,18 @@ test('Property financials - calculations', () => {
   assert.equal(annualCarryingCost, 10800);
 });
 
-test('Property status enum - validates expanded statuses', () => {
-  const validStatuses = [
-    'ACTIVE',
-    'INACTIVE',
-    'FOR_SALE',
-    'FOR_RENT',
-    'UNDER_CONTRACT',
-    'SOLD',
-    'RENTED',
-    'UNDER_RENOVATION',
-    'UNDER_MAINTENANCE',
-  ];
+const { STATUS_VALUES: PROPERTY_STATUS_VALUES } = propertiesRouter._test;
 
-  validStatuses.forEach((status) => {
-    const property = {
-      name: 'Test Property',
-      status,
-    };
-    assert.ok(validStatuses.includes(property.status));
-  });
+test('Property status enum - matches backend contract', () => {
+  assert.deepEqual(PROPERTY_STATUS_VALUES, ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE']);
 });
 
-test('Property status enum - rejects invalid statuses', () => {
-  const invalidStatus = 'INVALID_STATUS';
-  const validStatuses = [
-    'ACTIVE',
-    'INACTIVE',
-    'FOR_SALE',
-    'FOR_RENT',
-    'UNDER_CONTRACT',
-    'SOLD',
-    'RENTED',
-    'UNDER_RENOVATION',
-    'UNDER_MAINTENANCE',
-  ];
+test('Property status enum - rejects unsupported statuses', () => {
+  const unsupportedStatuses = ['FOR_SALE', 'UNDER_RENOVATION', 'SOLD'];
 
-  assert.ok(!validStatuses.includes(invalidStatus));
+  unsupportedStatuses.forEach((status) => {
+    assert.ok(!PROPERTY_STATUS_VALUES.includes(status));
+  });
 });
 
 test('PropertyImage reordering - validates ordered array', () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { PROPERTY_STATUS_OPTIONS, PROPERTY_STATUS_VALUES } from '../constants/propertyStatus';
 
 /**
  * Test suite for enhanced property components
@@ -326,29 +327,16 @@ describe('PropertyBasicInfo - Enhanced Fields', () => {
   });
 });
 
-describe('Property Status Enum - Expanded Options', () => {
-  it('should validate all status options', () => {
-    const validStatuses = [
-      'ACTIVE',
-      'INACTIVE',
-      'FOR_SALE',
-      'FOR_RENT',
-      'UNDER_CONTRACT',
-      'SOLD',
-      'RENTED',
-      'UNDER_RENOVATION',
-      'UNDER_MAINTENANCE',
-    ];
+describe('Property Status Enum - Allowed Options', () => {
+  it('should expose only backend-supported statuses in the form', () => {
+    const optionValues = PROPERTY_STATUS_OPTIONS.map((option) => option.value);
 
-    expect(validStatuses.length).toBe(9);
-    expect(validStatuses.includes('FOR_SALE')).toBe(true);
-    expect(validStatuses.includes('UNDER_RENOVATION')).toBe(true);
+    expect(optionValues).toEqual(PROPERTY_STATUS_VALUES);
   });
 
-  it('should reject invalid status', () => {
-    const validStatuses = ['ACTIVE', 'INACTIVE'];
-    const invalidStatus = 'INVALID_STATUS';
+  it('should reject invalid status selections', () => {
+    const invalidStatus = 'FOR_SALE';
 
-    expect(validStatuses.includes(invalidStatus)).toBe(false);
+    expect(PROPERTY_STATUS_VALUES.includes(invalidStatus)).toBe(false);
   });
 });
