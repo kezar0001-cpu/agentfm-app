@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement } from 'react';
 import { Box, Button, Typography, Stack } from '@mui/material';
 import InboxIcon from '@mui/icons-material/Inbox';
 
@@ -7,7 +8,7 @@ import InboxIcon from '@mui/icons-material/Inbox';
  * A flexible, reusable component for displaying empty states across the application
  * Shows an icon, title, description, and optional action button
  *
- * @param {ReactNode} icon - Icon component to display (defaults to InboxIcon)
+ * @param {ReactNode} icon - Icon component or element to display (defaults to InboxIcon)
  * @param {string} title - Main heading text
  * @param {string} description - Supporting description text
  * @param {string} actionLabel - Label for the action button
@@ -15,13 +16,38 @@ import InboxIcon from '@mui/icons-material/Inbox';
  * @param {object} sx - Additional styling overrides
  */
 export default function EmptyState({
-  icon: IconComponent = InboxIcon,
+  icon = InboxIcon,
   title = 'No items yet',
   description = "There's nothing here yet. Start by adding your first item.",
   actionLabel,
   onAction,
   sx = {},
 }) {
+  const defaultIconSx = { fontSize: { xs: 48, md: 56 }, color: 'primary.main', opacity: 0.8 };
+
+  const renderIcon = () => {
+    if (!icon) {
+      return null;
+    }
+
+    if (isValidElement(icon)) {
+      return cloneElement(icon, {
+        sx: {
+          ...defaultIconSx,
+          ...(icon.props?.sx || {}),
+        },
+      });
+    }
+
+    const IconComponent = icon;
+    if (typeof IconComponent === 'function' || typeof IconComponent === 'object') {
+      const ResolvedIcon = IconComponent;
+      return <ResolvedIcon sx={defaultIconSx} />;
+    }
+
+    return null;
+  };
+
   return (
     <Box
       sx={{
@@ -60,11 +86,7 @@ export default function EmptyState({
             },
           }}
         >
-          {typeof IconComponent === 'function' ? (
-            <IconComponent sx={{ fontSize: { xs: 48, md: 56 }, color: 'primary.main', opacity: 0.8 }} />
-          ) : (
-            IconComponent
-          )}
+          {renderIcon()}
         </Box>
 
         {/* Title */}
