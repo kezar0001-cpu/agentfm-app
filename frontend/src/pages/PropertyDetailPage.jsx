@@ -99,10 +99,58 @@ export default function PropertyDetailPage() {
     queryKey: queryKeys.properties.units(id),
     queryFn: async ({ pageParam = 0 }) => {
       const response = await apiClient.get(`/units?propertyId=${id}&limit=50&offset=${pageParam}`);
-      return response.data;
+      const data = response.data;
+
+      if (Array.isArray(data)) {
+        return {
+          items: data,
+          hasMore: false,
+          nextOffset: undefined,
+        };
+      }
+
+      if (Array.isArray(data?.items)) {
+        return {
+          ...data,
+          items: data.items,
+        };
+      }
+
+      if (Array.isArray(data?.data)) {
+        return {
+          ...data,
+          items: data.data,
+        };
+      }
+
+      return data;
     },
     getNextPageParam: (lastPage) => {
-      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+      if (!lastPage) {
+        return undefined;
+      }
+
+      if (Array.isArray(lastPage)) {
+        return undefined;
+      }
+
+      if (typeof lastPage.nextOffset === 'number') {
+        return lastPage.nextOffset;
+      }
+
+      if (lastPage.hasMore) {
+        if (typeof lastPage.offset === 'number') {
+          return lastPage.offset + 50;
+        }
+
+        if (typeof lastPage.page === 'number') {
+          return (lastPage.page + 1) * 50;
+        }
+
+        return 50;
+      }
+
+      return undefined;
     },
     initialPageParam: 0,
   });
@@ -133,7 +181,25 @@ export default function PropertyDetailPage() {
   const activities = ensureArray(activityQuery.data, ['activities', 'data.activities', 'items']);
 
   // Flatten all pages into a single array
-  const units = unitsQuery.data?.pages?.flatMap(page => page.items) || [];
+  const units = unitsQuery.data?.pages?.flatMap((page) => {
+    if (Array.isArray(page)) {
+      return page;
+    }
+
+    if (Array.isArray(page?.items)) {
+      return page.items;
+    }
+
+    if (Array.isArray(page?.data?.items)) {
+      return page.data.items;
+    }
+
+    if (Array.isArray(page?.data)) {
+      return page.data;
+    }
+
+    return [];
+  }) || [];
 
   // Fix: Reset all state when property ID changes to prevent race conditions
   useEffect(() => {
