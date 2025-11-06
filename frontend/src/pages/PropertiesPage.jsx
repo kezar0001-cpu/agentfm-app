@@ -480,7 +480,7 @@ export default function PropertiesPage() {
                         </Typography>
                         {property._count && (
                           <Typography variant="caption" color="text.secondary">
-                            {property._count.jobs} active jobs • {property._count.inspections} inspections
+                            {(property._count.jobs ?? 0)} active jobs • {(property._count.inspections ?? 0)} inspections
                           </Typography>
                         )}
                       </Stack>
@@ -617,7 +617,7 @@ export default function PropertiesPage() {
                         {/* Footer Stats */}
                         {property._count && (
                           <Typography variant="caption" color="text.secondary">
-                            {property._count.jobs} active jobs • {property._count.inspections} inspections
+                            {(property._count.jobs ?? 0)} active jobs • {(property._count.inspections ?? 0)} inspections
                           </Typography>
                         )}
                       </Box>
