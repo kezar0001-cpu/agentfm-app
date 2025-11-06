@@ -21,6 +21,7 @@ import subscriptionsRouter from './subscriptions.js';
 import tenantsRouter from './tenants.js';
 import uploadsRouter from './uploads.js';
 import usersRouter from './users.js';
+import blogRouter from './blog.js';
 // Note: 'routes.js' is likely an error or a duplicate and is not imported.
 // 'auth.js.backup' is ignored.
 
@@ -47,6 +48,7 @@ router.use('/subscriptions', subscriptionsRouter);
 router.use('/tenants', tenantsRouter);
 router.use('/uploads', uploadsRouter);
 router.use('/users', usersRouter);
+router.use('/blog', blogRouter);
 
 // Health check
 router.get('/health', (_req, res) => res.json({ ok: true }));

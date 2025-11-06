@@ -78,6 +78,8 @@ const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard.jsx'));
 const TenantDashboard = lazy(() => import('./pages/TenantDashboard.jsx'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 const TeamManagementPage = lazy(() => import('./pages/TeamManagementPage.jsx'));
+const BlogPage = lazy(() => import('./pages/BlogPage.jsx'));
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -128,6 +130,10 @@ export default function App() {
 
           {/* Landing */}
           <Route path="/" element={<LandingPage />} />
+
+          {/* Blog (Public) */}
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
 
           {/* Protected */}
           <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
