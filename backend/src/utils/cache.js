@@ -1,5 +1,5 @@
 // backend/src/utils/cache.js
-import { redisGet, redisSet, redisDel } from '../config/redisClient.js';
+import { redisGet, redisSet, redisDel, redisDelPattern } from '../config/redisClient.js';
 import logger from './logger.js';
 
 /**
@@ -49,6 +49,15 @@ export async function invalidate(key) {
     logger.debug(`[Cache] Invalidated key: ${key}`);
   } catch (error) {
     logger.warn(`[Cache] Failed to invalidate key ${key}:`, error.message);
+  }
+}
+
+export async function invalidatePattern(pattern) {
+  try {
+    await redisDelPattern(pattern);
+    logger.debug(`[Cache] Invalidated pattern: ${pattern}`);
+  } catch (error) {
+    logger.warn(`[Cache] Failed to invalidate pattern ${pattern}:`, error.message);
   }
 }
 
@@ -124,4 +133,5 @@ export default {
   invalidate,
   invalidateMultiple,
   cacheMiddleware,
+  invalidatePattern,
 };
