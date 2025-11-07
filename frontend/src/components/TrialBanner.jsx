@@ -33,6 +33,8 @@ const TrialBanner = () => {
   const totalTrialDays = 14;
   const progressPercentage = Math.max(0, Math.min(100, ((totalTrialDays - daysRemaining) / totalTrialDays) * 100));
 
+  const bannerOffset = { xs: '64px', sm: '72px' };
+
   // Trial expired or suspended - show urgent warning
   if (isTrialExpired || isSuspended) {
     return (
@@ -43,7 +45,7 @@ const TrialBanner = () => {
           py: 2,
           px: 3,
           position: 'sticky',
-          top: 0,
+          top: bannerOffset,
           zIndex: 1100,
           boxShadow: '0 4px 12px rgba(185, 28, 28, 0.3)',
         }}
@@ -125,7 +127,7 @@ const TrialBanner = () => {
           py: 2,
           px: 3,
           position: 'sticky',
-          top: 0,
+          top: bannerOffset,
           zIndex: 1100,
           boxShadow: isCritical || isUrgent ? '0 4px 12px rgba(185, 28, 28, 0.3)' : '0 4px 12px rgba(59, 130, 246, 0.3)',
         }}
