@@ -53,7 +53,6 @@ function NavBar() {
     { name: 'Service Requests', href: '/service-requests' },
     { name: 'Recommendations', href: '/recommendations' },
     { name: 'Subscriptions', href: '/subscriptions' },
-    { name: 'Blog', href: '/blog' },
   ];
 
   // Add Team link for Property Managers

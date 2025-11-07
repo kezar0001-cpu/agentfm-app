@@ -173,6 +173,7 @@ import usersRouter from './routes/users.js';
 import invitesRoutes from './routes/invites.js';
 import notificationsRoutes from './routes/notifications.js';
 import searchRoutes from './routes/search.js';
+import blogRoutes from './routes/blog.js';
 
 // ===================================================================
 //
@@ -209,6 +210,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/invites', invitesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/blog', blogRoutes);
 
 
 // ---- Health, Root, 404, Error Handler, and Shutdown logic
