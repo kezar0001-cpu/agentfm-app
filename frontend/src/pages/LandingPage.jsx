@@ -4,6 +4,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import heroIllustration from '../assets/landing/hero-operations.svg';
 import featureMaintenance from '../assets/landing/feature-maintenance.svg';
 import featureAnalytics from '../assets/landing/feature-analytics.svg';
+import featureInspections from '../assets/landing/feature-inspections.svg';
+import featureJobs from '../assets/landing/feature-jobs.svg';
+import featureReports from '../assets/landing/feature-reports.svg';
+import featureTeam from '../assets/landing/feature-team.svg';
 import avatarOperationsLead from '../assets/landing/avatar-operations-lead.svg';
 import avatarFacilitiesDirector from '../assets/landing/avatar-facilities-director.svg';
 
@@ -13,42 +17,42 @@ const featureHighlights = [
     description:
       'Visualise portfolio health at a glance with live KPIs for open jobs, overdue work, safety alerts, and subscription status reminders.',
     image: featureAnalytics,
-    alt: 'Dashboard overview with live status widgets',
+    alt: 'Analytics dashboard displaying upward trending graphs with colorful data points and performance metrics',
   },
   {
     title: 'Property & Unit Intelligence',
     description:
       'Create rich property records with image galleries, manage unit inventories, and keep everything searchable across your estate.',
     image: featureMaintenance,
-    alt: 'Blueprint inspired illustration of connected buildings',
+    alt: 'Property management interface showing building blueprint with organized unit listings and maintenance checklist',
   },
   {
     title: 'Inspections That Stay On Track',
     description:
       'Schedule inspections, track progress, and capture follow-up work orders without losing momentum or compliance history.',
-    image: featureAnalytics,
-    alt: 'Inspection checklist illustration',
+    image: featureInspections,
+    alt: 'Digital inspection checklist on clipboard showing completed items with green checkmarks and pending tasks',
   },
   {
     title: 'Jobs & Service Requests',
     description:
       'Assign technicians, monitor status changes in real time, and convert recommendations into actionable jobs with one click.',
-    image: featureMaintenance,
-    alt: 'Service request kanban board illustration',
+    image: featureJobs,
+    alt: 'Kanban-style workflow board with three columns displaying job cards in different status stages',
   },
   {
     title: 'Data-Driven Plans & Reports',
     description:
       'Build preventative maintenance plans, run owner-ready reports, and share insights that keep stakeholders aligned.',
-    image: featureAnalytics,
-    alt: 'Performance trends illustration',
+    image: featureReports,
+    alt: 'Layered report documents with bar charts showing comparative performance data across properties',
   },
   {
     title: 'Team Access & Notifications',
     description:
       'Invite owners, tenants, and vendors, control roles, and keep everyone up to speed with notifications and global search.',
-    image: featureMaintenance,
-    alt: 'Team collaboration illustration',
+    image: featureTeam,
+    alt: 'Connected team members with user avatars and notification badge indicating active collaboration',
   },
 ];
 
@@ -207,7 +211,13 @@ export default function LandingPage() {
 
           <div className="landing-hero-panel">
             <figure className="landing-hero-figure">
-              <img src={heroIllustration} alt="Illustration of Buildstate FM operations dashboard" />
+              <img
+                src={heroIllustration}
+                alt="Illustration of Buildstate FM operations dashboard with connected data flows and analytics"
+                width="420"
+                height="320"
+                decoding="async"
+              />
             </figure>
             <div className="landing-hero-card">
               <h3>What&apos;s happening today</h3>
@@ -241,7 +251,14 @@ export default function LandingPage() {
             {featureHighlights.map((feature) => (
               <article key={feature.title} className="landing-card">
                 <figure className="landing-card-media">
-                  <img src={feature.image} alt={feature.alt} loading="lazy" />
+                  <img
+                    src={feature.image}
+                    alt={feature.alt}
+                    width="420"
+                    height="320"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </figure>
                 <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
@@ -316,7 +333,15 @@ export default function LandingPage() {
             {testimonials.map((testimonial) => (
               <figure key={testimonial.name} className="landing-testimonial">
                 {testimonial.avatar && (
-                  <img src={testimonial.avatar} alt={`${testimonial.name} headshot`} className="landing-testimonial-avatar" />
+                  <img
+                    src={testimonial.avatar}
+                    alt={`${testimonial.name}, ${testimonial.role}`}
+                    className="landing-testimonial-avatar"
+                    width="120"
+                    height="120"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 )}
                 <blockquote>{testimonial.quote}</blockquote>
                 <figcaption>

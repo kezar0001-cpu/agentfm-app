@@ -1,0 +1,21 @@
+<svg width="420" height="320" viewBox="0 0 420 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="420" height="320" rx="32" fill="#0F172A"/>
+  <rect x="28" y="32" width="364" height="256" rx="24" fill="#111C31"/>
+  <!-- Clipboard/checklist -->
+  <rect x="120" y="64" width="180" height="224" rx="16" fill="#1E293B"/>
+  <rect x="144" y="84" width="132" height="16" rx="8" fill="#0F172A"/>
+  <!-- Checklist items -->
+  <circle cx="164" cy="132" r="16" fill="#34D399"/>
+  <path d="M158 132L163 137L172 125" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="192" y="124" width="72" height="16" rx="8" fill="#334155"/>
+
+  <circle cx="164" cy="172" r="16" fill="#34D399"/>
+  <path d="M158 172L163 177L172 165" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="192" y="164" width="72" height="16" rx="8" fill="#334155"/>
+
+  <circle cx="164" cy="212" r="16" fill="#475569"/>
+  <rect x="192" y="204" width="72" height="16" rx="8" fill="#334155" opacity="0.5"/>
+
+  <circle cx="164" cy="252" r="16" fill="#475569"/>
+  <rect x="192" y="244" width="72" height="16" rx="8" fill="#334155" opacity="0.5"/>
+</svg>
