@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ const TrialBanner = () => {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const lastScrollYRef = useRef(0);
   const isExpandedRef = useRef(true);
   const bannerRef = useRef(null);
@@ -34,6 +35,25 @@ const TrialBanner = () => {
   const isTrialActive = subscriptionStatus === 'TRIAL' && daysRemaining > 0;
   const isTrialExpired = subscriptionStatus === 'TRIAL' && daysRemaining <= 0;
   const isSuspended = subscriptionStatus === 'SUSPENDED' || subscriptionStatus === 'CANCELLED';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem('trialBannerCollapsed');
+    if (storedValue === 'true') {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem('trialBannerCollapsed', isCollapsed ? 'true' : 'false');
+  }, [isCollapsed]);
 
   // Handle scroll to collapse/expand banner
   useEffect(() => {
@@ -146,27 +166,6 @@ const TrialBanner = () => {
   // Calculate progress percentage (14-day trial assumed)
   const totalTrialDays = 14;
   const progressPercentage = Math.max(0, Math.min(100, ((totalTrialDays - daysRemaining) / totalTrialDays) * 100));
-
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const storedValue = window.localStorage.getItem('trialBannerCollapsed');
-    if (storedValue === 'true') {
-      setIsCollapsed(true);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    window.localStorage.setItem('trialBannerCollapsed', isCollapsed ? 'true' : 'false');
-  }, [isCollapsed]);
 
   const floatingContainerStyles = {
     position: 'fixed',
