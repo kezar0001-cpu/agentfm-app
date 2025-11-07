@@ -53,7 +53,6 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
 import PropertyImageManager from '../components/PropertyImageManager';
-import PropertyImageCarousel from '../components/PropertyImageCarousel.jsx';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import PropertyNotesSection from '../components/PropertyNotesSection';
 import { normaliseArray } from '../utils/error';
@@ -402,18 +401,33 @@ export default function PropertyDetailPage() {
             </Stack>
 
             {/* Property Image */}
-            <PropertyImageCarousel
-              images={property.images?.length ? property.images : property.imageUrl ? [property.imageUrl] : []}
-              fallbackText={property.name}
-              height={420}
-              borderRadius={3}
-              showDots={(property.images?.length ?? 0) > 1}
-              showArrows={(property.images?.length ?? 0) > 1}
-              autoplayInterval={(property.images?.length ?? 0) > 1 ? 5000 : null}
-              showCounter={(property.images?.length ?? 0) > 1}
-              showFullscreenButton={(property.images?.length ?? 0) > 0}
-              containerSx={{ height: { xs: 220, sm: 320, md: 420 } }}
-            />
+            {property.imageUrl ? (
+              <Box
+                component="img"
+                src={property.imageUrl}
+                alt={property.name}
+                sx={{
+                  width: '100%',
+                  height: { xs: 220, sm: 320, md: 420 },
+                  objectFit: 'cover',
+                  borderRadius: 3,
+                }}
+              />
+            ) : (
+              <Paper
+                sx={{
+                  height: { xs: 220, sm: 320, md: 420 },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'grey.100',
+                  borderRadius: 3,
+                  color: 'grey.400',
+                }}
+              >
+                <HomeIcon sx={{ fontSize: { xs: 72, md: 120 } }} />
+              </Paper>
+            )}
 
             {/* Quick Stats */}
             <Grid container spacing={2}>
