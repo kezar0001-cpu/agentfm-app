@@ -80,6 +80,10 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 const TeamManagementPage = lazy(() => import('./pages/TeamManagementPage.jsx'));
 const BlogPage = lazy(() => import('./pages/BlogPage.jsx'));
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage.jsx'));
+const BlogAdminPage = lazy(() => import('./pages/admin/BlogAdminPage.jsx'));
+const BlogPostEditorPage = lazy(() => import('./pages/admin/BlogPostEditorPage.jsx'));
+const CategoryEditorPage = lazy(() => import('./pages/admin/CategoryEditorPage.jsx'));
+const TagEditorPage = lazy(() => import('./pages/admin/TagEditorPage.jsx'));
 
 // NOTE: AddPropertyPage intentionally removed (wizard is in PropertiesPage)
 
@@ -134,6 +138,12 @@ export default function App() {
           {/* Blog (Public) */}
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
+
+          {/* Blog Admin (Admin only) */}
+          <Route path="/admin/blog" element={<AuthGate><Layout><BlogAdminPage /></Layout></AuthGate>} />
+          <Route path="/admin/blog/posts/:id" element={<AuthGate><Layout><BlogPostEditorPage /></Layout></AuthGate>} />
+          <Route path="/admin/blog/categories/:id" element={<AuthGate><Layout><CategoryEditorPage /></Layout></AuthGate>} />
+          <Route path="/admin/blog/tags/:id" element={<AuthGate><Layout><TagEditorPage /></Layout></AuthGate>} />
 
           {/* Protected */}
           <Route path="/dashboard" element={<AuthGate><Layout><Dashboard /></Layout></AuthGate>} />
