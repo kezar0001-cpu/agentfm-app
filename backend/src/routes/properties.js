@@ -46,6 +46,7 @@ const imageUpload = multer({
   },
 });
 
+<<<<<<< HEAD
 const imageUploadMiddleware = imageUpload.single('image');
 
 const isMultipartRequest = (req) => {
@@ -81,6 +82,8 @@ const propertyImagesListSelection = {
   take: 10,
 };
 
+=======
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
 const propertyListSelect = {
   id: true,
   name: true,
@@ -99,7 +102,28 @@ const propertyListSelect = {
   managerId: true,
   createdAt: true,
   updatedAt: true,
+<<<<<<< HEAD
   propertyImages: propertyImagesListSelection,
+=======
+  propertyImages: {
+    select: {
+      id: true,
+      propertyId: true,
+      imageUrl: true,
+      caption: true,
+      isPrimary: true,
+      displayOrder: true,
+      uploadedById: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [
+      { displayOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
+    take: 10,
+  },
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
   _count: {
     select: {
       units: true,
@@ -483,6 +507,7 @@ const unitSchema = z.object({
   status: optionalString(),
 });
 
+<<<<<<< HEAD
 const propertyImageCreateSchema = z
   .object({
     imageUrl: requiredImageLocation(),
@@ -511,11 +536,21 @@ const determineNewImagePrimaryFlag = (requestedIsPrimary, { hasExistingImages, h
 
   return false;
 };
+=======
+const propertyImageCreateSchema = z.object({
+  imageUrl: requiredImageLocation(),
+  caption: optionalString(),
+  isPrimary: booleanLike().optional(),
+});
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
 
 const propertyImageUpdateSchema = z
   .object({
     caption: optionalString(),
+<<<<<<< HEAD
     altText: optionalString(),
+=======
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
     isPrimary: booleanLike().optional(),
   })
   .refine((data) => data.caption !== undefined || data.altText !== undefined || data.isPrimary !== undefined, {
@@ -871,6 +906,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
+<<<<<<< HEAD
     const {
       managerId: managerIdInput,
       postcode,
@@ -880,16 +916,29 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       images: legacyImages,
       ...data
     } = parsed;
+=======
+    const { managerId: managerIdInput, postcode, type, coverImage, images: rawImages, ...data } = parsed;
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
 
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
 
+<<<<<<< HEAD
     const rawImages = legacyImages;
 
     const initialImages = normaliseSubmittedPropertyImages(rawImages);
 
     const primaryImageCandidate = initialImages.find((image) => image.isPrimary) || initialImages[0] || null;
     const coverImageUrl = data.imageUrl ?? primaryImageCandidate?.imageUrl ?? null;
+=======
+    const initialImages = Array.isArray(rawImages)
+      ? rawImages
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => isValidImageLocation(value))
+      : [];
+
+    const coverImageUrl = data.imageUrl ?? initialImages[0] ?? null;
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
 
     // Ensure converted fields are included in the data
     const propertyData = {
@@ -901,6 +950,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       ...(coverImageUrl ? { imageUrl: coverImageUrl } : {}),
     };
 
+<<<<<<< HEAD
     const { property, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
       const createdProperty = await prisma.$transaction(async (tx) => {
         const newProperty = await tx.property.create({
@@ -935,6 +985,39 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       });
 
       return { property: createdProperty, propertyWithImages: withImages };
+=======
+    const property = await prisma.$transaction(async (tx) => {
+      const createdProperty = await tx.property.create({
+        data: propertyData,
+      });
+
+      if (initialImages.length) {
+        const records = initialImages.map((imageUrl, index) => ({
+          propertyId: createdProperty.id,
+          imageUrl,
+          caption: null,
+          isPrimary: index === 0,
+          displayOrder: index,
+          uploadedById: req.user.id,
+        }));
+
+        await tx.propertyImage.createMany({ data: records });
+      }
+
+      return createdProperty;
+    });
+
+    const propertyWithImages = await prisma.property.findUnique({
+      where: { id: property.id },
+      include: {
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        },
+      },
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
     });
 
     // Invalidate property and dashboard caches for all affected users
@@ -1223,7 +1306,11 @@ propertyImagesRouter.get('/', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImageUpload, async (req, res) => {
+=======
+propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), imageUpload.single('image'), async (req, res) => {
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
   const propertyId = req.params.id;
 
   const cleanupUploadedFile = () => {
@@ -1255,6 +1342,11 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
     if (req.file?.filename) {
       body.imageUrl = `/uploads/${req.file.filename}`;
     }
+<<<<<<< HEAD
+=======
+
+    const parsed = propertyImageCreateSchema.parse(body);
+>>>>>>> 3c7f608 (Enable property photo uploads and carousel display)
 
     const parsed = propertyImageCreateSchema.parse(body);
 
