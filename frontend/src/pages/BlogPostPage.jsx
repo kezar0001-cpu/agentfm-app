@@ -92,18 +92,19 @@ const BlogPostPage = () => {
           <Box
             sx={{
               width: '100%',
-              height: { xs: 400, sm: 500, md: 580 },
+              height: { xs: 300, sm: 350, md: 400 },
               backgroundImage: `linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(30, 64, 175, 0.08)), url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundBlendMode: 'overlay',
               position: 'relative',
-              bgcolor: '#f5f5f7'
+              bgcolor: '#f5f5f7',
+              borderRadius: '0 0 24px 24px'
             }}
           />
         )}
 
-        <Container maxWidth="md" sx={{ mt: post.coverImage ? -12 : 8, position: 'relative', zIndex: 1 }}>
+        <Container maxWidth="md" sx={{ mt: post.coverImage ? 4 : 8, position: 'relative', zIndex: 1 }}>
           {/* Back Button */}
           <Button
             component={Link}
@@ -111,20 +112,18 @@ const BlogPostPage = () => {
             startIcon={<ArrowBackIcon />}
             sx={{
               mb: 3,
-              color: post.coverImage ? 'white' : '#0f172a',
-              fontWeight: 600,
+              color: 'white',
+              fontWeight: 700,
               textTransform: 'none',
               fontSize: '0.95rem',
-              px: 2.5,
-              py: 1,
+              px: 3,
+              py: 1.25,
               borderRadius: '999px',
-              bgcolor: post.coverImage ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
+              background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+              boxShadow: '0 6px 20px rgba(185, 28, 28, 0.3)',
               '&:hover': {
-                bgcolor: post.coverImage ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.9)',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 6px 16px rgba(15, 23, 42, 0.12)'
+                boxShadow: '0 10px 30px rgba(185, 28, 28, 0.4)'
               }
             }}
           >

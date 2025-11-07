@@ -456,26 +456,18 @@ const BlogPage = () => {
                       }}
                     >
                       {post.coverImage && (
-                        <Box sx={{
-                          position: 'relative',
-                          overflow: 'hidden',
-                          height: 240,
-                          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(30, 64, 175, 0.08))',
-                          p: 1.5
-                        }}>
-                          <CardMedia
-                            component="img"
-                            image={post.coverImage}
-                            alt={post.title}
-                            className="blog-card-image"
-                            sx={{
-                              height: '100%',
-                              objectFit: 'cover',
-                              transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                              borderRadius: 2
-                            }}
-                          />
-                        </Box>
+                        <CardMedia
+                          component="img"
+                          image={post.coverImage}
+                          alt={post.title}
+                          className="blog-card-image"
+                          sx={{
+                            height: 240,
+                            objectFit: 'cover',
+                            transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                            bgcolor: '#f8fafc'
+                          }}
+                        />
                       )}
                       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: { xs: 2.5, md: 3 } }}>
                         {/* Categories - Minimal */}
