@@ -8,8 +8,8 @@
       "destination": "https://api.buildstate.com.au/api/:path*"
     },
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/:path((?!assets/).*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
