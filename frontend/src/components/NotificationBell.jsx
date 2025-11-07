@@ -160,7 +160,8 @@ export default function NotificationBell() {
       const summary = response.data?.summary || response.data;
       return ensureArray(summary?.alerts).filter((alert) => alert.id !== 'no_subscription');
     },
-    enabled: Boolean(anchorEl),
+    staleTime: 60000,
+    refetchInterval: isWebSocketConnected ? 120000 : 30000,
   });
 
   // Mark as read mutation
@@ -243,6 +244,8 @@ export default function NotificationBell() {
     [dashboardAlerts],
   );
 
+  const dashboardAlertCount = normalizedDashboardAlerts.length;
+
   const combinedNotifications = useMemo(
     () => [...ensureArray(notifications), ...normalizedDashboardAlerts],
     [notifications, normalizedDashboardAlerts],
@@ -270,11 +273,12 @@ export default function NotificationBell() {
   };
 
   const unreadCount = (countData && typeof countData === 'object' && 'count' in countData) ? countData.count : 0;
+  const badgeCount = unreadCount + dashboardAlertCount;
 
   return (
     <>
       <IconButton color="inherit" onClick={handleOpen}>
-        <Badge badgeContent={unreadCount} color="error">
+        <Badge badgeContent={badgeCount} color="error">
           <NotificationsIcon />
         </Badge>
       </IconButton>
