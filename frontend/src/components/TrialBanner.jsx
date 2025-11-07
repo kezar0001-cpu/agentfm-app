@@ -1,10 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, Alert, AlertTitle, LinearProgress, Chip, Collapse } from '@mui/material';
+import React from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  LinearProgress,
+  Chip,
+  IconButton,
+  Paper,
+  Tooltip,
+} from '@mui/material';
 import {
   AccessTime as AccessTimeIcon,
   Warning as WarningIcon,
   Bolt as BoltIcon,
   TrendingUp as TrendingUpIcon,
+  Close as CloseIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '../context/UserContext';
@@ -136,91 +147,123 @@ const TrialBanner = () => {
   const totalTrialDays = 14;
   const progressPercentage = Math.max(0, Math.min(100, ((totalTrialDays - daysRemaining) / totalTrialDays) * 100));
 
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem('trialBannerCollapsed');
+    if (storedValue === 'true') {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem('trialBannerCollapsed', isCollapsed ? 'true' : 'false');
+  }, [isCollapsed]);
+
+  const floatingContainerStyles = {
+    position: 'fixed',
+    bottom: { xs: 16, sm: 24 },
+    right: { xs: 16, sm: 24 },
+    left: { xs: 16, sm: 'auto' },
+    zIndex: (theme) => theme.zIndex.drawer + 2,
+    width: { xs: 'auto', sm: 360 },
+    maxWidth: { xs: 'calc(100% - 32px)', sm: 360 },
+  };
+
+  const collapsedChip = (
+    <Box sx={floatingContainerStyles}>
+      <Tooltip title="Show trial details">
+        <Chip
+          color="warning"
+          onClick={() => setIsCollapsed(false)}
+          label={
+            daysRemaining > 0
+              ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left in your trial`
+              : 'Trial ended - view plans'
+          }
+          icon={daysRemaining > 0 ? <AccessTimeIcon /> : <WarningIcon />}
+          sx={{
+            cursor: 'pointer',
+            fontWeight: 600,
+            width: '100%',
+            px: 1.5,
+            '& .MuiChip-label': {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              whiteSpace: 'nowrap',
+            },
+          }}
+        />
+      </Tooltip>
+    </Box>
+  );
+
   // Trial expired or suspended - show urgent warning
   if (isTrialExpired || isSuspended) {
+    if (isCollapsed) {
+      return collapsedChip;
+    }
+
     return (
-      <Box
-        ref={bannerRef}
-        sx={{
-          background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-          borderBottom: '2px solid #7f1d1d',
-          py: isExpanded ? 0.75 : 0.375,
-          px: 2,
-          position: 'sticky',
-          top: 0,
-          zIndex: 1300,
-          boxShadow: '0 2px 6px rgba(185, 28, 28, 0.2)',
-          transition: 'padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
-          willChange: 'padding',
-        }}
-      >
-        <Box
+      <Box sx={floatingContainerStyles}>
+        <Paper
+          elevation={8}
           sx={{
-            maxWidth: 1240,
-            mx: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1.5,
+            background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+            color: '#fff',
+            borderRadius: 2,
+            overflow: 'hidden',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
-            <WarningIcon sx={{
-              color: '#fff',
-              fontSize: isExpanded ? 20 : 18,
-              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }} />
-            <Box sx={{ flex: 1, overflow: 'hidden' }}>
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: isExpanded ? '0.875rem' : '0.8rem',
-                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  lineHeight: 1.3,
-                }}
-              >
-                Your Trial Has Ended
-              </Typography>
-              <Collapse in={isExpanded} timeout={300} sx={{ overflow: 'hidden' }}>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '0.8rem',
-                    mt: 0.2,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  Subscribe now to restore full access to all features.
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', p: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <WarningIcon sx={{ fontSize: 28 }} />
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                  Your Trial Has Ended
                 </Typography>
-              </Collapse>
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', mt: 0.5 }}>
+                  Subscribe now to restore full access to all features and keep your data secure.
+                </Typography>
+              </Box>
             </Box>
+            <Tooltip title="Minimize">
+              <IconButton size="small" onClick={() => setIsCollapsed(true)} sx={{ color: '#fff' }}>
+                <KeyboardArrowUpIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => navigate('/subscriptions')}
-            sx={{
-              bgcolor: '#fff',
-              color: '#dc2626',
-              fontWeight: 700,
-              px: isExpanded ? 2.5 : 2,
-              py: isExpanded ? 0.625 : 0.5,
-              fontSize: isExpanded ? '0.8125rem' : '0.7rem',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              whiteSpace: 'nowrap',
-              '&:hover': {
-                bgcolor: '#fef2f2',
-                transform: 'scale(1.03)',
-              },
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
-            }}
-          >
-            Subscribe Now
-          </Button>
-        </Box>
+          <Box sx={{ bgcolor: 'rgba(0,0,0,0.12)', px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Reactivate your workspace instantly
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate('/subscriptions')}
+              sx={{
+                bgcolor: '#fff',
+                color: '#dc2626',
+                fontWeight: 700,
+                px: 2,
+                '&:hover': {
+                  bgcolor: '#fef2f2',
+                },
+              }}
+            >
+              Subscribe
+            </Button>
+          </Box>
+        </Paper>
       </Box>
     );
   }
@@ -236,165 +279,159 @@ const TrialBanner = () => {
 
     const bannerBorderColor = isCritical ? '#7f1d1d' : isUrgent ? '#92400e' : '#c2410c'; // Changed to orange
 
+    if (isCollapsed) {
+      return collapsedChip;
+    }
+
     return (
-      <Box
-        ref={bannerRef}
-        sx={{
-          background: bannerBgColor,
-          borderBottom: `2px solid ${bannerBorderColor}`,
-          py: isExpanded ? 0.75 : 0.375,
-          px: 2,
-          position: 'sticky',
-          top: 0,
-          zIndex: 1300,
-          boxShadow: isCritical || isUrgent ? '0 2px 6px rgba(185, 28, 28, 0.2)' : '0 2px 6px rgba(249, 115, 22, 0.2)',
-          transition: 'padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
-          willChange: 'padding',
-        }}
-      >
-        <Box
+      <Box sx={floatingContainerStyles}>
+        <Paper
+          elevation={6}
           sx={{
-            maxWidth: 1240,
-            mx: 'auto',
+            background: bannerBgColor,
+            color: '#fff',
+            borderRadius: 2,
+            overflow: 'hidden',
           }}
         >
-          {/* Always visible compact header */}
+          <Box sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                {isCritical || isUrgent ? (
+                  <BoltIcon sx={{ fontSize: 26 }} />
+                ) : (
+                  <AccessTimeIcon sx={{ fontSize: 26 }} />
+                )}
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                    {isCritical
+                      ? 'Your trial ends tomorrow'
+                      : isUrgent
+                      ? `Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left in your trial`
+                      : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left in your free trial`}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)', mt: 0.5 }}>
+                    {isCritical
+                      ? 'Lock in uninterrupted access before your team is locked out.'
+                      : isUrgent
+                      ? 'Secure your premium workflows now to keep momentum going.'
+                      : 'Upgrade to continue automated workflows, reminders, and reporting.'}
+                  </Typography>
+                </Box>
+              </Box>
+              <Tooltip title="Minimize">
+                <IconButton size="small" onClick={() => setIsCollapsed(true)} sx={{ color: '#fff' }}>
+                  <KeyboardArrowUpIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.85)', fontWeight: 600 }}>
+                  Trial progress
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.85)', fontWeight: 600 }}>
+                  {Math.max(daysRemaining, 0)} day{Math.max(daysRemaining, 0) === 1 ? '' : 's'} left
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={progressPercentage}
+                sx={{
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: '#fff',
+                  },
+                }}
+              />
+            </Box>
+          </Box>
           <Box
             sx={{
+              bgcolor: 'rgba(0,0,0,0.12)',
+              px: 2,
+              py: 1.5,
               display: 'flex',
-              alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 1.25,
-              minHeight: isExpanded ? 'auto' : '28px',
+              alignItems: 'center',
+              gap: 1,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
-              {isCritical || isUrgent ? (
-                <BoltIcon sx={{
-                  color: '#fff',
-                  fontSize: isExpanded ? 20 : 18,
-                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                }} />
-              ) : (
-                <AccessTimeIcon sx={{
-                  color: '#fff',
-                  fontSize: isExpanded ? 20 : 18,
-                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                }} />
-              )}
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: isExpanded ? '0.875rem' : '0.8rem',
-                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  lineHeight: 1.3,
-                }}
-              >
-                {isCritical
-                  ? '🔥 Your Trial Ends Tomorrow!'
-                  : isUrgent
-                  ? `⚡ Only ${daysRemaining} Days Left in Your Trial`
-                  : `Free Trial: ${daysRemaining} Days Remaining`}
-              </Typography>
-              {!isCritical && !isUrgent && isExpanded && (
-                <Chip
-                  label="LIMITED TIME"
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.6rem',
-                    height: 18,
-                    transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                />
-              )}
-            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {isCritical || isUrgent ? 'Reserve your rate today' : 'Upgrade when you’re ready'}
+            </Typography>
             <Button
               variant="contained"
               size="small"
               onClick={() => navigate('/subscriptions')}
-              startIcon={isExpanded ? <TrendingUpIcon /> : null}
+              startIcon={<TrendingUpIcon />}
               sx={{
                 bgcolor: '#fff',
                 color: isCritical || isUrgent ? '#dc2626' : '#ea580c',
                 fontWeight: 700,
-                px: isExpanded ? 2.5 : 2,
-                py: isExpanded ? 0.625 : 0.5,
-                fontSize: isExpanded ? '0.8125rem' : '0.7rem',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                whiteSpace: 'nowrap',
+                px: 2,
                 '&:hover': {
                   bgcolor: '#fef2f2',
-                  transform: 'scale(1.03)',
                 },
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
               }}
             >
-              {isCritical || isUrgent ? 'Subscribe Now' : 'View Plans'}
+              View plans
             </Button>
           </Box>
-
-          {/* Collapsible detailed content */}
-          <Collapse in={isExpanded} timeout={300} sx={{ overflow: 'hidden' }}>
-            <Box sx={{ mt: 0.4, overflow: 'hidden' }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  fontSize: '0.8rem',
-                  mb: 0.75,
-                  lineHeight: 1.3,
-                }}
-              >
-                {isCritical
-                  ? 'Subscribe today to avoid losing access!'
-                  : isUrgent
-                  ? 'Subscribe now to ensure uninterrupted access.'
-                  : 'Unlock full access. Start from just $29/month.'}
-              </Typography>
-
-              {/* Progress bar */}
-              <Box sx={{ width: '100%' }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={progressPercentage}
-                  sx={{
-                    height: 3,
-                    borderRadius: 1.5,
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    '& .MuiLinearProgress-bar': {
-                      bgcolor: '#fff',
-                      borderRadius: 1.5,
-                      transition: 'transform 0.3s ease',
-                    },
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    mt: 0.2,
-                    display: 'block',
-                    textAlign: 'right',
-                    fontSize: '0.65rem',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {Math.round(progressPercentage)}% of trial used
-                </Typography>
-              </Box>
-            </Box>
-          </Collapse>
-        </Box>
+        </Paper>
       </Box>
     );
   }
 
-  return null;
+  if (isCollapsed) {
+    return collapsedChip;
+  }
+
+  return (
+    <Box sx={floatingContainerStyles}>
+      <Paper
+        elevation={4}
+        sx={{
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', p: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <WarningIcon color="warning" sx={{ fontSize: 26 }} />
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                Trial status unavailable
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                Visit billing to review your subscription options and keep your workspace active.
+              </Typography>
+            </Box>
+          </Box>
+          <Tooltip title="Dismiss">
+            <IconButton size="small" onClick={() => setIsCollapsed(true)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Box sx={{ bgcolor: 'rgba(0,0,0,0.04)', px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Explore subscription plans
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate('/subscriptions')}
+            sx={{ fontWeight: 700 }}
+          >
+            View plans
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
+  );
 };
 
 export default TrialBanner;
