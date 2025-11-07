@@ -13,7 +13,6 @@ import {
   Select,
   MenuItem,
   Chip,
-  OutlinedInput,
   FormControlLabel,
   Switch,
   CircularProgress,
@@ -26,7 +25,10 @@ import {
   updateBlogPost,
   getBlogCategories,
   getBlogTags,
+  createBlogCategory,
+  createBlogTag,
 } from '../../api/blog';
+import RichTextEditor from '../../components/RichTextEditor';
 import toast from 'react-hot-toast';
 
 function BlogPostEditorPage() {
@@ -38,6 +40,8 @@ function BlogPostEditorPage() {
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -52,8 +56,6 @@ function BlogPostEditorPage() {
     metaDescription: '',
     metaKeywords: [],
     ogImage: '',
-    categoryIds: [],
-    tagIds: [],
   });
 
   useEffect(() => {
@@ -85,9 +87,13 @@ function BlogPostEditorPage() {
           metaDescription: post.metaDescription || '',
           metaKeywords: post.metaKeywords || [],
           ogImage: post.ogImage || '',
-          categoryIds: post.categories?.map((pc) => pc.category.id) || [],
-          tagIds: post.tags?.map((pt) => pt.tag.id) || [],
         });
+
+        // Set selected categories and tags
+        const postCategories = post.categories?.map((pc) => pc.category) || [];
+        const postTags = post.tags?.map((pt) => pt.tag) || [];
+        setSelectedCategories(postCategories);
+        setSelectedTags(postTags);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -110,6 +116,66 @@ function BlogPostEditorPage() {
     }
   };
 
+  const handleCategoryChange = async (event, newValue) => {
+    const processedCategories = [];
+
+    for (const item of newValue) {
+      if (typeof item === 'string') {
+        // User typed a new category name
+        try {
+          const slug = item.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const response = await createBlogCategory({
+            name: item,
+            slug: slug,
+            description: '',
+            color: '#3b82f6', // Default blue color
+          });
+          const newCategory = response.data;
+          processedCategories.push(newCategory);
+          setCategories((prev) => [...prev, newCategory]);
+          toast.success(`Category "${item}" created`);
+        } catch (error) {
+          console.error('Error creating category:', error);
+          toast.error(`Failed to create category "${item}"`);
+        }
+      } else {
+        // Existing category
+        processedCategories.push(item);
+      }
+    }
+
+    setSelectedCategories(processedCategories);
+  };
+
+  const handleTagChange = async (event, newValue) => {
+    const processedTags = [];
+
+    for (const item of newValue) {
+      if (typeof item === 'string') {
+        // User typed a new tag name
+        try {
+          const slug = item.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const response = await createBlogTag({
+            name: item,
+            slug: slug,
+          });
+          const newTag = response.data;
+          processedTags.push(newTag);
+          setTags((prev) => [...prev, newTag]);
+          toast.success(`Tag "${item}" created`);
+        } catch (error) {
+          console.error('Error creating tag:', error);
+          toast.error(`Failed to create tag "${item}"`);
+        }
+      } else {
+        // Existing tag
+        processedTags.push(item);
+      }
+    }
+
+    setSelectedTags(processedTags);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -117,8 +183,8 @@ function BlogPostEditorPage() {
     try {
       const payload = {
         ...formData,
-        // Convert htmlContent from content if not provided (simple conversion)
-        htmlContent: formData.htmlContent || formData.content.replace(/\n/g, '<br/>'),
+        categoryIds: selectedCategories.map((c) => c.id),
+        tagIds: selectedTags.map((t) => t.id),
       };
 
       if (isEditMode) {
@@ -196,29 +262,21 @@ function BlogPostEditorPage() {
                 multiline
                 rows={2}
                 helperText="Short summary for post listings"
-                sx={{ mb: 2 }}
+                sx={{ mb: 3 }}
               />
 
-              <TextField
-                fullWidth
-                label="Content"
-                value={formData.content}
-                onChange={(e) => handleChange('content', e.target.value)}
-                multiline
-                rows={12}
-                required
-                helperText="Markdown or plain text content"
-                sx={{ mb: 2 }}
-              />
-
-              <TextField
-                fullWidth
-                label="HTML Content (Optional)"
-                value={formData.htmlContent}
-                onChange={(e) => handleChange('htmlContent', e.target.value)}
-                multiline
-                rows={8}
-                helperText="Rendered HTML version of content (auto-generated if not provided)"
+              <Typography variant="subtitle2" gutterBottom fontWeight={600} sx={{ mb: 1 }}>
+                Content *
+              </Typography>
+              <RichTextEditor
+                content={formData.htmlContent || formData.content}
+                onChange={(html) => {
+                  handleChange('htmlContent', html);
+                  // Also update content field with plain text version (strip HTML for backwards compatibility)
+                  const plainText = html.replace(/<[^>]*>/g, '');
+                  handleChange('content', plainText);
+                }}
+                placeholder="Write your blog post content here..."
               />
             </Paper>
 
@@ -354,39 +412,36 @@ function BlogPostEditorPage() {
                 Categories
               </Typography>
 
-              <FormControl fullWidth>
-                <InputLabel>Select Categories</InputLabel>
-                <Select
-                  multiple
-                  value={formData.categoryIds}
-                  onChange={(e) => handleChange('categoryIds', e.target.value)}
-                  input={<OutlinedInput label="Select Categories" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => {
-                        const cat = categories.find((c) => c.id === value);
-                        return (
-                          <Chip
-                            key={value}
-                            label={cat?.name}
-                            size="small"
-                            sx={{
-                              bgcolor: cat?.color || 'primary.main',
-                              color: 'white',
-                            }}
-                          />
-                        );
-                      })}
-                    </Box>
-                  )}
-                >
-                  {categories.map((category) => (
-                    <MenuItem key={category.id} value={category.id}>
-                      {category.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                freeSolo
+                options={categories}
+                value={selectedCategories}
+                onChange={handleCategoryChange}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select or Create Categories"
+                    helperText="Type and press Enter to create new"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      {...getTagProps({ index })}
+                      key={option.id}
+                      label={option.name}
+                      size="small"
+                      sx={{
+                        bgcolor: option.color || 'primary.main',
+                        color: 'white',
+                      }}
+                    />
+                  ))
+                }
+              />
             </Paper>
 
             <Paper sx={{ p: 3 }}>
@@ -394,29 +449,33 @@ function BlogPostEditorPage() {
                 Tags
               </Typography>
 
-              <FormControl fullWidth>
-                <InputLabel>Select Tags</InputLabel>
-                <Select
-                  multiple
-                  value={formData.tagIds}
-                  onChange={(e) => handleChange('tagIds', e.target.value)}
-                  input={<OutlinedInput label="Select Tags" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => {
-                        const tag = tags.find((t) => t.id === value);
-                        return <Chip key={value} label={tag?.name} size="small" variant="outlined" />;
-                      })}
-                    </Box>
-                  )}
-                >
-                  {tags.map((tag) => (
-                    <MenuItem key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                freeSolo
+                options={tags}
+                value={selectedTags}
+                onChange={handleTagChange}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select or Create Tags"
+                    helperText="Type and press Enter to create new"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      {...getTagProps({ index })}
+                      key={option.id}
+                      label={option.name}
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))
+                }
+              />
             </Paper>
           </Grid>
         </Grid>
