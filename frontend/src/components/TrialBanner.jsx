@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Button, Alert, AlertTitle, LinearProgress, Chip, Collapse } from '@mui/material';
 import {
   AccessTime as AccessTimeIcon,
@@ -15,6 +15,13 @@ const TrialBanner = () => {
   const { user } = useCurrentUser();
   const [isExpanded, setIsExpanded] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const bannerRef = useRef(null);
+  const subscriptionStatus = user?.subscriptionStatus ?? null;
+  const trialEndDate = user?.trialEndDate;
+  const daysRemaining = calculateDaysRemaining(trialEndDate);
+  const isTrialActive = subscriptionStatus === 'TRIAL' && daysRemaining > 0;
+  const isTrialExpired = subscriptionStatus === 'TRIAL' && daysRemaining <= 0;
+  const isSuspended = subscriptionStatus === 'SUSPENDED' || subscriptionStatus === 'CANCELLED';
 
   // Handle scroll to collapse/expand banner
   useEffect(() => {
@@ -40,16 +47,35 @@ const TrialBanner = () => {
     };
   }, [lastScrollY]);
 
+  useEffect(() => {
+    const updateBannerHeight = () => {
+      const height = bannerRef.current?.offsetHeight ?? 0;
+      document.documentElement.style.setProperty('--trial-banner-height', `${height}px`);
+    };
+
+    updateBannerHeight();
+
+    window.addEventListener('resize', updateBannerHeight);
+
+    let resizeObserver;
+    if (bannerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateBannerHeight);
+      resizeObserver.observe(bannerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateBannerHeight);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      document.documentElement.style.removeProperty('--trial-banner-height');
+    };
+  }, [isExpanded, isTrialActive, isTrialExpired, isSuspended]);
+
   // Don't show banner if user has active subscription
-  if (!user || user.subscriptionStatus === 'ACTIVE') {
+  if (!user || subscriptionStatus === 'ACTIVE') {
     return null;
   }
-
-  const trialEndDate = user.trialEndDate;
-  const daysRemaining = calculateDaysRemaining(trialEndDate);
-  const isTrialActive = user.subscriptionStatus === 'TRIAL' && daysRemaining > 0;
-  const isTrialExpired = user.subscriptionStatus === 'TRIAL' && daysRemaining <= 0;
-  const isSuspended = user.subscriptionStatus === 'SUSPENDED' || user.subscriptionStatus === 'CANCELLED';
 
   // Calculate urgency level
   const isUrgent = daysRemaining <= 3 && daysRemaining > 0;
@@ -63,6 +89,7 @@ const TrialBanner = () => {
   if (isTrialExpired || isSuspended) {
     return (
       <Box
+        ref={bannerRef}
         sx={{
           background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
           borderBottom: '2px solid #7f1d1d',
@@ -160,6 +187,7 @@ const TrialBanner = () => {
 
     return (
       <Box
+        ref={bannerRef}
         sx={{
           background: bannerBgColor,
           borderBottom: `2px solid ${bannerBorderColor}`,

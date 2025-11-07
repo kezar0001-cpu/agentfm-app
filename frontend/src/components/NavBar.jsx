@@ -103,7 +103,7 @@ function NavBar() {
       position="sticky"
       elevation={0}
       sx={{
-        top: 0,
+        top: 'var(--trial-banner-height, 0px)',
         bgcolor: 'rgba(255, 255, 255, 0.85)',
         color: 'text.primary',
         borderBottom: '1px solid',
