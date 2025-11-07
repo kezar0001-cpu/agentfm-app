@@ -46,6 +46,25 @@ const imageUpload = multer({
   },
 });
 
+const propertyImagesListSelection = {
+  select: {
+    id: true,
+    propertyId: true,
+    imageUrl: true,
+    caption: true,
+    isPrimary: true,
+    displayOrder: true,
+    uploadedById: true,
+    createdAt: true,
+    updatedAt: true,
+  },
+  orderBy: [
+    { displayOrder: 'asc' },
+    { createdAt: 'asc' },
+  ],
+  take: 10,
+};
+
 const propertyListSelect = {
   id: true,
   name: true,
@@ -64,24 +83,7 @@ const propertyListSelect = {
   managerId: true,
   createdAt: true,
   updatedAt: true,
-  propertyImages: {
-    select: {
-      id: true,
-      propertyId: true,
-      imageUrl: true,
-      caption: true,
-      isPrimary: true,
-      displayOrder: true,
-      uploadedById: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: [
-      { displayOrder: 'asc' },
-      { createdAt: 'asc' },
-    ],
-    take: 10,
-  },
+  propertyImages: propertyImagesListSelection,
   _count: {
     select: {
       units: true,
@@ -197,6 +199,112 @@ const optionalFloat = () =>
     .optional();
 
 const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
+
+const propertyImagesIncludeConfig = {
+  orderBy: [
+    { displayOrder: 'asc' },
+    { createdAt: 'asc' },
+  ],
+};
+
+let propertyImagesFeatureCache = null;
+let propertyImagesFeatureLogged = false;
+
+const logPropertyImagesUnavailable = () => {
+  if (!propertyImagesFeatureLogged && process.env.NODE_ENV !== 'test') {
+    console.warn(
+      'Property images table not found. Falling back to legacy property.imageUrl field.'
+    );
+    propertyImagesFeatureLogged = true;
+  }
+};
+
+const isPropertyImagesMissingError = (error) => {
+  if (!error) return false;
+  if (error.code === 'P2021') return true;
+  if (error.code === 'P2010' && error.meta?.modelName === 'PropertyImage') return true;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  return message.includes('propertyimage');
+};
+
+const markPropertyImagesUnsupported = () => {
+  if (propertyImagesFeatureCache !== false) {
+    propertyImagesFeatureCache = false;
+    logPropertyImagesUnavailable();
+  }
+};
+
+const propertyImagesFeatureAvailable = async () => {
+  if (propertyImagesFeatureCache !== null) {
+    return propertyImagesFeatureCache;
+  }
+
+  try {
+    const result = await prisma.$queryRaw`
+      SELECT to_regclass('public."PropertyImage"') AS table_name;
+    `;
+    const exists = Boolean(result?.[0]?.table_name);
+    propertyImagesFeatureCache = exists;
+    if (!exists) {
+      logPropertyImagesUnavailable();
+    }
+    return propertyImagesFeatureCache;
+  } catch (error) {
+    console.warn('Failed to verify property images table. Assuming unavailable:', error.message);
+    markPropertyImagesUnsupported();
+    return propertyImagesFeatureCache;
+  }
+};
+
+const withPropertyImagesSupport = async (operation) => {
+  const includeImages = await propertyImagesFeatureAvailable();
+
+  try {
+    return await operation(includeImages);
+  } catch (error) {
+    if (includeImages && isPropertyImagesMissingError(error)) {
+      markPropertyImagesUnsupported();
+      return operation(false);
+    }
+    throw error;
+  }
+};
+
+const buildPropertyListSelect = (includeImages) => {
+  if (includeImages) return propertyListSelect;
+  const { propertyImages: _omit, ...rest } = propertyListSelect;
+  return rest;
+};
+
+const buildPropertyImagesInclude = (includeImages) =>
+  includeImages ? { propertyImages: propertyImagesIncludeConfig } : {};
+
+const buildPropertyDetailInclude = (includeImages) => ({
+  units: { orderBy: { unitNumber: 'asc' } },
+  manager: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+    },
+  },
+  owners: {
+    include: {
+      owner: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  },
+  ...buildPropertyImagesInclude(includeImages),
+});
 
 const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
@@ -468,19 +576,22 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
-    const select = propertyListSelect;
+    const { items: properties, total } = await withPropertyImagesSupport(async (includeImages) => {
+      const select = buildPropertyListSelect(includeImages);
 
-    // Fetch properties and total count in parallel
-    const [properties, total] = await Promise.all([
-      prisma.property.findMany({
-        where,
-        select,
-        orderBy: { createdAt: 'desc' },
-        skip: offset,
-        take: limit,
-      }),
-      prisma.property.count({ where }),
-    ]);
+      const [items, count] = await Promise.all([
+        prisma.property.findMany({
+          where,
+          select,
+          orderBy: { createdAt: 'desc' },
+          skip: offset,
+          take: limit,
+        }),
+        prisma.property.count({ where }),
+      ]);
+
+      return { items, total: count };
+    });
 
     // Calculate page number and hasMore
     const page = Math.floor(offset / limit) + 1;
@@ -533,37 +644,38 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       ...(coverImageUrl ? { imageUrl: coverImageUrl } : {}),
     };
 
-    const property = await prisma.$transaction(async (tx) => {
-      const createdProperty = await tx.property.create({
-        data: propertyData,
+    const { property, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
+      const createdProperty = await prisma.$transaction(async (tx) => {
+        const newProperty = await tx.property.create({
+          data: propertyData,
+        });
+
+        if (includeImages && initialImages.length) {
+          const records = initialImages.map((imageUrl, index) => ({
+            propertyId: newProperty.id,
+            imageUrl,
+            caption: null,
+            isPrimary: index === 0,
+            displayOrder: index,
+            uploadedById: req.user.id,
+          }));
+
+          await tx.propertyImage.createMany({ data: records });
+        }
+
+        return newProperty;
       });
 
-      if (initialImages.length) {
-        const records = initialImages.map((imageUrl, index) => ({
-          propertyId: createdProperty.id,
-          imageUrl,
-          caption: null,
-          isPrimary: index === 0,
-          displayOrder: index,
-          uploadedById: req.user.id,
-        }));
-
-        await tx.propertyImage.createMany({ data: records });
+      if (!includeImages) {
+        return { property: createdProperty, propertyWithImages: null };
       }
 
-      return createdProperty;
-    });
+      const withImages = await prisma.property.findUnique({
+        where: { id: createdProperty.id },
+        include: buildPropertyImagesInclude(true),
+      });
 
-    const propertyWithImages = await prisma.property.findUnique({
-      where: { id: property.id },
-      include: {
-        propertyImages: {
-          orderBy: [
-            { displayOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-        },
-      },
+      return { property: createdProperty, propertyWithImages: withImages };
     });
 
     // Invalidate property and dashboard caches for all affected users
@@ -590,40 +702,12 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
 // GET /:id - Get property by ID (with access check)
 router.get('/:id', async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-      include: {
-        units: { orderBy: { unitNumber: 'asc' } },
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-          },
-        },
-        owners: {
-          include: {
-            owner: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        propertyImages: {
-          orderBy: [
-            { displayOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-        },
-      },
-    });
+    const property = await withPropertyImagesSupport((includeImages) =>
+      prisma.property.findUnique({
+        where: { id: req.params.id },
+        include: buildPropertyDetailInclude(includeImages),
+      })
+    );
 
     const access = ensurePropertyAccess(property, req.user);
     if (!access.allowed) {
@@ -738,6 +822,24 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 // ---------------------------------------------------------------------------
 // Property image routes
 // ---------------------------------------------------------------------------
+
+propertyImagesRouter.use(async (req, res, next) => {
+  try {
+    const available = await propertyImagesFeatureAvailable();
+    if (!available) {
+      return sendError(
+        res,
+        503,
+        'Property image management is not available. Please run the latest database migrations.',
+        ErrorCodes.EXT_SERVICE_UNAVAILABLE
+      );
+    }
+    return next();
+  } catch (error) {
+    console.error('Property image availability check failed:', error);
+    return sendError(res, 500, 'Failed to process request', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
 
 propertyImagesRouter.get('/', async (req, res) => {
   const propertyId = req.params.id;
