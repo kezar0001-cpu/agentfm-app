@@ -121,22 +121,37 @@ function BlogPostEditorPage() {
 
     for (const item of newValue) {
       if (typeof item === 'string') {
-        // User typed a new category name
-        try {
-          const slug = item.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          const response = await createBlogCategory({
-            name: item,
-            slug: slug,
-            description: '',
-            color: '#3b82f6', // Default blue color
-          });
-          const newCategory = response.data;
-          processedCategories.push(newCategory);
-          setCategories((prev) => [...prev, newCategory]);
-          toast.success(`Category "${item}" created`);
-        } catch (error) {
-          console.error('Error creating category:', error);
-          toast.error(`Failed to create category "${item}"`);
+        // Split by comma and process each category
+        const categoryNames = item.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
+        for (const categoryName of categoryNames) {
+          // Check if category already exists
+          const existingCategory = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+
+          if (existingCategory) {
+            // Add existing category if not already selected
+            if (!processedCategories.find(pc => pc.id === existingCategory.id)) {
+              processedCategories.push(existingCategory);
+            }
+          } else {
+            // Create new category
+            try {
+              const slug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+              const response = await createBlogCategory({
+                name: categoryName,
+                slug: slug,
+                description: '',
+                color: '#3b82f6', // Default blue color
+              });
+              const newCategory = response.data;
+              processedCategories.push(newCategory);
+              setCategories((prev) => [...prev, newCategory]);
+              toast.success(`Category "${categoryName}" created`);
+            } catch (error) {
+              console.error('Error creating category:', error);
+              toast.error(`Failed to create category "${categoryName}"`);
+            }
+          }
         }
       } else {
         // Existing category
@@ -152,20 +167,35 @@ function BlogPostEditorPage() {
 
     for (const item of newValue) {
       if (typeof item === 'string') {
-        // User typed a new tag name
-        try {
-          const slug = item.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          const response = await createBlogTag({
-            name: item,
-            slug: slug,
-          });
-          const newTag = response.data;
-          processedTags.push(newTag);
-          setTags((prev) => [...prev, newTag]);
-          toast.success(`Tag "${item}" created`);
-        } catch (error) {
-          console.error('Error creating tag:', error);
-          toast.error(`Failed to create tag "${item}"`);
+        // Split by comma and process each tag
+        const tagNames = item.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
+        for (const tagName of tagNames) {
+          // Check if tag already exists
+          const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+
+          if (existingTag) {
+            // Add existing tag if not already selected
+            if (!processedTags.find(pt => pt.id === existingTag.id)) {
+              processedTags.push(existingTag);
+            }
+          } else {
+            // Create new tag
+            try {
+              const slug = tagName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+              const response = await createBlogTag({
+                name: tagName,
+                slug: slug,
+              });
+              const newTag = response.data;
+              processedTags.push(newTag);
+              setTags((prev) => [...prev, newTag]);
+              toast.success(`Tag "${tagName}" created`);
+            } catch (error) {
+              console.error('Error creating tag:', error);
+              toast.error(`Failed to create tag "${tagName}"`);
+            }
+          }
         }
       } else {
         // Existing tag
@@ -424,7 +454,7 @@ function BlogPostEditorPage() {
                   <TextField
                     {...params}
                     label="Select or Create Categories"
-                    helperText="Type and press Enter to create new"
+                    helperText="Type and press Enter to create new. Use commas to add multiple (e.g., 'Tech, Design, Development')"
                   />
                 )}
                 renderTags={(value, getTagProps) =>
@@ -434,9 +464,16 @@ function BlogPostEditorPage() {
                       key={option.id}
                       label={option.name}
                       size="small"
+                      onDelete={getTagProps({ index }).onDelete}
                       sx={{
                         bgcolor: option.color || 'primary.main',
                         color: 'white',
+                        '& .MuiChip-deleteIcon': {
+                          color: 'rgba(255, 255, 255, 0.7)',
+                          '&:hover': {
+                            color: 'white'
+                          }
+                        }
                       }}
                     />
                   ))
@@ -461,7 +498,7 @@ function BlogPostEditorPage() {
                   <TextField
                     {...params}
                     label="Select or Create Tags"
-                    helperText="Type and press Enter to create new"
+                    helperText="Type and press Enter to create new. Use commas to add multiple (e.g., 'react, javascript, web')"
                   />
                 )}
                 renderTags={(value, getTagProps) =>
@@ -472,6 +509,15 @@ function BlogPostEditorPage() {
                       label={option.name}
                       size="small"
                       variant="outlined"
+                      onDelete={getTagProps({ index }).onDelete}
+                      sx={{
+                        '& .MuiChip-deleteIcon': {
+                          color: 'rgba(0, 0, 0, 0.5)',
+                          '&:hover': {
+                            color: 'rgba(0, 0, 0, 0.8)'
+                          }
+                        }
+                      }}
                     />
                   ))
                 }

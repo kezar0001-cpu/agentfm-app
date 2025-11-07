@@ -82,13 +82,28 @@ const BlogPostPage = () => {
 
       <BlogPublicNav />
 
-      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Box sx={{
+        bgcolor: 'background.default',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        position: 'relative',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(253, 216, 53, 0.15), transparent 50%)',
+          pointerEvents: 'none'
+        }
+      }}>
         {/* Hero Section */}
         {post.coverImage && (
           <Box
             sx={{
               width: '100%',
-              height: { xs: 300, md: 500 },
+              height: { xs: 400, sm: 500, md: 600, lg: 700 },
               backgroundImage: `url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -100,13 +115,13 @@ const BlogPostPage = () => {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%)'
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.9) 100%)'
               }
             }}
           />
         )}
 
-        <Container maxWidth="md" sx={{ mt: post.coverImage ? -10 : 8, position: 'relative', zIndex: 1 }}>
+        <Container maxWidth="md" sx={{ mt: post.coverImage ? -15 : 8, position: 'relative', zIndex: 1 }}>
           {/* Back Button */}
           <Button
             component={Link}
@@ -118,7 +133,15 @@ const BlogPostPage = () => {
           </Button>
 
           {/* Article Card */}
-          <Card sx={{ p: { xs: 3, md: 5 }, mb: 6 }}>
+          <Card sx={{
+            p: { xs: 3, md: 5 },
+            mb: 6,
+            borderRadius: 3,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.98), rgba(255,255,255,1))',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.8)'
+          }}>
             {/* Categories */}
             {post.categories && post.categories.length > 0 && (
               <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -133,9 +156,15 @@ const BlogPostPage = () => {
                       bgcolor: pc.category.color || 'primary.main',
                       color: 'white',
                       fontWeight: 600,
+                      px: 0.5,
+                      fontSize: '0.875rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                       '&:hover': {
-                        bgcolor: pc.category.color ? `${pc.category.color}dd` : 'primary.dark'
-                      }
+                        bgcolor: pc.category.color ? `${pc.category.color}dd` : 'primary.dark',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                      },
+                      transition: 'all 0.3s ease'
                     }}
                   />
                 ))}
@@ -355,11 +384,31 @@ const BlogPostPage = () => {
           </Card>
 
           {/* Call to Action */}
-          <Card sx={{ p: 4, textAlign: 'center', mb: 6, bgcolor: 'primary.main', color: 'white' }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
+          <Card sx={{
+            p: 4,
+            textAlign: 'center',
+            mb: 6,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderRadius: 3,
+            boxShadow: '0 20px 60px rgba(102, 126, 234, 0.4)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1), transparent 50%)',
+              pointerEvents: 'none'
+            }
+          }}>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, position: 'relative', zIndex: 1 }}>
               Ready to Transform Your Property Management?
             </Typography>
-            <Typography variant="body1" sx={{ mb: 3, opacity: 0.9 }}>
+            <Typography variant="body1" sx={{ mb: 3, opacity: 0.95, position: 'relative', zIndex: 1 }}>
               Join thousands of property managers who trust Buildstate FM
             </Typography>
             <Button
@@ -369,10 +418,19 @@ const BlogPostPage = () => {
               size="large"
               sx={{
                 bgcolor: 'white',
-                color: 'primary.main',
+                color: '#667eea',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                position: 'relative',
+                zIndex: 1,
+                boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
                 '&:hover': {
-                  bgcolor: 'grey.100'
-                }
+                  bgcolor: 'grey.100',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.2)'
+                },
+                transition: 'all 0.3s ease'
               }}
             >
               Get Started Free
