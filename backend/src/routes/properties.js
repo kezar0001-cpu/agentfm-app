@@ -35,6 +35,12 @@ const propertyListSelect = {
       inspections: true,
     },
   },
+  propertyImages: {
+    orderBy: [
+      { displayOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
+  },
 };
 
 // All property routes require authentication
@@ -421,6 +427,15 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const managerId = req.user.id;
 
     // Ensure converted fields are included in the data
+    const imageInputs = Array.isArray(images) ? images : [];
+    const sanitizedImageUrls = Array.from(
+      new Set(
+        imageInputs
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => value.length > 0)
+      )
+    );
+
     const propertyData = {
       ...data,
       managerId,
@@ -430,8 +445,40 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
     };
 
-    const property = await prisma.property.create({
-      data: propertyData,
+    if (!propertyData.imageUrl && sanitizedImageUrls.length > 0) {
+      propertyData.imageUrl = sanitizedImageUrls[0];
+    }
+
+    const property = await prisma.$transaction(async (tx) => {
+      const created = await tx.property.create({
+        data: propertyData,
+      });
+
+      if (sanitizedImageUrls.length > 0) {
+        await tx.propertyImage.createMany({
+          data: sanitizedImageUrls.map((url, index) => ({
+            propertyId: created.id,
+            imageUrl: url,
+            caption: null,
+            isPrimary: index === 0,
+            displayOrder: index,
+            uploadedById: req.user.id,
+          })),
+        });
+      }
+
+      return tx.property.findUnique({
+        where: { id: created.id },
+        include: {
+          owners: { select: { ownerId: true } },
+          propertyImages: {
+            orderBy: [
+              { displayOrder: 'asc' },
+              { createdAt: 'asc' },
+            ],
+          },
+        },
+      });
     });
 
     // Invalidate property and dashboard caches for all affected users
