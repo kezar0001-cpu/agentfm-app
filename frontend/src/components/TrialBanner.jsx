@@ -41,13 +41,13 @@ const TrialBanner = () => {
       <Box
         sx={{
           background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-          borderBottom: '3px solid #7f1d1d',
-          py: 2,
-          px: 3,
+          borderBottom: '2px solid #7f1d1d',
+          py: 1,
+          px: 2,
           position: 'sticky',
           top: bannerOffset,
           zIndex: 1100,
-          boxShadow: '0 4px 12px rgba(185, 28, 28, 0.3)',
+          boxShadow: '0 2px 8px rgba(185, 28, 28, 0.25)',
         }}
       >
         <Box
@@ -58,18 +58,18 @@ const TrialBanner = () => {
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: 2,
+            gap: 1.5,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-            <WarningIcon sx={{ color: '#fff', fontSize: 32 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+            <WarningIcon sx={{ color: '#fff', fontSize: 24 }} />
             <Box>
               <Typography
-                variant="h6"
+                variant="subtitle1"
                 sx={{
                   color: '#fff',
                   fontWeight: 700,
-                  mb: 0.5,
+                  fontSize: '0.95rem',
                 }}
               >
                 Your Trial Has Ended
@@ -78,6 +78,8 @@ const TrialBanner = () => {
                 variant="body2"
                 sx={{
                   color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '0.85rem',
+                  mt: 0.25,
                 }}
               >
                 Subscribe now to restore full access to all features and continue managing your properties.
@@ -86,19 +88,20 @@ const TrialBanner = () => {
           </Box>
           <Button
             variant="contained"
-            size="large"
+            size="medium"
             onClick={() => navigate('/subscriptions')}
             sx={{
               bgcolor: '#fff',
               color: '#dc2626',
               fontWeight: 700,
-              px: 4,
-              py: 1.5,
+              px: 3,
+              py: 0.75,
+              fontSize: '0.875rem',
               '&:hover': {
                 bgcolor: '#fef2f2',
-                transform: 'scale(1.05)',
+                transform: 'scale(1.03)',
               },
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             }}
           >
             Subscribe Now
@@ -115,21 +118,21 @@ const TrialBanner = () => {
       ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'
       : isUrgent
       ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-      : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+      : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'; // Changed to orange theme
 
-    const bannerBorderColor = isCritical ? '#7f1d1d' : isUrgent ? '#92400e' : '#1e3a8a';
+    const bannerBorderColor = isCritical ? '#7f1d1d' : isUrgent ? '#92400e' : '#c2410c'; // Changed to orange
 
     return (
       <Box
         sx={{
           background: bannerBgColor,
-          borderBottom: `3px solid ${bannerBorderColor}`,
-          py: 2,
-          px: 3,
+          borderBottom: `2px solid ${bannerBorderColor}`,
+          py: 1,
+          px: 2,
           position: 'sticky',
           top: bannerOffset,
           zIndex: 1100,
-          boxShadow: isCritical || isUrgent ? '0 4px 12px rgba(185, 28, 28, 0.3)' : '0 4px 12px rgba(59, 130, 246, 0.3)',
+          boxShadow: isCritical || isUrgent ? '0 2px 8px rgba(185, 28, 28, 0.25)' : '0 2px 8px rgba(249, 115, 22, 0.25)',
         }}
       >
         <Box
@@ -144,23 +147,23 @@ const TrialBanner = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: 2,
-              mb: 1.5,
+              gap: 1.5,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
               {isCritical || isUrgent ? (
-                <BoltIcon sx={{ color: '#fff', fontSize: 32 }} />
+                <BoltIcon sx={{ color: '#fff', fontSize: 24 }} />
               ) : (
-                <AccessTimeIcon sx={{ color: '#fff', fontSize: 32 }} />
+                <AccessTimeIcon sx={{ color: '#fff', fontSize: 24 }} />
               )}
               <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Typography
-                    variant="h6"
+                    variant="subtitle1"
                     sx={{
                       color: '#fff',
                       fontWeight: 700,
+                      fontSize: '0.95rem',
                     }}
                   >
                     {isCritical
@@ -177,7 +180,8 @@ const TrialBanner = () => {
                         bgcolor: 'rgba(255, 255, 255, 0.2)',
                         color: '#fff',
                         fontWeight: 700,
-                        fontSize: '0.7rem',
+                        fontSize: '0.65rem',
+                        height: 20,
                       }}
                     />
                   )}
@@ -186,6 +190,8 @@ const TrialBanner = () => {
                   variant="body2"
                   sx={{
                     color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '0.85rem',
+                    mt: 0.25,
                   }}
                 >
                   {isCritical
@@ -196,56 +202,29 @@ const TrialBanner = () => {
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
               <Button
                 variant="contained"
-                size="large"
+                size="medium"
                 onClick={() => navigate('/subscriptions')}
                 startIcon={<TrendingUpIcon />}
                 sx={{
                   bgcolor: '#fff',
-                  color: isCritical || isUrgent ? '#dc2626' : '#1d4ed8',
+                  color: isCritical || isUrgent ? '#dc2626' : '#ea580c',
                   fontWeight: 700,
-                  px: 4,
-                  py: 1.5,
+                  px: 3,
+                  py: 0.75,
+                  fontSize: '0.875rem',
                   '&:hover': {
                     bgcolor: '#fef2f2',
-                    transform: 'scale(1.05)',
+                    transform: 'scale(1.03)',
                   },
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 }}
               >
                 {isCritical || isUrgent ? 'Subscribe Now' : 'View Plans'}
               </Button>
             </Box>
-          </Box>
-
-          {/* Progress bar */}
-          <Box sx={{ width: '100%' }}>
-            <LinearProgress
-              variant="determinate"
-              value={progressPercentage}
-              sx={{
-                height: 6,
-                borderRadius: 3,
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                '& .MuiLinearProgress-bar': {
-                  bgcolor: '#fff',
-                  borderRadius: 3,
-                },
-              }}
-            />
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                mt: 0.5,
-                display: 'block',
-                textAlign: 'right',
-              }}
-            >
-              {Math.round(progressPercentage)}% of trial used
-            </Typography>
           </Box>
         </Box>
       </Box>

@@ -12,8 +12,8 @@ function Layout({ children }) {
         flexDirection: 'column',
       }}
     >
-      <NavBar />
       <TrialBanner />
+      <NavBar />
       <Box
         component="main"
         sx={{
