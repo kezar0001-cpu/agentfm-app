@@ -92,7 +92,7 @@ export default function AdminSetupPage() {
         navigate('/admin/blog');
       }
     } catch (err) {
-      const message = err.response?.data?.error || 'Setup failed. Please try again.';
+      const message = err.response?.data?.message || 'Setup failed. Please try again.';
       setError(message);
       console.error('Setup error:', err);
     } finally {
