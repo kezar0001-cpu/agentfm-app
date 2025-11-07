@@ -1,0 +1,24 @@
+<svg width="420" height="320" viewBox="0 0 420 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="420" height="320" rx="32" fill="#0F172A"/>
+  <rect x="28" y="32" width="364" height="256" rx="24" fill="#0B1220"/>
+  <!-- User avatars in a collaborative arrangement -->
+  <circle cx="160" cy="120" r="40" fill="#3B82F6"/>
+  <circle cx="170" cy="110" r="12" fill="#0B1220"/>
+  <path d="M140 145C140 135 148 127 160 127C172 127 180 135 180 145" fill="#0B1220"/>
+
+  <circle cx="260" cy="120" r="40" fill="#34D399"/>
+  <circle cx="270" cy="110" r="12" fill="#0B1220"/>
+  <path d="M240 145C240 135 248 127 260 127C272 127 280 135 280 145" fill="#0B1220"/>
+
+  <circle cx="210" cy="200" r="40" fill="#F59E0B"/>
+  <circle cx="220" cy="190" r="12" fill="#0B1220"/>
+  <path d="M190 225C190 215 198 207 210 207C222 207 230 215 230 225" fill="#0B1220"/>
+
+  <!-- Connection lines -->
+  <line x1="190" y1="140" x2="220" y2="180" stroke="#475569" stroke-width="4" stroke-dasharray="8 8"/>
+  <line x1="230" y1="140" x2="205" y2="180" stroke="#475569" stroke-width="4" stroke-dasharray="8 8"/>
+
+  <!-- Notification badge -->
+  <circle cx="290" cy="95" r="20" fill="#EF4444"/>
+  <text x="290" y="102" text-anchor="middle" fill="white" font-size="20" font-weight="bold">3</text>
+</svg>
