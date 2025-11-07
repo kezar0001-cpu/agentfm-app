@@ -32,6 +32,7 @@ import { apiClient } from '../api/client';
 import DataState from '../components/DataState';
 import GradientButton from '../components/GradientButton';
 import AnalyticsCharts from '../components/AnalyticsCharts';
+import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useCurrentUser } from '../context/UserContext.jsx'; // Hook to reactively read user data
 import { calculateDaysRemaining, formatDateTime } from '../utils/date.js';
 import { redirectToBillingPortal } from '../utils/billing.js';
@@ -41,6 +42,7 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { user: currentUser } = useCurrentUser();
 
   useEffect(() => {
@@ -88,13 +90,40 @@ const DashboardPage = () => {
   const subscriptionStatus = currentUser?.subscriptionStatus;
   const trialEndDate = currentUser?.trialEndDate;
   const trialDaysRemaining = calculateDaysRemaining(trialEndDate);
-  
+
   const isTrialActive = subscriptionStatus === 'TRIAL' && trialDaysRemaining > 0;
   const isSubscribed = subscriptionStatus === 'ACTIVE';
-  
+
   // We want to show an alert if the user is NOT actively subscribed.
   // This covers cases where the trial has expired, or the status is null/cancelled/suspended.
   const showSubscriptionAlert = !isSubscribed;
+
+  // Show upgrade prompt at strategic moments for trial users
+  useEffect(() => {
+    // Only show for trial users who haven't seen the modal in this session
+    const hasSeenModal = sessionStorage.getItem('hasSeenUpgradeModal');
+
+    if (!isSubscribed && !hasSeenModal && summary) {
+      // Show modal after user has made some progress
+      const hasProgress =
+        (summary.properties?.total || 0) >= 2 || // Created 2+ properties
+        (summary.inspections?.total || 0) >= 1 || // Created an inspection
+        (summary.jobs?.total || 0) >= 2; // Created 2+ jobs
+
+      // Or show if trial is ending soon (3 days or less)
+      const isTrialEndingSoon = isTrialActive && trialDaysRemaining <= 3;
+
+      if (hasProgress || isTrialEndingSoon) {
+        // Delay showing modal slightly so it doesn't feel intrusive
+        const timer = setTimeout(() => {
+          setShowUpgradeModal(true);
+          sessionStorage.setItem('hasSeenUpgradeModal', 'true');
+        }, 3000); // Show after 3 seconds
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [summary, isSubscribed, isTrialActive, trialDaysRemaining]);
 
   const renderSubscriptionAlert = () => {
     if (isTrialActive) {
@@ -483,6 +512,13 @@ const DashboardPage = () => {
           )}
         </Grid>
       </Grid>
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePromptModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        trigger={trialDaysRemaining <= 3 ? 'milestone' : 'milestone'}
+      />
     </Container>
   );
 };
