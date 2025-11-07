@@ -96,6 +96,7 @@ export default function NotificationBell() {
   const [anchorEl, setAnchorEl] = useState(null);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [forcePollingTransport, setForcePollingTransport] = useState(false);
+  const [disableSocketClient, setDisableSocketClient] = useState(false);
   const { wsUrl, socketPaths } = useMemo(() => resolveSocketConfiguration(), []);
   const [socketPathIndex, setSocketPathIndex] = useState(0);
   const activeSocketPath = socketPaths[socketPathIndex] || '/socket.io';
@@ -121,6 +122,12 @@ export default function NotificationBell() {
   useEffect(() => {
     if (SOCKET_DISABLED) {
       console.info('[NotificationBell] WebSocket connection disabled via configuration');
+      setIsWebSocketConnected(false);
+      return undefined;
+    }
+
+    if (disableSocketClient) {
+      console.info('[NotificationBell] WebSocket client disabled after repeated connection failures');
       setIsWebSocketConnected(false);
       return undefined;
     }
@@ -175,7 +182,7 @@ export default function NotificationBell() {
     socket.on('connect_error', (error) => {
       console.error(
         `[NotificationBell] WebSocket connection error on path ${activeSocketPath}:`,
-        error.message
+        error?.message || error
       );
       setIsWebSocketConnected(false);
 
@@ -190,8 +197,24 @@ export default function NotificationBell() {
         if (error?.message === 'websocket error' || error?.message === 'xhr poll error') {
           console.warn('[NotificationBell] Falling back to HTTP polling transport for notifications');
           setForcePollingTransport(true);
+          return;
         }
       }
+
+      const statusCode =
+        error?.description?.status ||
+        error?.context?.status ||
+        error?.context?.response?.status ||
+        error?.status;
+
+      console.warn(
+        `[NotificationBell] Disabling WebSocket after repeated connection failures${
+          statusCode ? ` (status ${statusCode})` : ''
+        }; relying on HTTP polling.`
+      );
+      setDisableSocketClient(true);
+      setForcePollingTransport(false);
+      setSocketPathIndex(0);
     });
 
     // Listen for new notifications
@@ -224,6 +247,7 @@ export default function NotificationBell() {
     };
   }, [
     activeSocketPath,
+    disableSocketClient,
     forcePollingTransport,
     queryClient,
     socketPathIndex,
