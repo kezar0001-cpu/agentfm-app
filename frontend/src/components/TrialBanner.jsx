@@ -70,9 +70,10 @@ const TrialBanner = () => {
           px: 2,
           position: 'sticky',
           top: 0,
-          zIndex: 1200,
+          zIndex: 1300,
           boxShadow: '0 2px 6px rgba(185, 28, 28, 0.2)',
-          transition: 'all 0.3s ease-in-out',
+          transition: 'padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+          willChange: 'padding',
         }}
       >
         <Box
@@ -86,26 +87,32 @@ const TrialBanner = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
-            <WarningIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
-            <Box>
+            <WarningIcon sx={{
+              color: '#fff',
+              fontSize: isExpanded ? 20 : 18,
+              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }} />
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
               <Typography
                 variant="subtitle1"
                 sx={{
                   color: '#fff',
                   fontWeight: 700,
                   fontSize: isExpanded ? '0.875rem' : '0.8rem',
-                  transition: 'font-size 0.3s',
+                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  lineHeight: 1.3,
                 }}
               >
                 Your Trial Has Ended
               </Typography>
-              <Collapse in={isExpanded} timeout={300}>
+              <Collapse in={isExpanded} timeout={300} sx={{ overflow: 'hidden' }}>
                 <Typography
                   variant="body2"
                   sx={{
                     color: 'rgba(255, 255, 255, 0.9)',
                     fontSize: '0.8rem',
                     mt: 0.2,
+                    lineHeight: 1.3,
                   }}
                 >
                   Subscribe now to restore full access to all features.
@@ -115,7 +122,7 @@ const TrialBanner = () => {
           </Box>
           <Button
             variant="contained"
-            size={isExpanded ? 'small' : 'small'}
+            size="small"
             onClick={() => navigate('/subscriptions')}
             sx={{
               bgcolor: '#fff',
@@ -124,7 +131,8 @@ const TrialBanner = () => {
               px: isExpanded ? 2.5 : 2,
               py: isExpanded ? 0.625 : 0.5,
               fontSize: isExpanded ? '0.8125rem' : '0.7rem',
-              transition: 'all 0.3s',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              whiteSpace: 'nowrap',
               '&:hover': {
                 bgcolor: '#fef2f2',
                 transform: 'scale(1.03)',
@@ -159,9 +167,10 @@ const TrialBanner = () => {
           px: 2,
           position: 'sticky',
           top: 0,
-          zIndex: 1200,
+          zIndex: 1300,
           boxShadow: isCritical || isUrgent ? '0 2px 6px rgba(185, 28, 28, 0.2)' : '0 2px 6px rgba(249, 115, 22, 0.2)',
-          transition: 'all 0.3s ease-in-out',
+          transition: 'padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+          willChange: 'padding',
         }}
       >
         <Box
@@ -182,9 +191,17 @@ const TrialBanner = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
               {isCritical || isUrgent ? (
-                <BoltIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
+                <BoltIcon sx={{
+                  color: '#fff',
+                  fontSize: isExpanded ? 20 : 18,
+                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }} />
               ) : (
-                <AccessTimeIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
+                <AccessTimeIcon sx={{
+                  color: '#fff',
+                  fontSize: isExpanded ? 20 : 18,
+                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }} />
               )}
               <Typography
                 variant="subtitle1"
@@ -192,7 +209,8 @@ const TrialBanner = () => {
                   color: '#fff',
                   fontWeight: 700,
                   fontSize: isExpanded ? '0.875rem' : '0.8rem',
-                  transition: 'font-size 0.3s',
+                  transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  lineHeight: 1.3,
                 }}
               >
                 {isCritical
@@ -211,13 +229,14 @@ const TrialBanner = () => {
                     fontWeight: 700,
                     fontSize: '0.6rem',
                     height: 18,
+                    transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 />
               )}
             </Box>
             <Button
               variant="contained"
-              size={isExpanded ? 'small' : 'small'}
+              size="small"
               onClick={() => navigate('/subscriptions')}
               startIcon={isExpanded ? <TrendingUpIcon /> : null}
               sx={{
@@ -227,7 +246,8 @@ const TrialBanner = () => {
                 px: isExpanded ? 2.5 : 2,
                 py: isExpanded ? 0.625 : 0.5,
                 fontSize: isExpanded ? '0.8125rem' : '0.7rem',
-                transition: 'all 0.3s',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                whiteSpace: 'nowrap',
                 '&:hover': {
                   bgcolor: '#fef2f2',
                   transform: 'scale(1.03)',
@@ -240,14 +260,15 @@ const TrialBanner = () => {
           </Box>
 
           {/* Collapsible detailed content */}
-          <Collapse in={isExpanded} timeout={300}>
-            <Box sx={{ mt: 0.4 }}>
+          <Collapse in={isExpanded} timeout={300} sx={{ overflow: 'hidden' }}>
+            <Box sx={{ mt: 0.4, overflow: 'hidden' }}>
               <Typography
                 variant="body2"
                 sx={{
                   color: 'rgba(255, 255, 255, 0.9)',
                   fontSize: '0.8rem',
                   mb: 0.75,
+                  lineHeight: 1.3,
                 }}
               >
                 {isCritical
@@ -269,6 +290,7 @@ const TrialBanner = () => {
                     '& .MuiLinearProgress-bar': {
                       bgcolor: '#fff',
                       borderRadius: 1.5,
+                      transition: 'transform 0.3s ease',
                     },
                   }}
                 />
@@ -280,6 +302,7 @@ const TrialBanner = () => {
                     display: 'block',
                     textAlign: 'right',
                     fontSize: '0.65rem',
+                    lineHeight: 1.2,
                   }}
                 >
                   {Math.round(progressPercentage)}% of trial used
