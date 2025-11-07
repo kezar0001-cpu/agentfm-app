@@ -117,7 +117,6 @@ const PropertyImageCarousel = ({
 
   const handleCloseFullscreen = () => {
     setFullscreenOpen(false);
-    setAutoplayEnabled(true);
   };
 
   const currentItem = items[currentIndex] || { imageUrl: null, caption: null };
@@ -167,12 +166,9 @@ const PropertyImageCarousel = ({
 
         {/* Fullscreen Button */}
         {showFullscreenButton && items.length > 0 && (
-            <IconButton
-              size="small"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleOpenFullscreen();
-              }}
+          <IconButton
+            size="small"
+            onClick={handleOpenFullscreen}
             sx={{
               position: 'absolute',
               top: 8,
@@ -288,10 +284,7 @@ const PropertyImageCarousel = ({
                 component="img"
                 src={resolvePropertyImageUrl(item.imageUrl, fallbackText, '100x100')}
                 alt={item.caption || `Thumbnail ${index + 1}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleThumbnailClick(index);
-                }}
+                onClick={() => handleThumbnailClick(index)}
                 sx={{
                   width: 60,
                   height: 60,

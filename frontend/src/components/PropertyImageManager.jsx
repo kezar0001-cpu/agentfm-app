@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -11,7 +11,6 @@ import {
   DialogTitle,
   Grid,
   IconButton,
-  Stack,
   TextField,
   Typography,
   CircularProgress,
@@ -36,7 +35,6 @@ import {
 } from '../hooks/usePropertyImages.js';
 import { useNotification } from '../hooks/useNotification.js';
 import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
-import { useFileUpload } from '../hooks/useFileUpload.js';
 
 const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   const { showSuccess, showError } = useNotification();
@@ -67,50 +65,20 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   const [uploadError, setUploadError] = useState('');
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  const { uploadFiles, isUploading: isFileUploading } = useFileUpload();
-
-  useEffect(() => {
-    if (!uploadDialogOpen) {
-      setImageUrl('');
-      setCaption('');
-      setSelectedFile(null);
-      setUploadError('');
-    }
-  }, [uploadDialogOpen]);
 
   const images = imagesData?.images || [];
 
-  const selectedFileLabel = useMemo(() => {
-    if (!selectedFile) return '';
-    const sizeInMb = selectedFile.size / (1024 * 1024);
-    const formattedSize = sizeInMb >= 0.1 ? `${sizeInMb.toFixed(1)} MB` : `${Math.max(1, Math.round(selectedFile.size / 1024))} KB`;
-    return `${selectedFile.name} • ${formattedSize}`;
-  }, [selectedFile]);
-
   const handleAddImage = async () => {
-    if (!selectedFile && !imageUrl.trim()) {
-      setUploadError('Select an image file or provide an image URL');
+    if (!imageUrl.trim()) {
+      setUploadError('Image URL is required');
       return;
     }
 
     try {
       setUploadError('');
-      let finalImageUrl = imageUrl.trim();
-
-      if (selectedFile) {
-        const [uploadedUrl] = await uploadFiles([selectedFile]);
-        finalImageUrl = uploadedUrl;
-      }
-
-      if (!finalImageUrl) {
-        throw new Error('Upload did not return a valid image URL');
-      }
-
       await addImageMutation.mutateAsync({
         data: {
-          imageUrl: finalImageUrl,
+          imageUrl: imageUrl.trim(),
           caption: caption.trim() || null,
           isPrimary: images.length === 0, // First image is primary by default
         },
@@ -118,21 +86,9 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
       setUploadDialogOpen(false);
       setImageUrl('');
       setCaption('');
-      setSelectedFile(null);
     } catch (error) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to add image';
-      setUploadError(message);
+      setUploadError(error.response?.data?.message || 'Failed to add image');
     }
-  };
-
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0] ?? null;
-    if (file) {
-      setSelectedFile(file);
-      setImageUrl('');
-      setUploadError('');
-    }
-    event.target.value = '';
   };
 
   const handleUpdateCaption = async () => {
@@ -388,76 +344,42 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Stack spacing={2}>
-            {uploadError && <Alert severity="error">{uploadError}</Alert>}
-
-            <Stack spacing={1}>
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<CloudUploadIcon />}
-                disabled={isFileUploading || addImageMutation.isPending}
-              >
-                Select image file
-                <input type="file" hidden accept="image/*" onChange={handleFileChange} />
-              </Button>
-              {selectedFile && (
-                <Chip
-                  label={selectedFileLabel}
-                  onDelete={() => setSelectedFile(null)}
-                  variant="outlined"
-                />
-              )}
-              {isFileUploading && (
-                <Box display="flex" alignItems="center" gap={1}>
-                  <CircularProgress size={20} />
-                  <Typography variant="body2" color="text.secondary">
-                    Uploading image…
-                  </Typography>
-                </Box>
-              )}
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" textAlign="center">
-              or paste an existing image URL
-            </Typography>
-
-            <TextField
-              label="Image URL"
-              type="url"
-              fullWidth
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/property-image.jpg"
-              disabled={isFileUploading}
-            />
-
-            <TextField
-              label="Caption (optional)"
-              type="text"
-              fullWidth
-              multiline
-              rows={2}
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              disabled={isFileUploading}
-            />
-          </Stack>
+          {uploadError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {uploadError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Image URL"
+            type="url"
+            fullWidth
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            helperText="Enter the URL of the image (upload images via the Uploads page first)"
+            required
+          />
+          <TextField
+            margin="dense"
+            label="Caption (Optional)"
+            type="text"
+            fullWidth
+            multiline
+            rows={2}
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            helperText="Add a description for this image"
+          />
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setUploadDialogOpen(false)}
-            disabled={addImageMutation.isPending || isFileUploading}
-          >
-            Cancel
-          </Button>
+          <Button onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
           <Button
             onClick={handleAddImage}
             variant="contained"
-            disabled={addImageMutation.isPending || isFileUploading}
-            startIcon={addImageMutation.isPending ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+            disabled={addImageMutation.isPending}
           >
-            {addImageMutation.isPending ? 'Saving…' : 'Add image'}
+            {addImageMutation.isPending ? 'Adding...' : 'Add Image'}
           </Button>
         </DialogActions>
       </Dialog>
