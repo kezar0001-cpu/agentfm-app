@@ -93,12 +93,12 @@ const BlogPostPage = () => {
             sx={{
               width: '100%',
               height: { xs: 300, sm: 350, md: 400 },
-              backgroundImage: `linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(30, 64, 175, 0.08)), url(${post.coverImage})`,
+              backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.08)), url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundBlendMode: 'overlay',
               position: 'relative',
-              bgcolor: '#f5f5f7',
+              bgcolor: '#0f172a',
               borderRadius: '0 0 24px 24px'
             }}
           />

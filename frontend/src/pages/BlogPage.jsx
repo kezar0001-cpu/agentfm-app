@@ -152,10 +152,11 @@ const BlogPage = () => {
 
       <BlogPublicNav />
 
-      {/* Hero Section with Gradient Background */}
+      {/* Hero Section */}
       <Box
         sx={{
-          background: 'radial-gradient(circle at top left, rgba(249, 115, 22, 0.15), transparent 55%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 50%), #ffffff',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%)',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
           pt: { xs: 10, md: 12 },
           pb: 6
         }}
@@ -175,7 +176,7 @@ const BlogPage = () => {
                 letterSpacing: '0.2em',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#b91c1c',
+                color: '#0f172a',
                 mb: 2
               }}
             >
@@ -232,7 +233,7 @@ const BlogPage = () => {
           }}>
             <form onSubmit={handleSearch}>
               <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={5}>
+                <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
                     placeholder="Search articles..."
@@ -288,6 +289,37 @@ const BlogPage = () => {
                       {categories.map((cat) => (
                         <MenuItem key={cat.id} value={cat.slug}>
                           {cat.name} ({cat._count?.posts || 0})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel>Tag</InputLabel>
+                    <Select
+                      value={tagFilter}
+                      label="Tag"
+                      onChange={(e) => handleTagChange(e.target.value)}
+                      sx={{
+                        borderRadius: 1.5,
+                        '& fieldset': {
+                          borderColor: '#d2d2d7'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#b91c1c'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#b91c1c',
+                          borderWidth: 2
+                        }
+                      }}
+                    >
+                      <MenuItem value="">All Tags</MenuItem>
+                      {tags.map((tag) => (
+                        <MenuItem key={tag.id} value={tag.slug}>
+                          {tag.name} ({tag._count?.posts || 0})
                         </MenuItem>
                       ))}
                     </Select>
