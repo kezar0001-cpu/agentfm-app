@@ -157,13 +157,13 @@ export default function SignUp() {
           <Box sx={{ width: '100%', mb: 2, display: 'flex', justifyContent: 'flex-start' }}>
             <Button
               component={Link}
-              to="/"
+              to="/signin"
               startIcon={<ArrowBack />}
               variant="text"
               size="small"
               sx={{ textTransform: 'none', fontWeight: 600, color: '#b91c1c' }}
             >
-              Back to Buildstate FM
+              Back to Sign In
             </Button>
           </Box>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
