@@ -1,6 +1,9 @@
 // backend/src/routes/properties.js
 import { Router } from 'express';
 import { z } from 'zod';
+import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import prisma from '../config/prismaClient.js';
 import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
@@ -9,6 +12,39 @@ import { cacheMiddleware, invalidate, invalidatePattern } from '../utils/cache.j
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
 const router = Router();
+
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+const imageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '');
+    const base =
+      path
+        .basename(file.originalname || 'image', ext)
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, '-')
+        .slice(0, 40) || 'image';
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${base}-${unique}${ext}`);
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'image'));
+    }
+    cb(null, true);
+  },
+});
 
 const propertyListSelect = {
   id: true,
@@ -28,6 +64,24 @@ const propertyListSelect = {
   managerId: true,
   createdAt: true,
   updatedAt: true,
+  propertyImages: {
+    select: {
+      id: true,
+      propertyId: true,
+      imageUrl: true,
+      caption: true,
+      isPrimary: true,
+      displayOrder: true,
+      uploadedById: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [
+      { displayOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
+    take: 10,
+  },
   _count: {
     select: {
       units: true,
@@ -63,11 +117,52 @@ const requiredString = (message) =>
 const optionalString = () =>
   z.preprocess((value) => trimToNull(value), z.string().min(1).nullable().optional());
 
-const optionalUrl = () =>
+const preprocessImageValue = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+  if (value === undefined || value === null) {
+    return null;
+  }
+  return value;
+};
+
+const isValidImageLocation = (value) => {
+  if (typeof value !== 'string') return false;
+  if (!value.trim()) return false;
+  if (/^https?:\/\//i.test(value)) return true;
+  if (value.startsWith('data:')) return true;
+  if (value.startsWith('/uploads/')) return true;
+  return false;
+};
+
+const requiredImageLocation = () =>
   z
-    .preprocess((value) => trimToNull(value), z.string().url({ message: 'Must be a valid URL' }))
-    .nullable()
+    .preprocess(preprocessImageValue, z.union([z.string(), z.null()]))
+    .refine((value) => typeof value === 'string' && isValidImageLocation(value), {
+      message: 'Image URL is required',
+    })
+    .transform((value) => value);
+
+const optionalImageLocation = () =>
+  z
+    .preprocess(preprocessImageValue, z.union([z.string(), z.null()]))
+    .refine((value) => value === null || isValidImageLocation(value), {
+      message: 'Must be a valid URL or upload path',
+    })
+    .transform((value) => (value === null ? null : value))
     .optional();
+
+const booleanLike = () =>
+  z.preprocess((value) => {
+    if (typeof value === 'string') {
+      const normalised = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'on'].includes(normalised)) return true;
+      if (['false', '0', 'no', 'off'].includes(normalised)) return false;
+    }
+    return value;
+  }, z.boolean({ invalid_type_error: 'Must be true or false' }));
 
 const requiredUrl = (message) =>
   z.preprocess(
@@ -125,7 +220,7 @@ const basePropertySchema = z.object({
     totalUnits: optionalInt({ min: 0, minMessage: 'Total units cannot be negative' }).default(0),
     totalArea: optionalFloat(),
     description: optionalString(),
-    imageUrl: optionalUrl(),
+    imageUrl: optionalImageLocation(),
     managerId: optionalString(),
 
     // Legacy aliases – accepted but converted internally
@@ -155,15 +250,15 @@ const unitSchema = z.object({
 });
 
 const propertyImageCreateSchema = z.object({
-  imageUrl: requiredUrl('Image URL is required'),
+  imageUrl: requiredImageLocation(),
   caption: optionalString(),
-  isPrimary: z.boolean().optional(),
+  isPrimary: booleanLike().optional(),
 });
 
 const propertyImageUpdateSchema = z
   .object({
     caption: optionalString(),
-    isPrimary: z.boolean().optional(),
+    isPrimary: booleanLike().optional(),
   })
   .refine((data) => data.caption !== undefined || data.isPrimary !== undefined, {
     message: 'No updates provided',
@@ -415,10 +510,18 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+    const { managerId: managerIdInput, postcode, type, coverImage, images: rawImages, ...data } = parsed;
 
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
+
+    const initialImages = Array.isArray(rawImages)
+      ? rawImages
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => isValidImageLocation(value))
+      : [];
+
+    const coverImageUrl = data.imageUrl ?? initialImages[0] ?? null;
 
     // Ensure converted fields are included in the data
     const propertyData = {
@@ -427,18 +530,49 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       // Include converted fields if they exist
       ...(parsed.zipCode && { zipCode: parsed.zipCode }),
       ...(parsed.propertyType && { propertyType: parsed.propertyType }),
-      ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
+      ...(coverImageUrl ? { imageUrl: coverImageUrl } : {}),
     };
 
-    const property = await prisma.property.create({
-      data: propertyData,
+    const property = await prisma.$transaction(async (tx) => {
+      const createdProperty = await tx.property.create({
+        data: propertyData,
+      });
+
+      if (initialImages.length) {
+        const records = initialImages.map((imageUrl, index) => ({
+          propertyId: createdProperty.id,
+          imageUrl,
+          caption: null,
+          isPrimary: index === 0,
+          displayOrder: index,
+          uploadedById: req.user.id,
+        }));
+
+        await tx.propertyImage.createMany({ data: records });
+      }
+
+      return createdProperty;
+    });
+
+    const propertyWithImages = await prisma.property.findUnique({
+      where: { id: property.id },
+      include: {
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        },
+      },
     });
 
     // Invalidate property and dashboard caches for all affected users
-    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    const cacheUserIds = collectPropertyCacheUserIds(propertyWithImages ?? property, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
 
-    res.status(201).json({ success: true, property: toPublicProperty(property) });
+    const responsePayload = propertyWithImages ? toPublicProperty(propertyWithImages) : toPublicProperty(property);
+
+    res.status(201).json({ success: true, property: responsePayload });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
@@ -637,8 +771,18 @@ propertyImagesRouter.get('/', async (req, res) => {
   }
 });
 
-propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), imageUpload.single('image'), async (req, res) => {
   const propertyId = req.params.id;
+
+  const cleanupUploadedFile = () => {
+    if (req.file?.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Failed to remove uploaded file after error:', cleanupError);
+      }
+    }
+  };
 
   try {
     const property = await prisma.property.findUnique({
@@ -654,7 +798,12 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), async (req, res)
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    const parsed = propertyImageCreateSchema.parse(req.body ?? {});
+    const body = { ...(req.body ?? {}) };
+    if (req.file?.filename) {
+      body.imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const parsed = propertyImageCreateSchema.parse(body);
 
     const existingImages = await prisma.propertyImage.findMany({
       where: { propertyId },
@@ -695,6 +844,8 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), async (req, res)
 
     res.status(201).json({ success: true, image: normalizePropertyImages({ ...property, propertyImages: [createdImage] })[0] });
   } catch (error) {
+    cleanupUploadedFile();
+
     if (error instanceof z.ZodError) {
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
