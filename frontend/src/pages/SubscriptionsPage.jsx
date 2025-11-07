@@ -591,10 +591,41 @@ export default function SubscriptionsPage() {
               <Card
                 sx={{
                   maxWidth: 500, width: '100%', border: '2px solid',
-                  borderColor: 'primary.main', boxShadow: 3, borderRadius: 3
+                  borderColor: 'primary.main', boxShadow: 3, borderRadius: 3,
+                  position: 'relative',
+                  overflow: 'visible',
                 }}
               >
-                <CardContent sx={{ p: 4 }}>
+                {/* Limited Time Discount Banner - Show when trial is ending soon or expired */}
+                {(trialDaysRemaining <= 3 || !isTrialActive) && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: -12,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      zIndex: 1,
+                    }}
+                  >
+                    <Chip
+                      label="🔥 LIMITED TIME: 20% OFF FIRST MONTH"
+                      sx={{
+                        bgcolor: '#dc2626',
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        px: 2,
+                        py: 0.5,
+                        height: 'auto',
+                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.4)',
+                        '& .MuiChip-label': {
+                          px: 1,
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+                <CardContent sx={{ p: 4, pt: trialDaysRemaining <= 3 || !isTrialActive ? 5 : 4 }}>
                   <Stack spacing={3}>
                     {/* Plan Header */}
                     <Box sx={{ textAlign: 'center' }}>
@@ -606,11 +637,43 @@ export default function SubscriptionsPage() {
                         {planNameDisplay}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 1 }}>
-                        <Typography variant="h2" sx={{ fontWeight: 700 }}>
-                          {planPriceValue || '$29'}
-                        </Typography>
+                        {(trialDaysRemaining <= 3 || !isTrialActive) && (
+                          <>
+                            <Typography
+                              variant="h4"
+                              sx={{
+                                fontWeight: 700,
+                                color: 'text.disabled',
+                                textDecoration: 'line-through',
+                              }}
+                            >
+                              {planPriceValue || '$29'}
+                            </Typography>
+                            <Typography variant="h2" sx={{ fontWeight: 700, color: '#dc2626' }}>
+                              {formatCurrency(Math.round((planDetails?.price || 29) * 0.8))}
+                            </Typography>
+                          </>
+                        )}
+                        {!(trialDaysRemaining <= 3 || !isTrialActive) && (
+                          <Typography variant="h2" sx={{ fontWeight: 700 }}>
+                            {planPriceValue || '$29'}
+                          </Typography>
+                        )}
                         <Typography variant="h6" color="text.secondary">/{planPriceInterval}</Typography>
                       </Box>
+                      {(trialDaysRemaining <= 3 || !isTrialActive) && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: '#dc2626',
+                            fontWeight: 600,
+                            display: 'block',
+                            mt: 1,
+                          }}
+                        >
+                          First month only • Regular price applies after
+                        </Typography>
+                      )}
                     </Box>
                     <Divider />
                     {/* Features List */}

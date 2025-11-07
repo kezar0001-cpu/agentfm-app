@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
 import NavBar from './NavBar';
+import TrialBanner from './TrialBanner';
 
 function Layout({ children }) {
   return (
@@ -12,6 +13,7 @@ function Layout({ children }) {
       }}
     >
       <NavBar />
+      <TrialBanner />
       <Box
         component="main"
         sx={{
