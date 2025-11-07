@@ -24,16 +24,21 @@ import {
   Chip,
   Switch,
   FormControlLabel,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
   DeleteOutline as DeleteOutlineIcon,
   CheckCircle as CheckCircleIcon,
+  CloudUpload as CloudUploadIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useQueryClient } from '@tanstack/react-query';
 import useApiMutation from '../hooks/useApiMutation.js';
 import { COUNTRIES } from '../lib/countries.js';
 import { queryKeys } from '../utils/queryKeys.js';
+import { useFileUpload } from '../hooks/useFileUpload.js';
+import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
 
 const PROPERTY_TYPES = [
   'Residential',
@@ -67,6 +72,7 @@ const initialState = {
     status: 'ACTIVE',
     description: '',
     imageUrl: '',
+    images: [],
   },
   units: [
     {
@@ -116,6 +122,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   const [completed, setCompleted] = useState({});
   const [basicInfoErrors, setBasicInfoErrors] = useState({});
   const [createdProperty, setCreatedProperty] = useState(null);
+  const [imageUploadError, setImageUploadError] = useState('');
+
+  const { uploadFiles, isUploading: isUploadingImages } = useFileUpload();
 
   const createPropertyMutation = useApiMutation({
     url: '/properties',
@@ -129,6 +138,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setCompleted({});
       setBasicInfoErrors({});
       setCreatedProperty(null);
+      setImageUploadError('');
     }
   }, [open]);
 
@@ -147,6 +157,54 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       ...prev,
       [field]: undefined,
     }));
+  };
+
+  const updateBasicInfoImages = (updater) => {
+    setFormState((prev) => {
+      const currentImages = Array.isArray(prev.basicInfo.images) ? prev.basicInfo.images : [];
+      const nextImagesRaw = updater(currentImages);
+      const sanitized = Array.from(
+        new Set(
+          (Array.isArray(nextImagesRaw) ? nextImagesRaw : [])
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter((value) => value.length > 0)
+        )
+      );
+
+      return {
+        ...prev,
+        basicInfo: {
+          ...prev.basicInfo,
+          images: sanitized,
+          imageUrl: sanitized[0] || '',
+        },
+      };
+    });
+  };
+
+  const handleBasicInfoImageUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    event.target.value = '';
+
+    try {
+      setImageUploadError('');
+      const uploadedUrls = await uploadFiles(files);
+      if (!uploadedUrls?.length) return;
+      updateBasicInfoImages((current) => [...current, ...uploadedUrls]);
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to upload images';
+      setImageUploadError(message);
+    }
+  };
+
+  const handleRemoveUploadedImage = (targetUrl) => () => {
+    updateBasicInfoImages((current) => current.filter((url) => url !== targetUrl));
+  };
+
+  const handleClearImages = () => {
+    updateBasicInfoImages(() => []);
   };
 
   const handleUnitChange = (index, field) => (event) => {
@@ -322,8 +380,22 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         imageUrl: basicInfo.imageUrl.trim() || null,
       };
 
+      const imageUrls = Array.isArray(basicInfo.images)
+        ? basicInfo.images
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter((value) => value.length > 0)
+        : [];
+
+      if (!payload.imageUrl && imageUrls.length > 0) {
+        payload.imageUrl = imageUrls[0];
+      }
+
+      if (imageUrls.length > 0) {
+        payload.images = imageUrls;
+      }
+
       const response = await createPropertyMutation.mutateAsync({ data: payload });
-      const savedProperty = response?.data;
+      const savedProperty = response?.data?.property || null;
 
       setCompleted((prev) => ({
         ...prev,
@@ -489,13 +561,107 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         onChange={handleBasicInfoChange('description')}
       />
 
-      <TextField
-        fullWidth
-        id="onboarding-property-image-url"
-        label="Image URL (optional)"
-        value={basicInfo.imageUrl}
-        onChange={handleBasicInfoChange('imageUrl')}
-      />
+      <Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Property photos
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Upload photos to showcase this property. The first image becomes the cover photo on property cards.
+        </Typography>
+
+        <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mt: 2 }}>
+          {(basicInfo.images || []).map((url, index) => {
+            const resolvedUrl = resolvePropertyImageUrl(url, basicInfo.name, '200x200');
+            return (
+              <Box
+                key={`${url}-${index}`}
+                sx={{
+                  position: 'relative',
+                  width: 96,
+                  height: 96,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  border: '2px solid',
+                  borderColor: index === 0 ? 'primary.main' : 'divider',
+                }}
+              >
+                <Box
+                  component="img"
+                  src={resolvedUrl}
+                  alt={`Property upload ${index + 1}`}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={handleRemoveUploadedImage(url)}
+                  sx={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    bgcolor: 'rgba(0,0,0,0.6)',
+                    color: 'common.white',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+                {index === 0 && (
+                  <Chip
+                    size="small"
+                    color="primary"
+                    label="Cover"
+                    sx={{ position: 'absolute', bottom: 4, left: 4, fontSize: '0.625rem' }}
+                  />
+                )}
+              </Box>
+            );
+          })}
+
+          {isUploadingImages && (
+            <Box
+              sx={{
+                width: 96,
+                height: 96,
+                borderRadius: 2,
+                border: '1px dashed',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CircularProgress size={28} />
+            </Box>
+          )}
+        </Stack>
+
+        <Stack direction="row" spacing={2} sx={{ mt: 2 }} alignItems="center" flexWrap="wrap">
+          <Button
+            variant="outlined"
+            component="label"
+            startIcon={<CloudUploadIcon />}
+            disabled={isUploadingImages}
+          >
+            Upload photos
+            <input type="file" hidden accept="image/*" multiple onChange={handleBasicInfoImageUpload} />
+          </Button>
+          {basicInfo.images?.length > 0 && (
+            <Button color="error" variant="text" onClick={handleClearImages} disabled={isUploadingImages}>
+              Remove all
+            </Button>
+          )}
+        </Stack>
+
+        {imageUploadError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {imageUploadError}
+          </Alert>
+        )}
+
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          Supported formats: JPG, PNG, GIF. You can upload multiple images at once.
+        </Typography>
+      </Box>
     </Stack>
   );
 
