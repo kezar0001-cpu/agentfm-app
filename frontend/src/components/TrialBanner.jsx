@@ -59,8 +59,6 @@ const TrialBanner = () => {
   const totalTrialDays = 14;
   const progressPercentage = Math.max(0, Math.min(100, ((totalTrialDays - daysRemaining) / totalTrialDays) * 100));
 
-  const bannerOffset = { xs: '64px', sm: '72px' };
-
   // Trial expired or suspended - show urgent warning
   if (isTrialExpired || isSuspended) {
     return (
@@ -68,12 +66,12 @@ const TrialBanner = () => {
         sx={{
           background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
           borderBottom: '2px solid #7f1d1d',
-          py: isExpanded ? 1 : 0.5,
+          py: isExpanded ? 0.75 : 0.375,
           px: 2,
           position: 'sticky',
-          top: bannerOffset,
-          zIndex: 1100,
-          boxShadow: '0 2px 8px rgba(185, 28, 28, 0.25)',
+          top: 0,
+          zIndex: 1200,
+          boxShadow: '0 2px 6px rgba(185, 28, 28, 0.2)',
           transition: 'all 0.3s ease-in-out',
         }}
       >
@@ -87,15 +85,15 @@ const TrialBanner = () => {
             gap: 1.5,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
-            <WarningIcon sx={{ color: '#fff', fontSize: isExpanded ? 24 : 20, transition: 'font-size 0.3s' }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
+            <WarningIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
             <Box>
               <Typography
                 variant="subtitle1"
                 sx={{
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: isExpanded ? '0.95rem' : '0.85rem',
+                  fontSize: isExpanded ? '0.875rem' : '0.8rem',
                   transition: 'font-size 0.3s',
                 }}
               >
@@ -106,32 +104,32 @@ const TrialBanner = () => {
                   variant="body2"
                   sx={{
                     color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '0.85rem',
-                    mt: 0.25,
+                    fontSize: '0.8rem',
+                    mt: 0.2,
                   }}
                 >
-                  Subscribe now to restore full access to all features and continue managing your properties.
+                  Subscribe now to restore full access to all features.
                 </Typography>
               </Collapse>
             </Box>
           </Box>
           <Button
             variant="contained"
-            size={isExpanded ? 'medium' : 'small'}
+            size={isExpanded ? 'small' : 'small'}
             onClick={() => navigate('/subscriptions')}
             sx={{
               bgcolor: '#fff',
               color: '#dc2626',
               fontWeight: 700,
-              px: isExpanded ? 3 : 2,
-              py: isExpanded ? 0.75 : 0.5,
-              fontSize: isExpanded ? '0.875rem' : '0.75rem',
+              px: isExpanded ? 2.5 : 2,
+              py: isExpanded ? 0.625 : 0.5,
+              fontSize: isExpanded ? '0.8125rem' : '0.7rem',
               transition: 'all 0.3s',
               '&:hover': {
                 bgcolor: '#fef2f2',
                 transform: 'scale(1.03)',
               },
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
             }}
           >
             Subscribe Now
@@ -157,12 +155,12 @@ const TrialBanner = () => {
         sx={{
           background: bannerBgColor,
           borderBottom: `2px solid ${bannerBorderColor}`,
-          py: isExpanded ? 1 : 0.5,
+          py: isExpanded ? 0.75 : 0.375,
           px: 2,
           position: 'sticky',
-          top: bannerOffset,
-          zIndex: 1100,
-          boxShadow: isCritical || isUrgent ? '0 2px 8px rgba(185, 28, 28, 0.25)' : '0 2px 8px rgba(249, 115, 22, 0.25)',
+          top: 0,
+          zIndex: 1200,
+          boxShadow: isCritical || isUrgent ? '0 2px 6px rgba(185, 28, 28, 0.2)' : '0 2px 6px rgba(249, 115, 22, 0.2)',
           transition: 'all 0.3s ease-in-out',
         }}
       >
@@ -178,22 +176,22 @@ const TrialBanner = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 1.5,
-              minHeight: isExpanded ? 'auto' : '32px',
+              gap: 1.25,
+              minHeight: isExpanded ? 'auto' : '28px',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1 }}>
               {isCritical || isUrgent ? (
-                <BoltIcon sx={{ color: '#fff', fontSize: isExpanded ? 24 : 20, transition: 'font-size 0.3s' }} />
+                <BoltIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
               ) : (
-                <AccessTimeIcon sx={{ color: '#fff', fontSize: isExpanded ? 24 : 20, transition: 'font-size 0.3s' }} />
+                <AccessTimeIcon sx={{ color: '#fff', fontSize: isExpanded ? 20 : 18, transition: 'font-size 0.3s' }} />
               )}
               <Typography
                 variant="subtitle1"
                 sx={{
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: isExpanded ? '0.95rem' : '0.85rem',
+                  fontSize: isExpanded ? '0.875rem' : '0.8rem',
                   transition: 'font-size 0.3s',
                 }}
               >
@@ -211,30 +209,30 @@ const TrialBanner = () => {
                     bgcolor: 'rgba(255, 255, 255, 0.2)',
                     color: '#fff',
                     fontWeight: 700,
-                    fontSize: '0.65rem',
-                    height: 20,
+                    fontSize: '0.6rem',
+                    height: 18,
                   }}
                 />
               )}
             </Box>
             <Button
               variant="contained"
-              size={isExpanded ? 'medium' : 'small'}
+              size={isExpanded ? 'small' : 'small'}
               onClick={() => navigate('/subscriptions')}
               startIcon={isExpanded ? <TrendingUpIcon /> : null}
               sx={{
                 bgcolor: '#fff',
                 color: isCritical || isUrgent ? '#dc2626' : '#ea580c',
                 fontWeight: 700,
-                px: isExpanded ? 3 : 2,
-                py: isExpanded ? 0.75 : 0.5,
-                fontSize: isExpanded ? '0.875rem' : '0.75rem',
+                px: isExpanded ? 2.5 : 2,
+                py: isExpanded ? 0.625 : 0.5,
+                fontSize: isExpanded ? '0.8125rem' : '0.7rem',
                 transition: 'all 0.3s',
                 '&:hover': {
                   bgcolor: '#fef2f2',
                   transform: 'scale(1.03)',
                 },
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
               }}
             >
               {isCritical || isUrgent ? 'Subscribe Now' : 'View Plans'}
@@ -243,20 +241,20 @@ const TrialBanner = () => {
 
           {/* Collapsible detailed content */}
           <Collapse in={isExpanded} timeout={300}>
-            <Box sx={{ mt: 0.5 }}>
+            <Box sx={{ mt: 0.4 }}>
               <Typography
                 variant="body2"
                 sx={{
                   color: 'rgba(255, 255, 255, 0.9)',
-                  fontSize: '0.85rem',
-                  mb: 1,
+                  fontSize: '0.8rem',
+                  mb: 0.75,
                 }}
               >
                 {isCritical
-                  ? 'Subscribe today to avoid losing access to your properties and data!'
+                  ? 'Subscribe today to avoid losing access!'
                   : isUrgent
-                  ? 'Subscribe now to ensure uninterrupted access to all premium features.'
-                  : 'Unlock full access with a paid plan. Start from just $29/month.'}
+                  ? 'Subscribe now to ensure uninterrupted access.'
+                  : 'Unlock full access. Start from just $29/month.'}
               </Typography>
 
               {/* Progress bar */}
@@ -265,12 +263,12 @@ const TrialBanner = () => {
                   variant="determinate"
                   value={progressPercentage}
                   sx={{
-                    height: 4,
-                    borderRadius: 2,
+                    height: 3,
+                    borderRadius: 1.5,
                     bgcolor: 'rgba(255, 255, 255, 0.2)',
                     '& .MuiLinearProgress-bar': {
                       bgcolor: '#fff',
-                      borderRadius: 2,
+                      borderRadius: 1.5,
                     },
                   }}
                 />
@@ -278,10 +276,10 @@ const TrialBanner = () => {
                   variant="caption"
                   sx={{
                     color: 'rgba(255, 255, 255, 0.8)',
-                    mt: 0.25,
+                    mt: 0.2,
                     display: 'block',
                     textAlign: 'right',
-                    fontSize: '0.7rem',
+                    fontSize: '0.65rem',
                   }}
                 >
                   {Math.round(progressPercentage)}% of trial used
