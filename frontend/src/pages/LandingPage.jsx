@@ -423,6 +423,7 @@ export default function LandingPage() {
             <Link to="/signup">Create account</Link>
             <Link to="/forgot-password">Reset password</Link>
             <Link to="/reports">Reports</Link>
+            <Link to="/admin/blog/login" style={{ opacity: 0.5, fontSize: '0.85em' }}>Admin</Link>
           </div>
         </div>
         <p className="landing-footer-note">© {new Date().getFullYear()} Buildstate FM. All rights reserved.</p>

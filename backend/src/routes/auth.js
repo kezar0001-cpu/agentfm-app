@@ -129,7 +129,7 @@ const requireAuth = (req, res, next) => {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional()
+  role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT', 'ADMIN']).optional()
 });
 
 const registerSchema = z.object({
@@ -145,6 +145,105 @@ const registerSchema = z.object({
   }),
   role: z.enum(['PROPERTY_MANAGER', 'OWNER', 'TECHNICIAN', 'TENANT']).optional(),
   inviteToken: z.string().optional(), // Support for invite-based registration
+});
+
+const adminSetupSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(1, 'Password is required'),
+  phone: z.string().optional(),
+});
+
+// ========================================
+// GET /api/auth/setup/check
+// Check if admin setup is required
+// ========================================
+router.get('/setup/check', async (req, res) => {
+  try {
+    const adminExists = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+    });
+
+    res.json({
+      success: true,
+      setupRequired: !adminExists,
+    });
+  } catch (error) {
+    console.error('Setup check error:', error);
+    return sendError(res, 500, 'Setup check failed', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// ========================================
+// POST /api/auth/setup
+// Create first admin account (only works if no admin exists)
+// ========================================
+router.post('/setup', async (req, res) => {
+  try {
+    // Check if any admin already exists
+    const adminExists = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+    });
+
+    if (adminExists) {
+      return sendError(res, 403, 'Admin account already exists', ErrorCodes.BIZ_SETUP_ALREADY_COMPLETED);
+    }
+
+    const { firstName, lastName, email, password, phone } = adminSetupSchema.parse(req.body);
+
+    // Validate password strength and requirements
+    const passwordValidation = validatePassword(password, [email, firstName, lastName]);
+    if (!passwordValidation.isValid) {
+      return sendError(
+        res,
+        400,
+        getPasswordErrorMessage(passwordValidation),
+        ErrorCodes.VAL_PASSWORD_WEAK,
+        passwordValidation.requirements
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return sendError(res, 400, 'Email already registered', ErrorCodes.BIZ_EMAIL_ALREADY_REGISTERED);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        passwordHash,
+        phone,
+        role: 'ADMIN',
+        subscriptionPlan: 'ENTERPRISE', // Admin gets enterprise plan
+        subscriptionStatus: 'ACTIVE',
+        emailVerified: true, // Auto-verify admin
+      },
+    });
+
+    const { accessToken, refreshToken } = issueAuthTokens(user, res);
+
+    const { passwordHash: _ph, ...userWithoutPassword } = user;
+
+    res.status(201).json({
+      success: true,
+      token: accessToken,
+      accessToken,
+      refreshToken,
+      user: userWithoutPassword,
+      message: 'Admin account created successfully!',
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.errors);
+    }
+    console.error('Admin setup error:', error);
+    return sendError(res, 500, 'Admin setup failed', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
 });
 
 // ========================================

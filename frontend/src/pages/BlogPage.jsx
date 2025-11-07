@@ -146,7 +146,7 @@ const BlogPage = () => {
     <>
       <SEO
         title="Blog"
-        description="Read the latest insights, updates, and resources about property management from AgentFM"
+        description="Read the latest insights, updates, and resources about property management from Buildstate FM"
         keywords={['property management', 'blog', 'real estate', 'maintenance', 'inspections']}
       />
 
