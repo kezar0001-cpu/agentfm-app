@@ -795,6 +795,7 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), imageUpload.sing
     const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
       const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      cleanupUploadedFile();
       return sendError(res, access.status, access.reason, errorCode);
     }
 
