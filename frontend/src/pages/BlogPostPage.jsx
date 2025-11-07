@@ -92,19 +92,34 @@ const BlogPostPage = () => {
           <Box
             sx={{
               width: '100%',
-              height: { xs: 300, sm: 350, md: 400 },
-              backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.08)), url(${post.coverImage})`,
+              height: { xs: 320, sm: 380, md: 420 },
+              position: 'relative',
+              backgroundImage: `url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              backgroundBlendMode: 'overlay',
-              position: 'relative',
-              bgcolor: '#0f172a',
-              borderRadius: '0 0 24px 24px'
+              borderRadius: '0 0 32px 32px',
+              overflow: 'hidden'
             }}
-          />
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(135deg, rgba(185, 28, 28, 0.85) 0%, rgba(249, 115, 22, 0.7) 45%, rgba(15, 23, 42, 0.65) 100%)'
+              }}
+            />
+          </Box>
         )}
 
-        <Container maxWidth="md" sx={{ mt: post.coverImage ? 4 : 8, position: 'relative', zIndex: 1 }}>
+        <Container
+          maxWidth="md"
+          sx={{
+            mt: post.coverImage ? { xs: -14, sm: -16, md: -18 } : 8,
+            pt: post.coverImage ? { xs: 6, md: 8 } : 0,
+            position: 'relative',
+            zIndex: 2
+          }}
+        >
           {/* Back Button */}
           <Button
             component={Link}
