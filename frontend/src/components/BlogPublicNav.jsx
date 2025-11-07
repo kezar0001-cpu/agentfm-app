@@ -9,7 +9,8 @@ const BlogPublicNav = () => {
       backgroundColor: 'white',
       zIndex: 1000,
       borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-      padding: '1rem 2rem'
+      padding: '1rem 2rem',
+      marginBottom: 0
     }}>
       <Link to="/" className="landing-logo" aria-label="Buildstate FM home">
         Buildstate FM

@@ -155,9 +155,9 @@ const BlogPage = () => {
       {/* Hero Section */}
       <Box
         sx={{
-          background: 'linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%)',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-          pt: { xs: 10, md: 12 },
+          background:
+            'radial-gradient(circle at top left, rgba(249, 115, 22, 0.15), transparent 55%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 50%), #ffffff',
+          pt: { xs: 6, md: 8 },
           pb: 6
         }}
       >
