@@ -33,9 +33,14 @@ const TrialBanner = () => {
   const totalTrialDays = 14;
   const progressPercentage = Math.max(0, Math.min(100, ((totalTrialDays - daysRemaining) / totalTrialDays) * 100));
 
+  const bannerOffset = {
+    xs: '64px',
+    sm: '72px',
+  };
+
   const stickyStyles = {
     position: 'sticky',
-    top: 0,
+    top: bannerOffset,
     zIndex: (theme) => theme.zIndex.drawer + 2,
   };
 
