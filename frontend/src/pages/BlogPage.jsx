@@ -25,6 +25,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import { format } from 'date-fns';
 import { getBlogPosts, getBlogCategories, getBlogTags } from '../api/blog';
 import SEO from '../components/SEO';
+import PublicNavBar from '../components/PublicNavBar';
 import toast from 'react-hot-toast';
 
 const BlogPage = () => {
