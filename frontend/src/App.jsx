@@ -80,6 +80,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 const TeamManagementPage = lazy(() => import('./pages/TeamManagementPage.jsx'));
 const BlogPage = lazy(() => import('./pages/BlogPage.jsx'));
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage.jsx'));
+const BlogAdminLoginPage = lazy(() => import('./pages/admin/BlogAdminLoginPage.jsx'));
 const BlogAdminPage = lazy(() => import('./pages/admin/BlogAdminPage.jsx'));
 const BlogPostEditorPage = lazy(() => import('./pages/admin/BlogPostEditorPage.jsx'));
 const CategoryEditorPage = lazy(() => import('./pages/admin/CategoryEditorPage.jsx'));
@@ -138,6 +139,9 @@ export default function App() {
           {/* Blog (Public) */}
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
+
+          {/* Blog Admin Login (Public) */}
+          <Route path="/admin/blog/login" element={<BlogAdminLoginPage />} />
 
           {/* Blog Admin (Admin only) */}
           <Route path="/admin/blog" element={<AuthGate><Layout><BlogAdminPage /></Layout></AuthGate>} />
