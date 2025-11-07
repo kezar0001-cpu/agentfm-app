@@ -24,17 +24,120 @@ import { calculateDaysRemaining } from '../utils/date';
 const TrialBanner = () => {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
+  const [isExpanded, setIsExpanded] = useState(true);
+  const lastScrollYRef = useRef(0);
+  const isExpandedRef = useRef(true);
+  const bannerRef = useRef(null);
+  const subscriptionStatus = user?.subscriptionStatus ?? null;
+  const trialEndDate = user?.trialEndDate;
+  const daysRemaining = calculateDaysRemaining(trialEndDate);
+  const isTrialActive = subscriptionStatus === 'TRIAL' && daysRemaining > 0;
+  const isTrialExpired = subscriptionStatus === 'TRIAL' && daysRemaining <= 0;
+  const isSuspended = subscriptionStatus === 'SUSPENDED' || subscriptionStatus === 'CANCELLED';
+
+  // Handle scroll to collapse/expand banner
+  useEffect(() => {
+    lastScrollYRef.current = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const previousScrollY = lastScrollYRef.current;
+      const delta = currentScrollY - previousScrollY;
+
+      lastScrollYRef.current = currentScrollY;
+
+      // Ignore tiny adjustments that can happen from layout shifts while collapsing/expanding
+      if (Math.abs(delta) < 2) {
+        return;
+      }
+
+      const isScrollingDown = delta > 0;
+      const isScrollingUp = delta < 0;
+
+      if (isScrollingDown && currentScrollY > 50 && isExpandedRef.current) {
+        // Only collapse after a meaningful downward movement to avoid oscillation
+        if (delta > 4) {
+          isExpandedRef.current = false;
+          setIsExpanded(false);
+        }
+        return;
+      }
+
+      if (
+        isScrollingUp &&
+        !isExpandedRef.current &&
+        (currentScrollY < 16 || Math.abs(delta) > 8)
+      ) {
+        isExpandedRef.current = true;
+        setIsExpanded(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    isExpandedRef.current = isExpanded;
+  }, [isExpanded]);
+
+  useEffect(() => {
+    const updateBannerHeight = () => {
+      const height = bannerRef.current?.offsetHeight ?? 0;
+      document.documentElement.style.setProperty('--trial-banner-height', `${height}px`);
+    };
+
+    updateBannerHeight();
+
+    window.addEventListener('resize', updateBannerHeight);
+
+    let resizeObserver;
+    if (bannerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateBannerHeight);
+      resizeObserver.observe(bannerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateBannerHeight);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      document.documentElement.style.removeProperty('--trial-banner-height');
+    };
+  }, [isExpanded, isTrialActive, isTrialExpired, isSuspended]);
+
+  useEffect(() => {
+    const updateBannerHeight = () => {
+      const height = bannerRef.current?.offsetHeight ?? 0;
+      document.documentElement.style.setProperty('--trial-banner-height', `${height}px`);
+    };
+
+    updateBannerHeight();
+
+    window.addEventListener('resize', updateBannerHeight);
+
+    let resizeObserver;
+    if (bannerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateBannerHeight);
+      resizeObserver.observe(bannerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateBannerHeight);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      document.documentElement.style.removeProperty('--trial-banner-height');
+    };
+  }, [isExpanded, isTrialActive, isTrialExpired, isSuspended]);
 
   // Don't show banner if user has active subscription
-  if (!user || user.subscriptionStatus === 'ACTIVE') {
+  if (!user || subscriptionStatus === 'ACTIVE') {
     return null;
   }
-
-  const trialEndDate = user.trialEndDate;
-  const daysRemaining = calculateDaysRemaining(trialEndDate);
-  const isTrialActive = user.subscriptionStatus === 'TRIAL' && daysRemaining > 0;
-  const isTrialExpired = user.subscriptionStatus === 'TRIAL' && daysRemaining <= 0;
-  const isSuspended = user.subscriptionStatus === 'SUSPENDED' || user.subscriptionStatus === 'CANCELLED';
 
   // Calculate urgency level
   const isUrgent = daysRemaining <= 3 && daysRemaining > 0;
