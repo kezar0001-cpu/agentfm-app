@@ -176,7 +176,7 @@ const BlogPage = () => {
                 letterSpacing: '0.2em',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#b91c1c',
+                color: '#0f172a',
                 mb: 2
               }}
             >
