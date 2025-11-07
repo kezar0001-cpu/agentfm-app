@@ -152,51 +152,83 @@ const BlogPage = () => {
 
       <BlogPublicNav />
 
+      {/* Hero Section with Gradient Background */}
+      <Box
+        sx={{
+          background: 'radial-gradient(circle at top left, rgba(249, 115, 22, 0.15), transparent 55%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 50%), #ffffff',
+          pt: { xs: 10, md: 12 },
+          pb: 6
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{
+            textAlign: 'center',
+            maxWidth: 760,
+            mx: 'auto'
+          }}>
+            {/* Eyebrow Label */}
+            <Typography
+              component="span"
+              sx={{
+                display: 'inline-block',
+                textTransform: 'uppercase',
+                letterSpacing: '0.2em',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#b91c1c',
+                mb: 2
+              }}
+            >
+              Buildstate FM Insights
+            </Typography>
+
+            {/* Main Heading */}
+            <Typography variant="h1" component="h1" sx={{
+              fontWeight: 800,
+              fontSize: { xs: '2.5rem', sm: '3.2rem', md: '3.5rem' },
+              color: '#0f172a',
+              mb: 2,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.1
+            }}>
+              Property Management Insights & Best Practices
+            </Typography>
+
+            {/* Subtitle */}
+            <Typography variant="h5" sx={{
+              maxWidth: 650,
+              mx: 'auto',
+              color: '#475569',
+              fontWeight: 400,
+              fontSize: { xs: '1.05rem', md: '1.1rem' },
+              lineHeight: 1.7,
+              opacity: 0.9
+            }}>
+              Expert advice, industry trends, and practical tips to help you manage properties more effectively
+            </Typography>
+          </Box>
+        </Container>
+      </Box>
+
+      {/* Main Content */}
       <Box
         sx={{
           minHeight: '100vh',
-          bgcolor: '#fafafa',
-          pt: 8,
+          bgcolor: '#f8fafc',
+          pt: 6,
           pb: 12
         }}
       >
         <Container maxWidth="lg">
-          {/* Header */}
-          <Box sx={{
-            mb: 8,
-            textAlign: 'center',
-            pt: 6,
-            pb: 4
-          }}>
-            <Typography variant="h1" component="h1" gutterBottom sx={{
-              fontWeight: 700,
-              fontSize: { xs: '2.5rem', sm: '3.5rem', md: '4rem' },
-              color: '#1d1d1f',
-              mb: 2,
-              letterSpacing: '-0.02em'
-            }}>
-              Blog
-            </Typography>
-            <Typography variant="h5" sx={{
-              maxWidth: 650,
-              mx: 'auto',
-              color: '#6e6e73',
-              fontWeight: 400,
-              fontSize: { xs: '1.1rem', md: '1.25rem' },
-              lineHeight: 1.5
-            }}>
-              Insights, tips, and stories from the world of property management
-            </Typography>
-          </Box>
 
           {/* Filters */}
           <Box sx={{
             mb: 6,
             p: 3,
-            borderRadius: 2,
+            borderRadius: 3,
             bgcolor: 'white',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            border: '1px solid #e5e5e7'
+            boxShadow: '0 18px 35px rgba(15, 23, 42, 0.05)',
+            border: '1px solid rgba(148, 163, 184, 0.2)'
           }}>
             <form onSubmit={handleSearch}>
               <Grid container spacing={2} alignItems="center">
@@ -269,16 +301,17 @@ const BlogPage = () => {
                     variant="contained"
                     size="large"
                     sx={{
-                      bgcolor: '#b91c1c',
+                      background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+                      color: '#ffffff',
                       fontWeight: 600,
                       textTransform: 'none',
-                      fontSize: '1rem',
+                      fontSize: '0.95rem',
                       py: 1.2,
-                      borderRadius: 1.5,
-                      boxShadow: 'none',
+                      borderRadius: '999px',
+                      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
                       '&:hover': {
-                        bgcolor: '#991b1b',
-                        boxShadow: 'none'
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 16px 40px rgba(185, 28, 28, 0.15)'
                       }
                     }}
                   >
@@ -290,17 +323,22 @@ const BlogPage = () => {
                   <Grid item xs={12} md={2}>
                     <Button
                       fullWidth
-                      variant="text"
+                      variant="outlined"
                       size="large"
                       onClick={clearFilters}
                       sx={{
                         color: '#b91c1c',
+                        borderColor: 'rgba(248, 113, 113, 0.2)',
                         fontWeight: 600,
                         textTransform: 'none',
-                        fontSize: '1rem',
+                        fontSize: '0.95rem',
                         py: 1.2,
+                        borderRadius: '999px',
+                        bgcolor: 'rgba(255, 255, 255, 0.6)',
                         '&:hover': {
-                          bgcolor: 'rgba(185, 28, 28, 0.04)'
+                          borderColor: '#b91c1c',
+                          bgcolor: 'rgba(185, 28, 28, 0.04)',
+                          transform: 'translateY(-2px)'
                         }
                       }}
                     >
@@ -381,10 +419,10 @@ const BlogPage = () => {
               py: 12,
               px: 3
             }}>
-              <Typography variant="h3" gutterBottom sx={{ fontWeight: 600, color: '#1d1d1f', mb: 2 }}>
+              <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, color: '#0f172a', mb: 2 }}>
                 No posts found
               </Typography>
-              <Typography variant="body1" sx={{ color: '#86868b', fontSize: '1.1rem' }}>
+              <Typography variant="body1" sx={{ color: '#475569', fontSize: '1.05rem', lineHeight: 1.7 }}>
                 Try adjusting your filters or check back later for new content
               </Typography>
             </Box>
@@ -401,18 +439,18 @@ const BlogPage = () => {
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: 2,
+                        borderRadius: 3,
                         overflow: 'hidden',
-                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         bgcolor: 'white',
-                        border: '1px solid #e5e5e7',
-                        boxShadow: 'none',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        boxShadow: '0 18px 35px rgba(15, 23, 42, 0.05)',
                         textDecoration: 'none',
                         '&:hover': {
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                          transform: 'translateY(-4px)',
+                          boxShadow: '0 25px 50px rgba(15, 23, 42, 0.15)',
+                          transform: 'translateY(-6px)',
                           '& .blog-card-image': {
-                            transform: 'scale(1.03)'
+                            transform: 'scale(1.05)'
                           }
                         }
                       }}
@@ -421,8 +459,9 @@ const BlogPage = () => {
                         <Box sx={{
                           position: 'relative',
                           overflow: 'hidden',
-                          height: 220,
-                          bgcolor: '#f5f5f7'
+                          height: 240,
+                          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(30, 64, 175, 0.08))',
+                          p: 1.5
                         }}>
                           <CardMedia
                             component="img"
@@ -432,7 +471,8 @@ const BlogPage = () => {
                             sx={{
                               height: '100%',
                               objectFit: 'cover',
-                              transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                              transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                              borderRadius: 2
                             }}
                           />
                         </Box>
@@ -460,9 +500,9 @@ const BlogPage = () => {
                         <Typography
                           variant="h6"
                           sx={{
-                            color: '#1d1d1f',
-                            fontWeight: 600,
-                            fontSize: '1.25rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            fontSize: '1.15rem',
                             lineHeight: 1.3,
                             mb: 1.5,
                             mt: 0.5,
@@ -483,7 +523,7 @@ const BlogPage = () => {
                             sx={{
                               mb: 3,
                               flexGrow: 1,
-                              color: '#86868b',
+                              color: '#475569',
                               display: '-webkit-box',
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
@@ -498,13 +538,13 @@ const BlogPage = () => {
 
                         {/* Meta Info - Clean and minimal */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 'auto' }}>
-                          <Typography variant="caption" sx={{ color: '#86868b', fontSize: '0.813rem' }}>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.813rem' }}>
                             {post.publishedAt && format(new Date(post.publishedAt), 'MMM d, yyyy')}
                           </Typography>
                           {post.tags && post.tags.length > 0 && (
                             <>
-                              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
-                              <Typography variant="caption" sx={{ color: '#86868b', fontSize: '0.813rem' }}>
+                              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: 'rgba(148, 163, 184, 0.3)' }} />
+                              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.813rem' }}>
                                 {post.tags.length} {post.tags.length === 1 ? 'tag' : 'tags'}
                               </Typography>
                             </>

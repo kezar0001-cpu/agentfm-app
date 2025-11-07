@@ -83,7 +83,7 @@ const BlogPostPage = () => {
       <BlogPublicNav />
 
       <Box sx={{
-        bgcolor: '#fafafa',
+        bgcolor: '#f8fafc',
         minHeight: '100vh',
         pb: 8
       }}>
@@ -92,10 +92,11 @@ const BlogPostPage = () => {
           <Box
             sx={{
               width: '100%',
-              height: { xs: 400, sm: 500, md: 550 },
-              backgroundImage: `url(${post.coverImage})`,
+              height: { xs: 400, sm: 500, md: 580 },
+              backgroundImage: `linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(30, 64, 175, 0.08)), url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
+              backgroundBlendMode: 'overlay',
               position: 'relative',
               bgcolor: '#f5f5f7'
             }}
@@ -110,12 +111,20 @@ const BlogPostPage = () => {
             startIcon={<ArrowBackIcon />}
             sx={{
               mb: 3,
-              color: post.coverImage ? 'white' : '#1d1d1f',
-              fontWeight: 500,
+              color: post.coverImage ? 'white' : '#0f172a',
+              fontWeight: 600,
               textTransform: 'none',
-              fontSize: '1rem',
+              fontSize: '0.95rem',
+              px: 2.5,
+              py: 1,
+              borderRadius: '999px',
+              bgcolor: post.coverImage ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
               '&:hover': {
-                bgcolor: post.coverImage ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)'
+                bgcolor: post.coverImage ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.9)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 16px rgba(15, 23, 42, 0.12)'
               }
             }}
           >
@@ -126,10 +135,10 @@ const BlogPostPage = () => {
           <Card sx={{
             p: { xs: 3, md: 6 },
             mb: 6,
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            borderRadius: 3,
+            boxShadow: '0 25px 50px rgba(15, 23, 42, 0.08)',
             bgcolor: 'white',
-            border: '1px solid #e5e5e7'
+            border: '1px solid rgba(148, 163, 184, 0.2)'
           }}>
             {/* Categories */}
             {post.categories && post.categories.length > 0 && (
@@ -155,12 +164,12 @@ const BlogPostPage = () => {
               component="h1"
               gutterBottom
               sx={{
-                fontWeight: 700,
+                fontWeight: 800,
                 fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
                 lineHeight: 1.1,
-                color: '#1d1d1f',
+                color: '#0f172a',
                 mb: 3,
-                letterSpacing: '-0.02em'
+                letterSpacing: '-0.04em'
               }}
             >
               {post.title}
@@ -168,34 +177,35 @@ const BlogPostPage = () => {
 
             {/* Meta Information */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, flexWrap: 'wrap' }}>
-              <Typography variant="body2" sx={{ color: '#1d1d1f', fontWeight: 500 }}>
+              <Typography variant="body2" sx={{ color: '#0f172a', fontWeight: 600 }}>
                 {authorName}
               </Typography>
-              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
+              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: 'rgba(148, 163, 184, 0.3)' }} />
               {post.publishedAt && (
-                <Typography variant="body2" sx={{ color: '#86868b' }}>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
                   {format(new Date(post.publishedAt), 'MMMM d, yyyy')}
                 </Typography>
               )}
-              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
-              <Typography variant="body2" sx={{ color: '#86868b' }}>
+              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: 'rgba(148, 163, 184, 0.3)' }} />
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
                 {post.viewCount || 0} views
               </Typography>
             </Box>
 
-            <Divider sx={{ mb: 5, borderColor: '#e5e5e7' }} />
+            <Divider sx={{ mb: 5, borderColor: 'rgba(148, 163, 184, 0.2)' }} />
 
             {/* Excerpt */}
             {post.excerpt && (
               <Typography
                 variant="h6"
                 sx={{
-                  color: '#6e6e73',
+                  color: '#475569',
                   fontWeight: 400,
                   fontSize: '1.25rem',
-                  lineHeight: 1.6,
+                  lineHeight: 1.7,
                   mb: 5,
-                  letterSpacing: '-0.01em'
+                  letterSpacing: '-0.01em',
+                  opacity: 0.9
                 }}
               >
                 {post.excerpt}
@@ -206,26 +216,26 @@ const BlogPostPage = () => {
             <Box
               sx={{
                 '& h1, & h2, & h3, & h4, & h5, & h6': {
-                  fontWeight: 600,
+                  fontWeight: 700,
                   mt: 5,
                   mb: 2.5,
                   lineHeight: 1.3,
-                  color: '#1d1d1f',
-                  letterSpacing: '-0.01em'
+                  color: '#0f172a',
+                  letterSpacing: '-0.02em'
                 },
-                '& h2': { fontSize: '2rem', mt: 6 },
+                '& h2': { fontSize: '2rem', mt: 6, fontWeight: 800 },
                 '& h3': { fontSize: '1.5rem' },
                 '& p': {
                   lineHeight: 1.7,
                   mb: 2.5,
-                  fontSize: '1.125rem',
-                  color: '#1d1d1f',
+                  fontSize: '1.05rem',
+                  color: '#475569',
                   letterSpacing: '-0.005em'
                 },
                 '& a': {
                   color: '#b91c1c',
                   textDecoration: 'none',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   '&:hover': {
                     textDecoration: 'underline'
                   }
@@ -233,8 +243,9 @@ const BlogPostPage = () => {
                 '& img': {
                   maxWidth: '100%',
                   height: 'auto',
-                  borderRadius: 1.5,
-                  my: 4
+                  borderRadius: 2,
+                  my: 4,
+                  boxShadow: '0 10px 25px rgba(15, 23, 42, 0.08)'
                 },
                 '& ul, & ol': {
                   pl: 3,
@@ -242,41 +253,47 @@ const BlogPostPage = () => {
                   '& li': {
                     mb: 1.5,
                     lineHeight: 1.7,
-                    fontSize: '1.125rem',
-                    color: '#1d1d1f'
+                    fontSize: '1.05rem',
+                    color: '#475569'
                   }
                 },
                 '& code': {
-                  bgcolor: '#f5f5f7',
-                  color: '#1d1d1f',
+                  bgcolor: '#f8fafc',
+                  color: '#0f172a',
                   p: 0.5,
                   px: 1,
-                  borderRadius: 0.5,
+                  borderRadius: 0.75,
                   fontFamily: 'monospace',
                   fontSize: '0.9em',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  border: '1px solid rgba(148, 163, 184, 0.15)'
                 },
                 '& pre': {
-                  bgcolor: '#1d1d1f',
-                  color: '#f5f5f7',
+                  bgcolor: '#0f172a',
+                  color: '#f8fafc',
                   p: 3,
-                  borderRadius: 1.5,
+                  borderRadius: 2,
                   overflow: 'auto',
                   mb: 3,
+                  boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
                   '& code': {
                     bgcolor: 'transparent',
                     p: 0,
-                    color: 'inherit'
+                    color: 'inherit',
+                    border: 'none'
                   }
                 },
                 '& blockquote': {
-                  borderLeft: '3px solid #b91c1c',
+                  borderLeft: '4px solid #b91c1c',
                   pl: 3,
                   py: 0.5,
                   my: 4,
                   fontStyle: 'normal',
-                  color: '#6e6e73',
-                  fontSize: '1.125rem'
+                  color: '#475569',
+                  fontSize: '1.125rem',
+                  bgcolor: 'rgba(249, 115, 22, 0.04)',
+                  borderRadius: 1,
+                  p: 3
                 }
               }}
               dangerouslySetInnerHTML={{ __html: post.htmlContent || post.content }}
@@ -339,13 +356,13 @@ const BlogPostPage = () => {
               </Box>
             )}
 
-            <Divider sx={{ mt: 6, mb: 4, borderColor: '#e5e5e7' }} />
+            <Divider sx={{ mt: 6, mb: 4, borderColor: 'rgba(148, 163, 184, 0.2)' }} />
 
             {/* Tags */}
             {post.tags && post.tags.length > 0 && (
               <Box>
-                <Typography variant="body2" sx={{ mb: 2, fontWeight: 500, color: '#86868b' }}>
-                  Tagged with:
+                <Typography variant="body2" sx={{ mb: 2, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.1em' }}>
+                  Tagged with
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                   {post.tags.map((pt) => (
@@ -357,13 +374,17 @@ const BlogPostPage = () => {
                       clickable
                       size="medium"
                       sx={{
-                        bgcolor: '#f5f5f7',
-                        color: '#1d1d1f',
-                        border: '1px solid #d2d2d7',
-                        fontWeight: 500,
+                        bgcolor: '#f8fafc',
+                        color: '#0f172a',
+                        border: '1px solid rgba(148, 163, 184, 0.25)',
+                        fontWeight: 600,
+                        borderRadius: 2,
+                        transition: 'all 0.2s ease-in-out',
                         '&:hover': {
-                          bgcolor: '#e8e8ed',
-                          borderColor: '#b91c1c'
+                          bgcolor: 'rgba(185, 28, 28, 0.08)',
+                          borderColor: '#b91c1c',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(185, 28, 28, 0.15)'
                         }
                       }}
                     />
@@ -378,25 +399,25 @@ const BlogPostPage = () => {
             p: { xs: 4, md: 5 },
             textAlign: 'center',
             mb: 6,
-            bgcolor: '#1d1d1f',
+            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
             color: 'white',
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            borderRadius: 3,
+            boxShadow: '0 25px 50px rgba(185, 28, 28, 0.2)',
             border: 'none'
           }}>
             <Typography
               variant="h4"
               gutterBottom
               sx={{
-                fontWeight: 600,
+                fontWeight: 800,
                 fontSize: { xs: '1.75rem', md: '2rem' },
                 mb: 2,
-                letterSpacing: '-0.01em'
+                letterSpacing: '-0.02em'
               }}
             >
               Ready to Transform Your Property Management?
             </Typography>
-            <Typography variant="body1" sx={{ mb: 4, color: '#f5f5f7', fontSize: '1.125rem', maxWidth: 500, mx: 'auto' }}>
+            <Typography variant="body1" sx={{ mb: 4, color: 'rgba(255, 255, 255, 0.95)', fontSize: '1.05rem', lineHeight: 1.7, maxWidth: 500, mx: 'auto' }}>
               Join thousands of property managers who trust Buildstate FM
             </Typography>
             <Button
@@ -405,18 +426,19 @@ const BlogPostPage = () => {
               variant="contained"
               size="large"
               sx={{
-                bgcolor: '#b91c1c',
-                color: 'white',
-                fontWeight: 600,
+                bgcolor: 'white',
+                color: '#b91c1c',
+                fontWeight: 700,
                 textTransform: 'none',
                 px: 4,
                 py: 1.5,
-                fontSize: '1rem',
-                borderRadius: 1.5,
-                boxShadow: 'none',
+                fontSize: '0.95rem',
+                borderRadius: '999px',
+                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.15)',
                 '&:hover': {
-                  bgcolor: '#991b1b',
-                  boxShadow: 'none'
+                  bgcolor: '#f8fafc',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 16px 40px rgba(15, 23, 42, 0.2)'
                 }
               }}
             >
