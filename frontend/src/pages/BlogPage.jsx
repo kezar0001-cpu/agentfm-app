@@ -155,44 +155,35 @@ const BlogPage = () => {
       <Box
         sx={{
           minHeight: '100vh',
+          bgcolor: '#fafafa',
           pt: 8,
-          pb: 8,
-          background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
-          position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'radial-gradient(circle at 20% 50%, rgba(185, 28, 28, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(249, 115, 22, 0.2), transparent 50%)',
-            pointerEvents: 'none'
-          }
+          pb: 12
         }}
       >
-        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+        <Container maxWidth="lg">
           {/* Header */}
           <Box sx={{
-            mb: 6,
+            mb: 8,
             textAlign: 'center',
-            pt: 4,
-            pb: 2
+            pt: 6,
+            pb: 4
           }}>
-            <Typography variant="h2" component="h1" gutterBottom sx={{
-              fontWeight: 800,
-              color: 'white',
-              textShadow: '0 2px 20px rgba(0,0,0,0.2)',
-              mb: 2
+            <Typography variant="h1" component="h1" gutterBottom sx={{
+              fontWeight: 700,
+              fontSize: { xs: '2.5rem', sm: '3.5rem', md: '4rem' },
+              color: '#1d1d1f',
+              mb: 2,
+              letterSpacing: '-0.02em'
             }}>
-              Our Blog
+              Blog
             </Typography>
             <Typography variant="h5" sx={{
-              maxWidth: 700,
+              maxWidth: 650,
               mx: 'auto',
-              color: 'rgba(255,255,255,0.95)',
+              color: '#6e6e73',
               fontWeight: 400,
-              textShadow: '0 1px 10px rgba(0,0,0,0.1)'
+              fontSize: { xs: '1.1rem', md: '1.25rem' },
+              lineHeight: 1.5
             }}>
               Insights, tips, and stories from the world of property management
             </Typography>
@@ -200,12 +191,12 @@ const BlogPage = () => {
 
           {/* Filters */}
           <Box sx={{
-            mb: 4,
+            mb: 6,
             p: 3,
-            borderRadius: 3,
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+            borderRadius: 2,
+            bgcolor: 'white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            border: '1px solid #e5e5e7'
           }}>
             <form onSubmit={handleSearch}>
               <Grid container spacing={2} alignItems="center">
@@ -218,13 +209,23 @@ const BlogPage = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <SearchIcon />
+                          <SearchIcon sx={{ color: '#86868b' }} />
                         </InputAdornment>
                       ),
                     }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white'
+                        borderRadius: 1.5,
+                        '& fieldset': {
+                          borderColor: '#d2d2d7'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#b91c1c'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#b91c1c',
+                          borderWidth: 2
+                        }
                       }
                     }}
                   />
@@ -238,7 +239,17 @@ const BlogPage = () => {
                       label="Category"
                       onChange={handleCategoryChange}
                       sx={{
-                        bgcolor: 'white'
+                        borderRadius: 1.5,
+                        '& fieldset': {
+                          borderColor: '#d2d2d7'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#b91c1c'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#b91c1c',
+                          borderWidth: 2
+                        }
                       }}
                     >
                       <MenuItem value="">All Categories</MenuItem>
@@ -258,15 +269,17 @@ const BlogPage = () => {
                     variant="contained"
                     size="large"
                     sx={{
-                      background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+                      bgcolor: '#b91c1c',
                       fontWeight: 600,
-                      color: 'white',
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      py: 1.2,
+                      borderRadius: 1.5,
+                      boxShadow: 'none',
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #991b1b 0%, #ea580c 100%)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 6px 20px rgba(185, 28, 28, 0.4)'
-                      },
-                      transition: 'all 0.3s ease'
+                        bgcolor: '#991b1b',
+                        boxShadow: 'none'
+                      }
                     }}
                   >
                     Search
@@ -277,19 +290,18 @@ const BlogPage = () => {
                   <Grid item xs={12} md={2}>
                     <Button
                       fullWidth
-                      variant="outlined"
+                      variant="text"
                       size="large"
                       onClick={clearFilters}
                       sx={{
-                        borderColor: 'white',
-                        color: 'white',
+                        color: '#b91c1c',
                         fontWeight: 600,
+                        textTransform: 'none',
+                        fontSize: '1rem',
+                        py: 1.2,
                         '&:hover': {
-                          borderColor: 'white',
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-2px)'
-                        },
-                        transition: 'all 0.3s ease'
+                          bgcolor: 'rgba(185, 28, 28, 0.04)'
+                        }
                       }}
                     >
                       Clear Filters
@@ -303,32 +315,28 @@ const BlogPage = () => {
           {/* Active Filters Display */}
           {(tagFilter || categoryFilter) && (
             <Box sx={{
-              mb: 3,
+              mb: 4,
               display: 'flex',
-              gap: 1,
+              gap: 1.5,
               flexWrap: 'wrap',
-              alignItems: 'center',
-              p: 2,
-              borderRadius: 2,
-              background: 'rgba(255,255,255,0.9)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              alignItems: 'center'
             }}>
-              <Typography variant="body2" sx={{ color: '#b91c1c', fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ color: '#86868b', fontWeight: 500 }}>
                 Filtering by:
               </Typography>
               {tagFilter && (
                 <Chip
-                  label={`Tag: ${tags.find(t => t.slug === tagFilter)?.name || tagFilter}`}
+                  label={tags.find(t => t.slug === tagFilter)?.name || tagFilter}
                   onDelete={() => handleTagChange('')}
                   sx={{
-                    bgcolor: '#b91c1c',
-                    color: 'white',
-                    fontWeight: 600,
+                    bgcolor: '#f5f5f7',
+                    color: '#1d1d1f',
+                    fontWeight: 500,
+                    border: '1px solid #d2d2d7',
                     '& .MuiChip-deleteIcon': {
-                      color: 'rgba(255, 255, 255, 0.7)',
+                      color: '#86868b',
                       '&:hover': {
-                        color: 'white'
+                        color: '#b91c1c'
                       }
                     }
                   }}
@@ -336,16 +344,17 @@ const BlogPage = () => {
               )}
               {categoryFilter && (
                 <Chip
-                  label={`Category: ${categories.find(c => c.slug === categoryFilter)?.name || categoryFilter}`}
+                  label={categories.find(c => c.slug === categoryFilter)?.name || categoryFilter}
                   onDelete={handleCategoryChange}
                   sx={{
-                    bgcolor: '#f97316',
-                    color: 'white',
-                    fontWeight: 600,
+                    bgcolor: '#f5f5f7',
+                    color: '#1d1d1f',
+                    fontWeight: 500,
+                    border: '1px solid #d2d2d7',
                     '& .MuiChip-deleteIcon': {
-                      color: 'rgba(255, 255, 255, 0.7)',
+                      color: '#86868b',
                       '&:hover': {
-                        color: 'white'
+                        color: '#b91c1c'
                       }
                     }
                   }}
@@ -359,53 +368,51 @@ const BlogPage = () => {
             <Box sx={{
               display: 'flex',
               justifyContent: 'center',
-              py: 8,
+              py: 12,
               minHeight: '400px',
               alignItems: 'center'
             }}>
-              <CircularProgress size={60} sx={{ color: 'white' }} />
+              <CircularProgress size={50} sx={{ color: '#b91c1c' }} />
             </Box>
           ) : posts.length === 0 ? (
             /* Empty State */
             <Box sx={{
               textAlign: 'center',
-              py: 8,
-              px: 3,
-              borderRadius: 3,
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+              py: 12,
+              px: 3
             }}>
-              <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#b91c1c' }}>
+              <Typography variant="h3" gutterBottom sx={{ fontWeight: 600, color: '#1d1d1f', mb: 2 }}>
                 No posts found
               </Typography>
-              <Typography variant="body1" sx={{ color: 'text.secondary', mt: 2 }}>
+              <Typography variant="body1" sx={{ color: '#86868b', fontSize: '1.1rem' }}>
                 Try adjusting your filters or check back later for new content
               </Typography>
             </Box>
           ) : (
             <>
               {/* Blog Posts Grid */}
-              <Grid container spacing={4}>
+              <Grid container spacing={{ xs: 3, md: 4 }}>
                 {posts.map((post) => (
                   <Grid item xs={12} sm={6} md={4} key={post.id}>
                     <Card
+                      component={Link}
+                      to={`/blog/${post.slug}`}
                       sx={{
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: 3,
+                        borderRadius: 2,
                         overflow: 'hidden',
-                        transition: 'all 0.3s ease',
-                        background: 'linear-gradient(to bottom, rgba(255,255,255,0.98), rgba(255,255,255,1))',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255,255,255,0.8)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        bgcolor: 'white',
+                        border: '1px solid #e5e5e7',
+                        boxShadow: 'none',
+                        textDecoration: 'none',
                         '&:hover': {
-                          transform: 'translateY(-12px)',
-                          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                          transform: 'translateY(-4px)',
                           '& .blog-card-image': {
-                            transform: 'scale(1.05)'
+                            transform: 'scale(1.03)'
                           }
                         }
                       }}
@@ -414,8 +421,8 @@ const BlogPage = () => {
                         <Box sx={{
                           position: 'relative',
                           overflow: 'hidden',
-                          height: 240,
-                          background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)'
+                          height: 220,
+                          bgcolor: '#f5f5f7'
                         }}>
                           <CardMedia
                             component="img"
@@ -425,53 +432,45 @@ const BlogPage = () => {
                             sx={{
                               height: '100%',
                               objectFit: 'cover',
-                              transition: 'transform 0.3s ease'
+                              transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                             }}
                           />
                         </Box>
                       )}
-                      <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 3 }}>
-                        {/* Categories - Subtle and less prominent */}
+                      <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: { xs: 2.5, md: 3 } }}>
+                        {/* Categories - Minimal */}
                         {post.categories && post.categories.length > 0 && (
-                          <Box sx={{ mb: 2 }}>
-                            {post.categories.slice(0, 2).map((pc) => (
-                              <Chip
-                                key={pc.category.id}
-                                label={pc.category.name}
-                                size="small"
-                                sx={{
-                                  mr: 0.5,
-                                  bgcolor: pc.category.color || 'primary.main',
-                                  color: 'white',
-                                  fontWeight: 500,
-                                  fontSize: '0.75rem',
-                                  height: '22px',
-                                  opacity: 0.9
-                                }}
-                              />
-                            ))}
+                          <Box sx={{ mb: 1.5 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: '#b91c1c',
+                                fontWeight: 600,
+                                fontSize: '0.813rem',
+                                letterSpacing: '0.02em',
+                                textTransform: 'uppercase'
+                              }}
+                            >
+                              {post.categories[0].category.name}
+                            </Typography>
                           </Box>
                         )}
 
-                        {/* Title - More Prominent */}
+                        {/* Title - Clean and prominent */}
                         <Typography
-                          variant="h5"
-                          component={Link}
-                          to={`/blog/${post.slug}`}
+                          variant="h6"
                           sx={{
-                            textDecoration: 'none',
-                            color: 'text.primary',
-                            fontWeight: 800,
-                            fontSize: '1.35rem',
+                            color: '#1d1d1f',
+                            fontWeight: 600,
+                            fontSize: '1.25rem',
                             lineHeight: 1.3,
-                            mb: 2,
+                            mb: 1.5,
+                            mt: 0.5,
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
                             overflow: 'hidden',
-                            '&:hover': {
-                              color: 'primary.main'
-                            }
+                            letterSpacing: '-0.01em'
                           }}
                         >
                           {post.title}
@@ -481,90 +480,36 @@ const BlogPage = () => {
                         {post.excerpt && (
                           <Typography
                             variant="body2"
-                            color="text.secondary"
                             sx={{
                               mb: 3,
                               flexGrow: 1,
+                              color: '#86868b',
                               display: '-webkit-box',
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
                               overflow: 'hidden',
-                              lineHeight: 1.6
+                              lineHeight: 1.6,
+                              fontSize: '0.938rem'
                             }}
                           >
                             {post.excerpt}
                           </Typography>
                         )}
 
-                        {/* Meta Info - Subtle */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 'auto', mb: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <PersonIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.7 }} />
-                            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
-                              {post.author?.firstName} {post.author?.lastName}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.7 }} />
-                            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
-                              {post.publishedAt && format(new Date(post.publishedAt), 'MMM d, yyyy')}
-                            </Typography>
-                          </Box>
+                        {/* Meta Info - Clean and minimal */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 'auto' }}>
+                          <Typography variant="caption" sx={{ color: '#86868b', fontSize: '0.813rem' }}>
+                            {post.publishedAt && format(new Date(post.publishedAt), 'MMM d, yyyy')}
+                          </Typography>
+                          {post.tags && post.tags.length > 0 && (
+                            <>
+                              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
+                              <Typography variant="caption" sx={{ color: '#86868b', fontSize: '0.813rem' }}>
+                                {post.tags.length} {post.tags.length === 1 ? 'tag' : 'tags'}
+                              </Typography>
+                            </>
+                          )}
                         </Box>
-
-                        {/* Tags - Very subtle */}
-                        {post.tags && post.tags.length > 0 && (
-                          <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                            {post.tags.slice(0, 3).map((pt) => (
-                              <Chip
-                                key={pt.tag.id}
-                                label={pt.tag.name}
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleTagChange(pt.tag.slug)}
-                                sx={{
-                                  cursor: 'pointer',
-                                  fontSize: '0.7rem',
-                                  height: '20px',
-                                  borderColor: 'divider',
-                                  color: 'text.disabled',
-                                  opacity: 0.6,
-                                  '&:hover': {
-                                    opacity: 1,
-                                    borderColor: 'primary.main',
-                                    color: 'primary.main'
-                                  }
-                                }}
-                              />
-                            ))}
-                          </Box>
-                        )}
-
-                        {/* Read More Link */}
-                        <Button
-                          component={Link}
-                          to={`/blog/${post.slug}`}
-                          variant="text"
-                          sx={{
-                            mt: 2,
-                            alignSelf: 'flex-start',
-                            fontWeight: 700,
-                            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #991b1b 0%, #ea580c 100%)',
-                              WebkitBackgroundClip: 'text',
-                              WebkitTextFillColor: 'transparent',
-                              backgroundClip: 'text',
-                              transform: 'translateX(4px)'
-                            },
-                            transition: 'all 0.3s ease'
-                          }}
-                        >
-                          Read More →
-                        </Button>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -574,14 +519,9 @@ const BlogPage = () => {
               {/* Pagination */}
               {pagination.totalPages > 1 && (
                 <Box sx={{
-                  mt: 6,
+                  mt: 8,
                   display: 'flex',
-                  justifyContent: 'center',
-                  p: 3,
-                  borderRadius: 3,
-                  background: 'rgba(255,255,255,0.95)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                  justifyContent: 'center'
                 }}>
                   <Pagination
                     count={pagination.totalPages}
@@ -592,16 +532,21 @@ const BlogPage = () => {
                     showLastButton
                     sx={{
                       '& .MuiPaginationItem-root': {
-                        fontWeight: 600,
+                        fontWeight: 500,
+                        color: '#1d1d1f',
+                        border: '1px solid #d2d2d7',
                         '&.Mui-selected': {
-                          background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+                          bgcolor: '#b91c1c',
                           color: 'white',
+                          border: '1px solid #b91c1c',
                           '&:hover': {
-                            background: 'linear-gradient(135deg, #991b1b 0%, #ea580c 100%)'
+                            bgcolor: '#991b1b',
+                            border: '1px solid #991b1b'
                           }
                         },
                         '&:hover': {
-                          bgcolor: 'rgba(185, 28, 28, 0.1)'
+                          bgcolor: '#f5f5f7',
+                          border: '1px solid #86868b'
                         }
                       }
                     }}

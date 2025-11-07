@@ -83,147 +83,119 @@ const BlogPostPage = () => {
       <BlogPublicNav />
 
       <Box sx={{
-        bgcolor: 'background.default',
+        bgcolor: '#fafafa',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
-        position: 'relative',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'radial-gradient(circle at 20% 50%, rgba(185, 28, 28, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(249, 115, 22, 0.2), transparent 50%)',
-          pointerEvents: 'none'
-        }
+        pb: 8
       }}>
         {/* Hero Section */}
         {post.coverImage && (
           <Box
             sx={{
               width: '100%',
-              height: { xs: 400, sm: 500, md: 600, lg: 700 },
+              height: { xs: 400, sm: 500, md: 550 },
               backgroundImage: `url(${post.coverImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               position: 'relative',
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.9) 100%)'
-              }
+              bgcolor: '#f5f5f7'
             }}
           />
         )}
 
-        <Container maxWidth="md" sx={{ mt: post.coverImage ? -15 : 8, position: 'relative', zIndex: 1 }}>
+        <Container maxWidth="md" sx={{ mt: post.coverImage ? -12 : 8, position: 'relative', zIndex: 1 }}>
           {/* Back Button */}
           <Button
             component={Link}
             to="/blog"
             startIcon={<ArrowBackIcon />}
-            sx={{ mb: 3, color: post.coverImage ? 'white' : 'text.primary' }}
+            sx={{
+              mb: 3,
+              color: post.coverImage ? 'white' : '#1d1d1f',
+              fontWeight: 500,
+              textTransform: 'none',
+              fontSize: '1rem',
+              '&:hover': {
+                bgcolor: post.coverImage ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)'
+              }
+            }}
           >
             Back to Blog
           </Button>
 
           {/* Article Card */}
           <Card sx={{
-            p: { xs: 3, md: 5 },
+            p: { xs: 3, md: 6 },
             mb: 6,
-            borderRadius: 3,
-            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.98), rgba(255,255,255,1))',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.8)'
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            bgcolor: 'white',
+            border: '1px solid #e5e5e7'
           }}>
             {/* Categories */}
             {post.categories && post.categories.length > 0 && (
-              <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {post.categories.map((pc) => (
-                  <Chip
-                    key={pc.category.id}
-                    label={pc.category.name}
-                    component={Link}
-                    to={`/blog?category=${pc.category.slug}`}
-                    clickable
-                    sx={{
-                      bgcolor: pc.category.color || 'primary.main',
-                      color: 'white',
-                      fontWeight: 600,
-                      px: 0.5,
-                      fontSize: '0.875rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      '&:hover': {
-                        bgcolor: pc.category.color ? `${pc.category.color}dd` : 'primary.dark',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                  />
-                ))}
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: '#b91c1c',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {post.categories[0].category.name}
+                </Typography>
               </Box>
             )}
 
             {/* Title */}
-            <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 800, mb: 3 }}>
+            <Typography
+              variant="h1"
+              component="h1"
+              gutterBottom
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                lineHeight: 1.1,
+                color: '#1d1d1f',
+                mb: 3,
+                letterSpacing: '-0.02em'
+              }}
+            >
               {post.title}
             </Typography>
 
             {/* Meta Information */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, flexWrap: 'wrap' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Avatar sx={{ bgcolor: 'primary.main' }}>
-                  {post.author?.firstName?.charAt(0) || 'A'}
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {authorName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Author
-                  </Typography>
-                </Box>
-              </Box>
-
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, flexWrap: 'wrap' }}>
+              <Typography variant="body2" sx={{ color: '#1d1d1f', fontWeight: 500 }}>
+                {authorName}
+              </Typography>
+              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
               {post.publishedAt && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <CalendarTodayIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                  <Typography variant="body2" color="text.secondary">
-                    {format(new Date(post.publishedAt), 'MMMM d, yyyy')}
-                  </Typography>
-                </Box>
-              )}
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <VisibilityIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  {post.viewCount || 0} views
+                <Typography variant="body2" sx={{ color: '#86868b' }}>
+                  {format(new Date(post.publishedAt), 'MMMM d, yyyy')}
                 </Typography>
-              </Box>
+              )}
+              <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: '#d2d2d7' }} />
+              <Typography variant="body2" sx={{ color: '#86868b' }}>
+                {post.viewCount || 0} views
+              </Typography>
             </Box>
 
-            <Divider sx={{ mb: 4 }} />
+            <Divider sx={{ mb: 5, borderColor: '#e5e5e7' }} />
 
             {/* Excerpt */}
             {post.excerpt && (
               <Typography
                 variant="h6"
                 sx={{
-                  color: 'text.secondary',
+                  color: '#6e6e73',
                   fontWeight: 400,
-                  lineHeight: 1.8,
-                  mb: 4,
-                  fontStyle: 'italic',
-                  pl: 3,
-                  borderLeft: '4px solid',
-                  borderColor: 'primary.main'
+                  fontSize: '1.25rem',
+                  lineHeight: 1.6,
+                  mb: 5,
+                  letterSpacing: '-0.01em'
                 }}
               >
                 {post.excerpt}
@@ -234,54 +206,63 @@ const BlogPostPage = () => {
             <Box
               sx={{
                 '& h1, & h2, & h3, & h4, & h5, & h6': {
-                  fontWeight: 700,
-                  mt: 4,
-                  mb: 2,
-                  lineHeight: 1.3
+                  fontWeight: 600,
+                  mt: 5,
+                  mb: 2.5,
+                  lineHeight: 1.3,
+                  color: '#1d1d1f',
+                  letterSpacing: '-0.01em'
                 },
-                '& h2': { fontSize: '2rem' },
+                '& h2': { fontSize: '2rem', mt: 6 },
                 '& h3': { fontSize: '1.5rem' },
                 '& p': {
-                  lineHeight: 1.8,
-                  mb: 2,
-                  fontSize: '1.1rem',
-                  color: 'text.primary'
+                  lineHeight: 1.7,
+                  mb: 2.5,
+                  fontSize: '1.125rem',
+                  color: '#1d1d1f',
+                  letterSpacing: '-0.005em'
                 },
                 '& a': {
-                  color: 'primary.main',
-                  textDecoration: 'underline',
+                  color: '#b91c1c',
+                  textDecoration: 'none',
+                  fontWeight: 500,
                   '&:hover': {
-                    color: 'primary.dark'
+                    textDecoration: 'underline'
                   }
                 },
                 '& img': {
                   maxWidth: '100%',
                   height: 'auto',
-                  borderRadius: 2,
-                  my: 3
+                  borderRadius: 1.5,
+                  my: 4
                 },
                 '& ul, & ol': {
                   pl: 3,
-                  mb: 2,
+                  mb: 3,
                   '& li': {
-                    mb: 1,
-                    lineHeight: 1.8
+                    mb: 1.5,
+                    lineHeight: 1.7,
+                    fontSize: '1.125rem',
+                    color: '#1d1d1f'
                   }
                 },
                 '& code': {
-                  bgcolor: 'grey.100',
+                  bgcolor: '#f5f5f7',
+                  color: '#1d1d1f',
                   p: 0.5,
-                  borderRadius: 1,
+                  px: 1,
+                  borderRadius: 0.5,
                   fontFamily: 'monospace',
-                  fontSize: '0.9em'
+                  fontSize: '0.9em',
+                  fontWeight: 500
                 },
                 '& pre': {
-                  bgcolor: 'grey.900',
-                  color: 'white',
-                  p: 2,
-                  borderRadius: 2,
+                  bgcolor: '#1d1d1f',
+                  color: '#f5f5f7',
+                  p: 3,
+                  borderRadius: 1.5,
                   overflow: 'auto',
-                  mb: 2,
+                  mb: 3,
                   '& code': {
                     bgcolor: 'transparent',
                     p: 0,
@@ -289,13 +270,13 @@ const BlogPostPage = () => {
                   }
                 },
                 '& blockquote': {
-                  borderLeft: '4px solid',
-                  borderColor: 'primary.main',
+                  borderLeft: '3px solid #b91c1c',
                   pl: 3,
-                  py: 1,
-                  my: 3,
-                  fontStyle: 'italic',
-                  color: 'text.secondary'
+                  py: 0.5,
+                  my: 4,
+                  fontStyle: 'normal',
+                  color: '#6e6e73',
+                  fontSize: '1.125rem'
                 }
               }}
               dangerouslySetInnerHTML={{ __html: post.htmlContent || post.content }}
@@ -358,15 +339,15 @@ const BlogPostPage = () => {
               </Box>
             )}
 
-            <Divider sx={{ mt: 4, mb: 3 }} />
+            <Divider sx={{ mt: 6, mb: 4, borderColor: '#e5e5e7' }} />
 
             {/* Tags */}
             {post.tags && post.tags.length > 0 && (
               <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontWeight: 600 }}>
-                  Tags:
+                <Typography variant="body2" sx={{ mb: 2, fontWeight: 500, color: '#86868b' }}>
+                  Tagged with:
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                   {post.tags.map((pt) => (
                     <Chip
                       key={pt.tag.id}
@@ -374,8 +355,17 @@ const BlogPostPage = () => {
                       component={Link}
                       to={`/blog?tag=${pt.tag.slug}`}
                       clickable
-                      variant="outlined"
                       size="medium"
+                      sx={{
+                        bgcolor: '#f5f5f7',
+                        color: '#1d1d1f',
+                        border: '1px solid #d2d2d7',
+                        fontWeight: 500,
+                        '&:hover': {
+                          bgcolor: '#e8e8ed',
+                          borderColor: '#b91c1c'
+                        }
+                      }}
                     />
                   ))}
                 </Box>
@@ -385,30 +375,28 @@ const BlogPostPage = () => {
 
           {/* Call to Action */}
           <Card sx={{
-            p: 4,
+            p: { xs: 4, md: 5 },
             textAlign: 'center',
             mb: 6,
-            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
+            bgcolor: '#1d1d1f',
             color: 'white',
-            borderRadius: 3,
-            boxShadow: '0 20px 60px rgba(185, 28, 28, 0.4)',
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1), transparent 50%)',
-              pointerEvents: 'none'
-            }
+            borderRadius: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            border: 'none'
           }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, position: 'relative', zIndex: 1 }}>
+            <Typography
+              variant="h4"
+              gutterBottom
+              sx={{
+                fontWeight: 600,
+                fontSize: { xs: '1.75rem', md: '2rem' },
+                mb: 2,
+                letterSpacing: '-0.01em'
+              }}
+            >
               Ready to Transform Your Property Management?
             </Typography>
-            <Typography variant="body1" sx={{ mb: 3, opacity: 0.95, position: 'relative', zIndex: 1 }}>
+            <Typography variant="body1" sx={{ mb: 4, color: '#f5f5f7', fontSize: '1.125rem', maxWidth: 500, mx: 'auto' }}>
               Join thousands of property managers who trust Buildstate FM
             </Typography>
             <Button
@@ -417,20 +405,19 @@ const BlogPostPage = () => {
               variant="contained"
               size="large"
               sx={{
-                bgcolor: 'white',
-                color: '#b91c1c',
-                fontWeight: 700,
+                bgcolor: '#b91c1c',
+                color: 'white',
+                fontWeight: 600,
+                textTransform: 'none',
                 px: 4,
                 py: 1.5,
-                position: 'relative',
-                zIndex: 1,
-                boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                fontSize: '1rem',
+                borderRadius: 1.5,
+                boxShadow: 'none',
                 '&:hover': {
-                  bgcolor: 'grey.100',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.2)'
-                },
-                transition: 'all 0.3s ease'
+                  bgcolor: '#991b1b',
+                  boxShadow: 'none'
+                }
               }}
             >
               Get Started Free
