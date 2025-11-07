@@ -375,7 +375,7 @@ const BlogPage = () => {
               <CircularProgress size={50} sx={{ color: '#b91c1c' }} />
             </Box>
           ) : posts.length === 0 ? (
-            /* Empty State */}
+            /* Empty State */
             <Box sx={{
               textAlign: 'center',
               py: 12,
