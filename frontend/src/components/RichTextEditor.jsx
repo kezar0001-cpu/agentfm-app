@@ -7,8 +7,11 @@ import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common as lowlight } from 'lowlight';
+import { createLowlight, common } from 'lowlight';
 import { useState } from 'react';
+
+// Create lowlight instance for syntax highlighting
+const lowlight = createLowlight(common);
 import {
   Box,
   Paper,
@@ -54,7 +57,10 @@ const RichTextEditor = ({ content, onChange, placeholder = 'Start writing...' })
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // Disable extensions we're replacing with custom configurations
+        codeBlock: false,
+      }),
       Image,
       Link.configure({
         openOnClick: false,
