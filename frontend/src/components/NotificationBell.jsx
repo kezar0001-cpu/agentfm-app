@@ -59,7 +59,14 @@ function resolveSocketConfiguration() {
     console.warn('[NotificationBell] Failed to parse API base URL for WebSocket configuration:', error);
   }
 
-  const protocol = resolvedUrl?.protocol === 'https:' ? 'wss:' : resolvedUrl?.protocol === 'http:' ? 'ws:' : null;
+  let protocol = null;
+  if (resolvedUrl?.protocol === 'https:') {
+    protocol = 'wss:';
+  } else if (resolvedUrl?.protocol === 'http:') {
+    protocol = 'ws:';
+  } else if (resolvedUrl?.protocol === 'wss:' || resolvedUrl?.protocol === 'ws:') {
+    protocol = resolvedUrl.protocol;
+  }
   const wsUrl = resolvedUrl
     ? `${protocol || 'ws:'}//${resolvedUrl.host}`.replace(/\/+$/, '')
     : apiBase.replace(/^http/, 'ws').replace(/\/+$/, '');
