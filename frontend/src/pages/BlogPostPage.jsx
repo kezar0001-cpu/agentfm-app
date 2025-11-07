@@ -85,7 +85,7 @@ const BlogPostPage = () => {
       <Box sx={{
         bgcolor: 'background.default',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
         position: 'relative',
         '&::before': {
           content: '""',
@@ -94,7 +94,7 @@ const BlogPostPage = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(253, 216, 53, 0.15), transparent 50%)',
+          background: 'radial-gradient(circle at 20% 50%, rgba(185, 28, 28, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(249, 115, 22, 0.2), transparent 50%)',
           pointerEvents: 'none'
         }
       }}>
@@ -388,10 +388,10 @@ const BlogPostPage = () => {
             p: 4,
             textAlign: 'center',
             mb: 6,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #b91c1c 0%, #f97316 100%)',
             color: 'white',
             borderRadius: 3,
-            boxShadow: '0 20px 60px rgba(102, 126, 234, 0.4)',
+            boxShadow: '0 20px 60px rgba(185, 28, 28, 0.4)',
             position: 'relative',
             overflow: 'hidden',
             '&::before': {
@@ -418,7 +418,7 @@ const BlogPostPage = () => {
               size="large"
               sx={{
                 bgcolor: 'white',
-                color: '#667eea',
+                color: '#b91c1c',
                 fontWeight: 700,
                 px: 4,
                 py: 1.5,
