@@ -168,7 +168,10 @@ const PropertyImageCarousel = ({
         {showFullscreenButton && items.length > 0 && (
           <IconButton
             size="small"
-            onClick={handleOpenFullscreen}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleOpenFullscreen();
+            }}
             sx={{
               position: 'absolute',
               top: 8,
@@ -284,7 +287,10 @@ const PropertyImageCarousel = ({
                 component="img"
                 src={resolvePropertyImageUrl(item.imageUrl, fallbackText, '100x100')}
                 alt={item.caption || `Thumbnail ${index + 1}`}
-                onClick={() => handleThumbnailClick(index)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleThumbnailClick(index);
+                }}
                 sx={{
                   width: 60,
                   height: 60,

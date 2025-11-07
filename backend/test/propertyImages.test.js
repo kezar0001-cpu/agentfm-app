@@ -45,9 +45,13 @@ test('normalizePropertyImages sorts images by displayOrder then createdAt', () =
   assert.deepEqual(result.map((img) => img.id), ['img-1', 'img-3', 'img-2']);
 });
 
-test('propertyImageCreateSchema requires a valid URL', () => {
-  const success = propertyImageCreateSchema.safeParse({ imageUrl: ' https://example.com/test.jpg ' });
-  assert.equal(success.success, true);
+test('propertyImageCreateSchema accepts hosted or uploaded image sources', () => {
+  const hosted = propertyImageCreateSchema.safeParse({ imageUrl: ' https://example.com/test.jpg ' });
+  assert.equal(hosted.success, true);
+
+  const uploaded = propertyImageCreateSchema.safeParse({ imageUrl: '/uploads/example.png' });
+  assert.equal(uploaded.success, true);
+
   const failure = propertyImageCreateSchema.safeParse({ imageUrl: 'not-a-url' });
   assert.equal(failure.success, false);
 });
