@@ -94,10 +94,6 @@ const DashboardPage = () => {
   const isTrialActive = subscriptionStatus === 'TRIAL' && trialDaysRemaining > 0;
   const isSubscribed = subscriptionStatus === 'ACTIVE';
 
-  // We want to show an alert if the user is NOT actively subscribed.
-  // This covers cases where the trial has expired, or the status is null/cancelled/suspended.
-  const showSubscriptionAlert = !isSubscribed;
-
   // Show upgrade prompt at strategic moments for trial users
   useEffect(() => {
     // Only show for trial users who haven't seen the modal in this session
@@ -124,44 +120,6 @@ const DashboardPage = () => {
       }
     }
   }, [summary, isSubscribed, isTrialActive, trialDaysRemaining]);
-
-  const renderSubscriptionAlert = () => {
-    if (isTrialActive) {
-      return (
-        <Alert
-          severity="info"
-          icon={<AccessTimeIcon fontSize="inherit" />}
-          action={
-            <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
-              Subscribe Now
-            </Button>
-          }
-          sx={{ mb: 3 }}
-        >
-          <AlertTitle>Trial Period</AlertTitle>
-          You have <strong>{trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left</strong> in your free trial. Subscribe to keep access to all features.
-        </Alert>
-      );
-    }
-    
-    // This will show if the trial is over, or status is anything other than ACTIVE or a valid TRIAL.
-    return (
-      <Alert
-        severity="warning"
-        icon={<WarningIcon fontSize="inherit" />}
-        action={
-          <Button color="inherit" size="small" onClick={() => navigate('/subscriptions')}>
-            Subscribe
-          </Button>
-        }
-        sx={{ mb: 3 }}
-      >
-        <AlertTitle>No Active Subscription</AlertTitle>
-        Your trial has ended or your subscription is inactive. Please subscribe to restore full functionality.
-      </Alert>
-    );
-  };
-  // --- End Subscription Status Logic ---
 
   if (isLoading) {
     return (
@@ -253,30 +211,6 @@ const DashboardPage = () => {
           </GradientButton>
         </Stack>
       </Stack>
-
-      {/* --- Dynamic Subscription Status Display --- */}
-      {showSubscriptionAlert && renderSubscriptionAlert()}
-      
-      {isSubscribed && (
-         <Alert
-          severity="success"
-          icon={<CheckCircleIcon fontSize="inherit" />}
-          sx={{ mb: 3, display: 'flex', alignItems: 'center' }}
-        >
-          <Box sx={{ flexGrow: 1 }}>
-            <AlertTitle>Subscription Active</AlertTitle>
-            You have full access to all features.
-          </Box>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {currentTime.toLocaleTimeString()}
-          </Typography>
-          <Button color="inherit" size="small" onClick={redirectToBillingPortal}>
-            Manage
-          </Button>
-        </Alert>
-      )}
-      {/* --- End Subscription Status Display --- */}
-
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4, animation: 'fade-in-up 0.6s ease-out' }}>
