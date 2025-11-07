@@ -25,6 +25,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import { format } from 'date-fns';
 import { getBlogPosts, getBlogCategories, getBlogTags } from '../api/blog';
 import SEO from '../components/SEO';
+import BlogPublicNav from '../components/BlogPublicNav';
 import toast from 'react-hot-toast';
 
 const BlogPage = () => {
@@ -148,6 +149,8 @@ const BlogPage = () => {
         description="Read the latest insights, updates, and resources about property management from AgentFM"
         keywords={['property management', 'blog', 'real estate', 'maintenance', 'inspections']}
       />
+
+      <BlogPublicNav />
 
       <Box
         sx={{

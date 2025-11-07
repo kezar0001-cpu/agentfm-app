@@ -19,6 +19,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { format } from 'date-fns';
 import { getBlogPost } from '../api/blog';
 import SEO from '../components/SEO';
+import BlogPublicNav from '../components/BlogPublicNav';
 import toast from 'react-hot-toast';
 
 const BlogPostPage = () => {
@@ -78,6 +79,8 @@ const BlogPostPage = () => {
         modifiedDate={post.updatedAt}
         tags={post.tags?.map(pt => pt.tag.name) || []}
       />
+
+      <BlogPublicNav />
 
       <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
         {/* Hero Section */}

@@ -1,34 +1,44 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
 import { refreshCurrentUser } from './lib/auth.js';
 
 function AuthGate({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const user = await refreshCurrentUser();
-        
+
         console.log('AuthGate checking authentication:', !!user);
 
         if (!user) {
-          console.log('Not authenticated, redirecting to signin');
-          navigate('/signin', { replace: true });
+          // Check if this is a blog admin route
+          const isBlogAdminRoute = location.pathname.startsWith('/admin/blog');
+          const loginPath = isBlogAdminRoute ? '/admin/blog/login' : '/signin';
+
+          console.log('Not authenticated, redirecting to', loginPath);
+          navigate(loginPath, { replace: true });
         } else {
           console.log('Authentication valid, proceeding');
           setIsChecking(false);
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        navigate('/signin', { replace: true });
+
+        // Check if this is a blog admin route
+        const isBlogAdminRoute = location.pathname.startsWith('/admin/blog');
+        const loginPath = isBlogAdminRoute ? '/admin/blog/login' : '/signin';
+
+        navigate(loginPath, { replace: true });
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   if (isChecking) {
     return (
