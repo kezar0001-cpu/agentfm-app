@@ -3,7 +3,7 @@ import { apiClient } from '../api/client.js';
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
-export const USER_UPDATED_EVENT = 'agentfm:user-updated';
+export const USER_UPDATED_EVENT = 'buildstate:user-updated';
 
 function dispatchUserUpdated(user) {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;

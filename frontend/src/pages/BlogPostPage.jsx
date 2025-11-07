@@ -360,7 +360,7 @@ const BlogPostPage = () => {
               Ready to Transform Your Property Management?
             </Typography>
             <Typography variant="body1" sx={{ mb: 3, opacity: 0.9 }}>
-              Join thousands of property managers who trust AgentFM
+              Join thousands of property managers who trust Buildstate FM
             </Typography>
             <Button
               component={Link}

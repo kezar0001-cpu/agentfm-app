@@ -18,7 +18,7 @@ const SEO = ({
   article = false,
   tags = []
 }) => {
-  const siteName = 'AgentFM';
+  const siteName = 'Buildstate FM';
   const defaultDescription = 'Professional Property Management Platform';
   const defaultImage = `${window.location.origin}/logo.png`;
 

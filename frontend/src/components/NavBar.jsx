@@ -53,16 +53,12 @@ function NavBar() {
     { name: 'Service Requests', href: '/service-requests' },
     { name: 'Recommendations', href: '/recommendations' },
     { name: 'Subscriptions', href: '/subscriptions' },
+    { name: 'Blog', href: '/blog' },
   ];
 
   // Add Team link for Property Managers
   if (user?.role === 'PROPERTY_MANAGER') {
     navigation.push({ name: 'Team', href: '/team' });
-  }
-
-  // Add Blog Admin link for Admins
-  if (user?.role === 'ADMIN') {
-    navigation.push({ name: 'Blog Admin', href: '/admin/blog' });
   }
 
   const handleNavigation = (path) => {
