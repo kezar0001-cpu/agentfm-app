@@ -1,91 +1,71 @@
-/**
- * Tests for property legacy alias handling
- * Ensures that legacy fields (postcode, type, coverImage, images) are properly
- * converted to standard fields (zipCode, propertyType, imageUrl) and not lost
- */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import propertiesRouter from '../routes/properties.js';
+
+const { applyLegacyAliases, resolvePrimaryImageUrl } = propertiesRouter._test;
 
 describe('Property Legacy Aliases', () => {
   describe('applyLegacyAliases function', () => {
-    // Mock the function behavior
-    const applyLegacyAliases = (input = {}) => {
-      const data = { ...input };
-      if (!data.zipCode && data.postcode) {
-        data.zipCode = data.postcode;
-      }
-      if (!data.propertyType && data.type) {
-        data.propertyType = data.type;
-      }
-      if (!data.imageUrl && (data.coverImage || data.images?.length)) {
-        const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
-        const firstUrl = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
-        if (firstUrl) {
-          data.imageUrl = firstUrl;
-        }
-      }
-      return data;
-    };
-
-    test('converts postcode to zipCode', () => {
+    it('converts postcode to zipCode', () => {
       const input = { postcode: '12345' };
       const result = applyLegacyAliases(input);
-      
-      expect(result.zipCode).toBe('12345');
-      expect(result.postcode).toBe('12345'); // Original preserved
+
+      assert.equal(result.zipCode, '12345');
+      assert.equal(result.postcode, '12345');
     });
 
-    test('converts type to propertyType', () => {
+    it('converts type to propertyType', () => {
       const input = { type: 'RESIDENTIAL' };
       const result = applyLegacyAliases(input);
-      
-      expect(result.propertyType).toBe('RESIDENTIAL');
-      expect(result.type).toBe('RESIDENTIAL'); // Original preserved
+
+      assert.equal(result.propertyType, 'RESIDENTIAL');
+      assert.equal(result.type, 'RESIDENTIAL');
     });
 
-    test('converts coverImage to imageUrl', () => {
+    it('converts coverImage to imageUrl', () => {
       const input = { coverImage: 'https://example.com/image.jpg' };
       const result = applyLegacyAliases(input);
-      
-      expect(result.imageUrl).toBe('https://example.com/image.jpg');
-      expect(result.coverImage).toBe('https://example.com/image.jpg'); // Original preserved
+
+      assert.equal(result.imageUrl, 'https://example.com/image.jpg');
+      assert.equal(result.coverImage, 'https://example.com/image.jpg');
     });
 
-    test('converts first image from images array to imageUrl', () => {
+    it('converts first image from images array to imageUrl', () => {
       const input = { images: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'] };
       const result = applyLegacyAliases(input);
-      
-      expect(result.imageUrl).toBe('https://example.com/image1.jpg');
+
+      assert.equal(result.imageUrl, 'https://example.com/image1.jpg');
     });
 
-    test('prefers coverImage over images array', () => {
+    it('prefers coverImage over images array', () => {
       const input = {
         coverImage: 'https://example.com/cover.jpg',
-        images: ['https://example.com/image1.jpg']
+        images: ['https://example.com/image1.jpg'],
       };
       const result = applyLegacyAliases(input);
-      
-      expect(result.imageUrl).toBe('https://example.com/cover.jpg');
+
+      assert.equal(result.imageUrl, 'https://example.com/cover.jpg');
     });
 
-    test('does not override existing standard fields', () => {
+    it('does not override existing standard fields', () => {
       const input = {
         zipCode: '54321',
         postcode: '12345',
         propertyType: 'COMMERCIAL',
         type: 'RESIDENTIAL',
         imageUrl: 'https://example.com/existing.jpg',
-        coverImage: 'https://example.com/cover.jpg'
+        coverImage: 'https://example.com/cover.jpg',
       };
       const result = applyLegacyAliases(input);
-      
-      // Standard fields should not be overridden
-      expect(result.zipCode).toBe('54321');
-      expect(result.propertyType).toBe('COMMERCIAL');
-      expect(result.imageUrl).toBe('https://example.com/existing.jpg');
+
+      assert.equal(result.zipCode, '54321');
+      assert.equal(result.propertyType, 'COMMERCIAL');
+      assert.equal(result.imageUrl, 'https://example.com/existing.jpg');
     });
   });
 
   describe('Property data extraction after alias conversion', () => {
-    test('should include converted fields in final data', () => {
+    it('includes converted fields in final data', () => {
       const parsed = {
         name: 'Test Property',
         address: '123 Main St',
@@ -94,16 +74,13 @@ describe('Property Legacy Aliases', () => {
         postcode: '12345',
         type: 'RESIDENTIAL',
         coverImage: 'https://example.com/image.jpg',
-        zipCode: '12345', // Converted by applyLegacyAliases
-        propertyType: 'RESIDENTIAL', // Converted by applyLegacyAliases
-        imageUrl: 'https://example.com/image.jpg', // Converted by applyLegacyAliases
+        zipCode: '12345',
+        propertyType: 'RESIDENTIAL',
+        imageUrl: 'https://example.com/image.jpg',
       };
 
-      // Simulate the destructuring in the route
-      const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+      const { managerId: _managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
-      // The bug: converted fields are in ...data but might be lost
-      // The fix: explicitly include converted fields
       const propertyData = {
         ...data,
         ...(parsed.zipCode && { zipCode: parsed.zipCode }),
@@ -111,25 +88,23 @@ describe('Property Legacy Aliases', () => {
         ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
       };
 
-      // Verify converted fields are present
-      expect(propertyData.zipCode).toBe('12345');
-      expect(propertyData.propertyType).toBe('RESIDENTIAL');
-      expect(propertyData.imageUrl).toBe('https://example.com/image.jpg');
+      assert.equal(propertyData.zipCode, '12345');
+      assert.equal(propertyData.propertyType, 'RESIDENTIAL');
+      assert.equal(propertyData.imageUrl, 'https://example.com/image.jpg');
 
-      // Verify legacy aliases are removed
-      expect(propertyData.postcode).toBeUndefined();
-      expect(propertyData.type).toBeUndefined();
-      expect(propertyData.coverImage).toBeUndefined();
-      expect(propertyData.images).toBeUndefined();
+      assert.equal(propertyData.postcode, undefined);
+      assert.equal(propertyData.type, undefined);
+      assert.equal(propertyData.coverImage, undefined);
+      assert.equal(propertyData.images, undefined);
     });
 
-    test('should handle partial updates with only legacy fields', () => {
+    it('handles partial updates with only legacy fields', () => {
       const parsed = {
         postcode: '54321',
-        zipCode: '54321', // Converted
+        zipCode: '54321',
       };
 
-      const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+      const { managerId: _managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
       const updateData = {
         ...data,
@@ -138,18 +113,18 @@ describe('Property Legacy Aliases', () => {
         ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
       };
 
-      expect(updateData.zipCode).toBe('54321');
-      expect(updateData.postcode).toBeUndefined();
+      assert.equal(updateData.zipCode, '54321');
+      assert.equal(updateData.postcode, undefined);
     });
 
-    test('should handle null/empty values correctly', () => {
+    it('preserves null or empty values', () => {
       const parsed = {
         name: 'Test',
-        zipCode: '', // Empty string
-        propertyType: null, // Null
+        zipCode: '',
+        propertyType: null,
       };
 
-      const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+      const { managerId: _managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
       const updateData = {
         ...data,
@@ -158,34 +133,26 @@ describe('Property Legacy Aliases', () => {
         ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
       };
 
-      // Empty string and null should be preserved
-      expect(updateData.zipCode).toBe('');
-      expect(updateData.propertyType).toBeNull();
+      assert.equal(updateData.zipCode, '');
+      assert.equal(updateData.propertyType, null);
     });
   });
 
   describe('Integration: Full property creation flow', () => {
-    test('should create property with legacy aliases', () => {
+    it('creates property data with legacy aliases', () => {
       const requestBody = {
         name: 'Legacy Property',
         address: '456 Old St',
         city: 'Legacy City',
         country: 'USA',
-        postcode: '67890', // Legacy
-        type: 'COMMERCIAL', // Legacy
-        coverImage: 'https://example.com/legacy.jpg', // Legacy
+        postcode: '67890',
+        type: 'COMMERCIAL',
+        coverImage: 'https://example.com/legacy.jpg',
       };
 
-      // Simulate applyLegacyAliases
-      const parsed = {
-        ...requestBody,
-        zipCode: requestBody.postcode,
-        propertyType: requestBody.type,
-        imageUrl: requestBody.coverImage,
-      };
+      const parsed = applyLegacyAliases(requestBody);
 
-      // Simulate route destructuring and data preparation
-      const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+      const { managerId: _managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
 
       const propertyData = {
         ...data,
@@ -195,16 +162,66 @@ describe('Property Legacy Aliases', () => {
         ...(parsed.imageUrl && { imageUrl: parsed.imageUrl }),
       };
 
-      // Verify final data has converted fields
-      expect(propertyData.name).toBe('Legacy Property');
-      expect(propertyData.zipCode).toBe('67890');
-      expect(propertyData.propertyType).toBe('COMMERCIAL');
-      expect(propertyData.imageUrl).toBe('https://example.com/legacy.jpg');
+      assert.equal(propertyData.name, 'Legacy Property');
+      assert.equal(propertyData.zipCode, '67890');
+      assert.equal(propertyData.propertyType, 'COMMERCIAL');
+      assert.equal(propertyData.imageUrl, 'https://example.com/legacy.jpg');
 
-      // Verify legacy fields are not in final data
-      expect(propertyData.postcode).toBeUndefined();
-      expect(propertyData.type).toBeUndefined();
-      expect(propertyData.coverImage).toBeUndefined();
+      assert.equal(propertyData.postcode, undefined);
+      assert.equal(propertyData.type, undefined);
+      assert.equal(propertyData.coverImage, undefined);
     });
+  });
+});
+
+describe('resolvePrimaryImageUrl', () => {
+  it('returns null when there are no images', () => {
+    assert.equal(resolvePrimaryImageUrl([]), null);
+    assert.equal(resolvePrimaryImageUrl(null), null);
+  });
+
+  it('prefers explicitly marked primary images', () => {
+    const images = [
+      { imageUrl: 'https://example.com/secondary.jpg', isPrimary: false, displayOrder: 0 },
+      { imageUrl: 'https://example.com/primary.jpg', isPrimary: true, displayOrder: 5 },
+    ];
+
+    assert.equal(resolvePrimaryImageUrl(images), 'https://example.com/primary.jpg');
+  });
+
+  it('falls back to display order when no primary exists', () => {
+    const images = [
+      { imageUrl: 'https://example.com/second.jpg', displayOrder: 2 },
+      { imageUrl: 'https://example.com/first.jpg', displayOrder: 0 },
+    ];
+
+    assert.equal(resolvePrimaryImageUrl(images), 'https://example.com/first.jpg');
+  });
+
+  it('uses creation time as a final tiebreaker', () => {
+    const images = [
+      {
+        imageUrl: 'https://example.com/newer.jpg',
+        displayOrder: 0,
+        createdAt: new Date('2024-02-01').toISOString(),
+      },
+      {
+        imageUrl: 'https://example.com/older.jpg',
+        displayOrder: 0,
+        createdAt: new Date('2024-01-01').toISOString(),
+      },
+    ];
+
+    assert.equal(resolvePrimaryImageUrl(images), 'https://example.com/older.jpg');
+  });
+
+  it('ignores images without usable URLs', () => {
+    const images = [
+      { imageUrl: '', isPrimary: true },
+      { imageUrl: '   ', displayOrder: 0 },
+      { imageUrl: 'https://example.com/valid.jpg', displayOrder: 1 },
+    ];
+
+    assert.equal(resolvePrimaryImageUrl(images), 'https://example.com/valid.jpg');
   });
 });
