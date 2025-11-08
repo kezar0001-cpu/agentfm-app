@@ -16,9 +16,7 @@ export async function uploadPropertyImages(files) {
     formData.append('files', file);
   });
 
-  const response = await apiClient.post('/uploads/multiple', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await apiClient.post('/uploads/multiple', formData);
 
   const urls = Array.isArray(response?.data?.urls) ? response.data.urls : [];
   if (!urls.length) {
