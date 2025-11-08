@@ -97,7 +97,7 @@ const propertyListSelect = {
 router.use(requireAuth);
 
 // Nested units routes
-router.use('/:id/units', unitsRouter);
+router.use('/:propertyId/units', unitsRouter);
 
 // Nested property image routes (defined later)
 const propertyImagesRouter = Router({ mergeParams: true });
