@@ -33,11 +33,13 @@ import {
   CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import { useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import useApiMutation from '../hooks/useApiMutation.js';
 import { COUNTRIES } from '../lib/countries.js';
 import { queryKeys } from '../utils/queryKeys.js';
 import apiClient from '../api/client.js';
 import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
+import { inviteOwnersToProperty } from '../utils/inviteOwners.js';
 
 const PROPERTY_TYPES = [
   'Residential',
@@ -123,6 +125,8 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   const [createdProperty, setCreatedProperty] = useState(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [imageUploadError, setImageUploadError] = useState('');
+  const [isSendingOwnerInvites, setIsSendingOwnerInvites] = useState(false);
+  const [ownerInviteResults, setOwnerInviteResults] = useState(null);
 
   const createPropertyMutation = useApiMutation({
     url: '/properties',
@@ -138,6 +142,8 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setCreatedProperty(null);
       setImageUploadError('');
       setIsUploadingImages(false);
+      setIsSendingOwnerInvites(false);
+      setOwnerInviteResults(null);
     }
   }, [open]);
 
@@ -398,6 +404,10 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
     }
 
     try {
+      const ownerEmails = formState.owners.emails
+        .map((email) => (typeof email === 'string' ? email.trim() : ''))
+        .filter(Boolean);
+
       const payload = {
         name: basicInfo.name.trim(),
         address: basicInfo.address.trim(),
@@ -424,6 +434,52 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
 
       const response = await createPropertyMutation.mutateAsync({ data: payload });
       const savedProperty = response?.data?.property || response?.data || null;
+
+      let inviteResult = null;
+
+      if (savedProperty?.id && ownerEmails.length > 0) {
+        setIsSendingOwnerInvites(true);
+        try {
+          inviteResult = await inviteOwnersToProperty({ emails: ownerEmails, propertyId: savedProperty.id });
+
+          if (inviteResult.successes > 0) {
+            toast.success(`Sent ${inviteResult.successes} owner invite${inviteResult.successes === 1 ? '' : 's'}.`);
+          }
+
+          if (inviteResult.failures.length > 0) {
+            const failureMessage =
+              inviteResult.failures.length === 1
+                ? `${inviteResult.failures[0].email}: ${inviteResult.failures[0].error}`
+                : `${inviteResult.failures.length} owner invites failed. You can retry from Team Management.`;
+            toast.error(failureMessage);
+          }
+
+          await queryClient.invalidateQueries({ queryKey: queryKeys.teams.invites() });
+        } catch (inviteError) {
+          const message =
+            inviteError?.response?.data?.message || inviteError?.message || 'Failed to send owner invitations.';
+          toast.error(message);
+          inviteResult = {
+            total: ownerEmails.length,
+            successes: 0,
+            failures: ownerEmails.map((email) => ({ email, error: message })),
+            emails: ownerEmails,
+          };
+        } finally {
+          setIsSendingOwnerInvites(false);
+        }
+      } else if (ownerEmails.length === 0) {
+        inviteResult = null;
+      } else {
+        inviteResult = {
+          total: ownerEmails.length,
+          successes: 0,
+          failures: ownerEmails.map((email) => ({ email, error: 'Missing property identifier for invitations.' })),
+          emails: ownerEmails,
+        };
+      }
+
+      setOwnerInviteResults(inviteResult);
 
       setCompleted((prev) => ({
         ...prev,
@@ -953,12 +1009,32 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
               <CheckCircleIcon color="success" />
             </ListItemIcon>
             <ListItemText
-              primary="Owner invitations ready"
-              secondary={
-                formState.owners.emails.filter(Boolean).length > 0
-                  ? formState.owners.emails.filter(Boolean).join(', ')
-                  : 'You can send invitations whenever you are ready.'
-              }
+              primary="Owner invitations"
+              secondary={(() => {
+                if (!ownerInviteResults) {
+                  const pending = formState.owners.emails
+                    .map((email) => (typeof email === 'string' ? email.trim() : ''))
+                    .filter(Boolean);
+                  return pending.length > 0
+                    ? `${pending.length} invite${pending.length === 1 ? ' is' : 's are'} queued to send.`
+                    : 'You can send invitations whenever you are ready.';
+                }
+
+                if (ownerInviteResults.total === 0) {
+                  return 'No owner invitations were queued.';
+                }
+
+                if (ownerInviteResults.failures.length === 0) {
+                  return `Invites sent to ${ownerInviteResults.emails.join(', ')}`;
+                }
+
+                if (ownerInviteResults.successes > 0) {
+                  const failedList = ownerInviteResults.failures.map((failure) => failure.email).join(', ');
+                  return `${ownerInviteResults.successes} invite${ownerInviteResults.successes === 1 ? '' : 's'} sent successfully. ${ownerInviteResults.failures.length} failed: ${failedList}.`;
+                }
+
+                return 'Owner invitations could not be sent. You can retry from Team Management.';
+              })()}
             />
           </ListItem>
           <ListItem>
@@ -1008,7 +1084,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         return renderCompletion();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStep, formState, basicInfoErrors]);
+  }, [activeStep, formState, basicInfoErrors, ownerInviteResults]);
 
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="md" fullWidth>
@@ -1039,19 +1115,29 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
 
       <DialogActions sx={{ px: 3, pb: 3 }}>
         {activeStep < steps.length && (
-          <Button onClick={handleCancel} disabled={createPropertyMutation.isPending || isUploadingImages}>
+          <Button
+            onClick={handleCancel}
+            disabled={createPropertyMutation.isPending || isUploadingImages || isSendingOwnerInvites}
+          >
             Cancel
           </Button>
         )}
 
         {activeStep > 0 && activeStep < steps.length && (
-          <Button onClick={handleBack} disabled={createPropertyMutation.isPending || isUploadingImages}>
+          <Button
+            onClick={handleBack}
+            disabled={createPropertyMutation.isPending || isUploadingImages || isSendingOwnerInvites}
+          >
             Back
           </Button>
         )}
 
         {activeStep < steps.length - 1 && (
-          <Button variant="contained" onClick={handleNext} disabled={isUploadingImages}>
+          <Button
+            variant="contained"
+            onClick={handleNext}
+            disabled={isUploadingImages || isSendingOwnerInvites}
+          >
             Save & Continue
           </Button>
         )}
@@ -1060,9 +1146,15 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
           <Button
             variant="contained"
             onClick={handleFinish}
-            disabled={createPropertyMutation.isPending || isUploadingImages}
+            disabled={
+              createPropertyMutation.isPending || isUploadingImages || isSendingOwnerInvites
+            }
           >
-            {createPropertyMutation.isPending ? 'Saving...' : 'Finish setup'}
+            {createPropertyMutation.isPending
+              ? 'Saving...'
+              : isSendingOwnerInvites
+              ? 'Sending invites...'
+              : 'Finish setup'}
           </Button>
         )}
 

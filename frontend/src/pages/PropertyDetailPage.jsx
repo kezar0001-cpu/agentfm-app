@@ -57,6 +57,7 @@ import UnitForm from '../components/UnitForm';
 import PropertyImageManager from '../components/PropertyImageManager';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import PropertyNotesSection from '../components/PropertyNotesSection';
+import InviteOwnerDialog from '../components/InviteOwnerDialog.jsx';
 import { normaliseArray } from '../utils/error';
 import {
   formatPropertyAddressLine,
@@ -140,6 +141,7 @@ export default function PropertyDetailPage() {
   const [deleteUnitDialogOpen, setDeleteUnitDialogOpen] = useState(false);
   const unitDialogOpenRef = useRef(unitDialogOpen);
   const deleteUnitDialogOpenRef = useRef(deleteUnitDialogOpen);
+  const [ownerInviteDialogOpen, setOwnerInviteDialogOpen] = useState(false);
 
   useEffect(() => {
     unitDialogOpenRef.current = unitDialogOpen;
@@ -235,6 +237,7 @@ export default function PropertyDetailPage() {
   });
 
   const property = propertyQuery.data?.property ?? null;
+  const canInviteOwners = user?.role === 'PROPERTY_MANAGER';
   const propertyStatus = property?.status ?? 'UNKNOWN';
   const propertyManager = property?.manager ?? null;
   const propertyManagerName = propertyManager
@@ -1294,7 +1297,12 @@ export default function PropertyDetailPage() {
                   <Button
                     variant="outlined"
                     startIcon={<PersonAddIcon />}
-                    disabled
+                    disabled={!canInviteOwners || !property}
+                    onClick={() => {
+                      if (canInviteOwners && property) {
+                        setOwnerInviteDialogOpen(true);
+                      }
+                    }}
                   >
                     Add Owner
                   </Button>
@@ -1536,6 +1544,17 @@ export default function PropertyDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <InviteOwnerDialog
+        open={ownerInviteDialogOpen}
+        onClose={() => setOwnerInviteDialogOpen(false)}
+        property={property}
+        onInvitesSent={(result) => {
+          if (result?.successes) {
+            propertyQuery.refetch();
+          }
+        }}
+      />
     </Box>
   );
 }
