@@ -25,6 +25,76 @@ const passwordChangeSchema = z.object({
   newPassword: z.string().min(8).max(100),
 });
 
+const BASIC_USER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  role: true,
+};
+
+function normalisePropertyIds(propertyIds) {
+  if (!Array.isArray(propertyIds)) {
+    return [];
+  }
+  return propertyIds.filter(Boolean);
+}
+
+export async function fetchUsersForManagedProperties(prismaClient, propertyIds, requestedRole) {
+  const safePropertyIds = normalisePropertyIds(propertyIds);
+
+  if (requestedRole === 'OWNER') {
+    if (safePropertyIds.length === 0) {
+      return [];
+    }
+
+    const ownerships = await prismaClient.propertyOwner.findMany({
+      where: {
+        propertyId: { in: safePropertyIds },
+      },
+      include: {
+        owner: {
+          select: BASIC_USER_SELECT,
+        },
+      },
+    });
+
+    return ownerships.map(record => record.owner).filter(Boolean);
+  }
+
+  if (requestedRole === 'TENANT') {
+    if (safePropertyIds.length === 0) {
+      return [];
+    }
+
+    const assignments = await prismaClient.unitTenant.findMany({
+      where: {
+        isActive: true,
+        unit: {
+          propertyId: { in: safePropertyIds },
+        },
+      },
+      include: {
+        tenant: {
+          select: BASIC_USER_SELECT,
+        },
+      },
+    });
+
+    return assignments.map(record => record.tenant).filter(Boolean);
+  }
+
+  if (requestedRole === 'TECHNICIAN') {
+    const technicians = await prismaClient.user.findMany({
+      where: { role: requestedRole },
+      select: BASIC_USER_SELECT,
+    });
+    return technicians;
+  }
+
+  return [];
+}
+
 // GET /api/users - List users by role (restricted to PROPERTY_MANAGER)
 router.get('/', asyncHandler(async (req, res) => {
   const { role } = req.query;
@@ -62,65 +132,10 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const propertyIds = managedProperties.map(p => p.id);
 
-  let users;
+  const rawUsers = await fetchUsersForManagedProperties(prisma, propertyIds, requestedRole);
 
-  if (requestedRole === 'OWNER') {
-    // Get owners of managed properties
-    const propertyOwnerships = await prisma.propertyOwner.findMany({
-      where: {
-        propertyId: { in: propertyIds },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
-    });
-    users = propertyOwnerships.map(po => po.user);
-  } else if (requestedRole === 'TENANT') {
-    // Get tenants of units in managed properties
-    const units = await prisma.unit.findMany({
-      where: {
-        propertyId: { in: propertyIds },
-        tenantId: { not: null },
-      },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
-    });
-    users = units.map(unit => unit.tenant).filter(Boolean);
-  } else {
-    // For TECHNICIAN role, return all technicians (they're not property-specific)
-    users = await prisma.user.findMany({
-      where: {
-        role: requestedRole,
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-      },
-    });
-  }
-
-  // Remove duplicates (same owner might own multiple properties)
-  const uniqueUsers = Array.from(new Map(users.map(user => [user.id, user])).values());
+  // Remove duplicates (same owner/tenant might be associated with multiple properties)
+  const uniqueUsers = Array.from(new Map(rawUsers.map(user => [user.id, user])).values());
 
   res.json({ success: true, users: uniqueUsers });
 }));
