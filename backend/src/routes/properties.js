@@ -663,6 +663,45 @@ const normalizePropertyImages = (property) => {
     }));
 };
 
+const normalizeImageRecordValue = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const determinePrimaryImageIndex = (imageUrls = [], preferredPrimaryUrl) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const preferred = normalizeImageRecordValue(preferredPrimaryUrl);
+
+  if (preferred) {
+    const matchIndex = urls.findIndex((url) => normalizeImageRecordValue(url) === preferred);
+    if (matchIndex !== -1) {
+      return matchIndex;
+    }
+  }
+
+  return urls.length > 0 ? 0 : -1;
+};
+
+const buildPropertyImageRecords = ({
+  propertyId,
+  imageUrls = [],
+  preferredPrimaryUrl,
+  getCaption,
+  uploadedById,
+}) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const primaryIndex = determinePrimaryImageIndex(urls, preferredPrimaryUrl);
+
+  return urls.map((imageUrl, index) => {
+    const caption = typeof getCaption === 'function' ? getCaption(imageUrl, index) : null;
+    return {
+      propertyId,
+      imageUrl,
+      caption: caption ?? null,
+      isPrimary: index === primaryIndex,
+      displayOrder: index,
+      uploadedById,
+    };
+  });
+};
+
 const resolvePrimaryImageUrl = (images = []) => {
   if (!Array.isArray(images) || images.length === 0) {
     return null;
@@ -861,9 +900,11 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
             isPrimary: image.isPrimary,
             displayOrder: index,
             uploadedById: req.user.id,
-          }));
+          });
 
-          await tx.propertyImage.createMany({ data: records });
+          if (records.length) {
+            await tx.propertyImage.createMany({ data: records });
+          }
         }
 
         return newProperty;
@@ -1022,7 +1063,9 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
               };
             });
 
-            await tx.propertyImage.createMany({ data: records });
+            if (records.length) {
+              await tx.propertyImage.createMany({ data: records });
+            }
           }
         }
 
