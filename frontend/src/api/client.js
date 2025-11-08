@@ -12,7 +12,6 @@ const apiClient = axios.create({
   baseURL,
   // Don't use withCredentials when using Bearer tokens - it can cause CORS issues
   withCredentials: false,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 let refreshRequest = null;
