@@ -122,6 +122,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   const [createdProperty, setCreatedProperty] = useState(null);
   const [isSendingOwnerInvites, setIsSendingOwnerInvites] = useState(false);
   const [ownerInviteResults, setOwnerInviteResults] = useState(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const createPropertyMutation = useApiMutation({
     url: '/properties',
@@ -137,6 +138,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setCreatedProperty(null);
       setIsSendingOwnerInvites(false);
       setOwnerInviteResults(null);
+      setIsUploadingImages(false);
     }
   }, [open]);
 
