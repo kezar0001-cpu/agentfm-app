@@ -55,6 +55,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
 import PropertyImageManager from '../components/PropertyImageManager';
+import PropertyImageCarousel from '../components/PropertyImageCarousel';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import PropertyNotesSection from '../components/PropertyNotesSection';
 import InviteOwnerDialog from '../components/InviteOwnerDialog.jsx';
@@ -63,7 +64,6 @@ import {
   formatPropertyAddressLine,
   formatPropertyLocality,
 } from '../utils/formatPropertyLocation';
-import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
@@ -240,6 +240,13 @@ export default function PropertyDetailPage() {
   const property = propertyQuery.data?.property ?? null;
   const canInviteOwners = user?.role === 'PROPERTY_MANAGER';
   const propertyStatus = property?.status ?? 'UNKNOWN';
+  const propertyImages = Array.isArray(property?.images) ? property.images : [];
+  const carouselImages = propertyImages.length
+    ? propertyImages
+    : property?.imageUrl
+      ? [property.imageUrl]
+      : [];
+  const hasMultipleCarouselImages = carouselImages.length > 1;
   const propertyManager = property?.manager ?? null;
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
@@ -599,17 +606,16 @@ export default function PropertyDetailPage() {
             </Stack>
 
             {/* Property Image */}
-            {property.imageUrl ? (
-              <Box
-                component="img"
-                src={resolvePropertyImageUrl(property.imageUrl, property.name)}
-                alt={property.name}
-                sx={{
-                  width: '100%',
-                  height: { xs: 220, sm: 320, md: 420 },
-                  objectFit: 'cover',
-                  borderRadius: 3,
-                }}
+            {carouselImages.length > 0 ? (
+              <PropertyImageCarousel
+                images={carouselImages}
+                fallbackText={property.name}
+                height={{ xs: 220, sm: 320, md: 420 }}
+                borderRadius={3}
+                showDots={hasMultipleCarouselImages}
+                showArrows={hasMultipleCarouselImages}
+                showCounter={hasMultipleCarouselImages}
+                showFullscreenButton
               />
             ) : (
               <Paper
@@ -1363,7 +1369,11 @@ export default function PropertyDetailPage() {
                   Property Images
                 </Typography>
                 <Divider sx={{ mb: 3 }} />
-                <PropertyImageManager propertyId={id} canEdit={canEdit} />
+                <PropertyImageManager
+                  propertyId={id}
+                  canEdit={canEdit}
+                  onImagesUpdated={propertyQuery.refetch}
+                />
               </Paper>
             )}
 
