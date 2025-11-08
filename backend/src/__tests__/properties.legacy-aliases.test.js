@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import propertiesRouter from '../routes/properties.js';
 
-const { applyLegacyAliases, resolvePrimaryImageUrl } = propertiesRouter._test;
+const { applyLegacyAliases, resolvePrimaryImageUrl, buildPropertyImageRecords } = propertiesRouter._test;
 
 describe('Property Legacy Aliases', () => {
   describe('applyLegacyAliases function', () => {
@@ -223,5 +223,50 @@ describe('resolvePrimaryImageUrl', () => {
     ];
 
     assert.equal(resolvePrimaryImageUrl(images), 'https://example.com/valid.jpg');
+  });
+});
+
+describe('buildPropertyImageRecords', () => {
+  it('marks the preferred image as primary even when not first', () => {
+    const records = buildPropertyImageRecords({
+      propertyId: 'prop-1',
+      imageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+      preferredPrimaryUrl: 'https://example.com/b.jpg',
+      uploadedById: 'user-1',
+    });
+
+    assert.equal(records.length, 2);
+    assert.equal(records[0].isPrimary, false);
+    assert.equal(records[1].isPrimary, true);
+  });
+
+  it('falls back to the first image when preferred primary is missing', () => {
+    const records = buildPropertyImageRecords({
+      propertyId: 'prop-1',
+      imageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+      preferredPrimaryUrl: 'https://example.com/c.jpg',
+      uploadedById: 'user-1',
+    });
+
+    assert.equal(records[0].isPrimary, true);
+    assert.equal(records[1].isPrimary, false);
+  });
+
+  it('reuses captions through the provided getter', () => {
+    const captions = new Map([
+      ['https://example.com/a.jpg', ['Front']],
+      ['https://example.com/b.jpg', ['Lobby']],
+    ]);
+
+    const records = buildPropertyImageRecords({
+      propertyId: 'prop-1',
+      imageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+      preferredPrimaryUrl: ' https://example.com/a.jpg ',
+      getCaption: (url) => captions.get(url)?.shift() ?? null,
+      uploadedById: 'user-1',
+    });
+
+    assert.deepEqual(records.map((record) => record.caption), ['Front', 'Lobby']);
+    assert.equal(records[0].isPrimary, true);
   });
 });

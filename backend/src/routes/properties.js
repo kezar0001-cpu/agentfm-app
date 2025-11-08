@@ -555,6 +555,45 @@ const normalizePropertyImages = (property) => {
     }));
 };
 
+const normalizeImageRecordValue = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const determinePrimaryImageIndex = (imageUrls = [], preferredPrimaryUrl) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const preferred = normalizeImageRecordValue(preferredPrimaryUrl);
+
+  if (preferred) {
+    const matchIndex = urls.findIndex((url) => normalizeImageRecordValue(url) === preferred);
+    if (matchIndex !== -1) {
+      return matchIndex;
+    }
+  }
+
+  return urls.length > 0 ? 0 : -1;
+};
+
+const buildPropertyImageRecords = ({
+  propertyId,
+  imageUrls = [],
+  preferredPrimaryUrl,
+  getCaption,
+  uploadedById,
+}) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const primaryIndex = determinePrimaryImageIndex(urls, preferredPrimaryUrl);
+
+  return urls.map((imageUrl, index) => {
+    const caption = typeof getCaption === 'function' ? getCaption(imageUrl, index) : null;
+    return {
+      propertyId,
+      imageUrl,
+      caption: caption ?? null,
+      isPrimary: index === primaryIndex,
+      displayOrder: index,
+      uploadedById,
+    };
+  });
+};
+
 const resolvePrimaryImageUrl = (images = []) => {
   if (!Array.isArray(images) || images.length === 0) {
     return null;
@@ -749,16 +788,16 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         });
 
         if (includeImages && initialImages.length) {
-          const records = initialImages.map((imageUrl, index) => ({
+          const records = buildPropertyImageRecords({
             propertyId: newProperty.id,
-            imageUrl,
-            caption: null,
-            isPrimary: index === 0,
-            displayOrder: index,
+            imageUrls: initialImages,
+            preferredPrimaryUrl: coverImageUrl,
             uploadedById: req.user.id,
-          }));
+          });
 
-          await tx.propertyImage.createMany({ data: records });
+          if (records.length) {
+            await tx.propertyImage.createMany({ data: records });
+          }
         }
 
         return newProperty;
@@ -903,16 +942,20 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
           await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
 
           if (imageUpdates.length) {
-            const records = imageUpdates.map((imageUrl, index) => ({
-              propertyId: property.id,
-              imageUrl,
-              caption: existingImagesByUrl.get(imageUrl)?.shift()?.caption ?? null,
-              isPrimary: index === 0,
-              displayOrder: index,
-              uploadedById: req.user.id,
-            }));
+            const preferredPrimaryUrl =
+              parsed.imageUrl !== undefined ? parsed.imageUrl : imageUpdates[0] ?? null;
 
-            await tx.propertyImage.createMany({ data: records });
+            const records = buildPropertyImageRecords({
+              propertyId: property.id,
+              imageUrls: imageUpdates,
+              preferredPrimaryUrl,
+              getCaption: (imageUrl) => existingImagesByUrl.get(imageUrl)?.shift()?.caption ?? null,
+              uploadedById: req.user.id,
+            });
+
+            if (records.length) {
+              await tx.propertyImage.createMany({ data: records });
+            }
           }
         }
 
@@ -1449,6 +1492,8 @@ router._test = {
   normalizePropertyImages,
   resolvePrimaryImageUrl,
   determineNewImagePrimaryFlag,
+  determinePrimaryImageIndex,
+  buildPropertyImageRecords,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
