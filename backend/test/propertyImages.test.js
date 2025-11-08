@@ -13,6 +13,8 @@ const {
   propertyImageUpdateSchema,
   propertyImageReorderSchema,
   propertyImagesRouter,
+  maybeHandleImageUpload,
+  isMultipartRequest,
 } = propertiesRouter._test;
 
 test('property images router is exposed and configured with merge params', () => {
@@ -72,6 +74,36 @@ test('propertyImageReorderSchema enforces non-empty ordered ids array', () => {
   assert.equal(failure.success, false);
   const success = propertyImageReorderSchema.safeParse({ orderedImageIds: ['img-1', 'img-2'] });
   assert.equal(success.success, true);
+});
+
+test('isMultipartRequest detects multipart form submissions', () => {
+  assert.equal(isMultipartRequest({ headers: { 'content-type': 'multipart/form-data; boundary=abc' } }), true);
+  assert.equal(isMultipartRequest({ headers: { 'content-type': 'application/json' } }), false);
+  assert.equal(isMultipartRequest({ headers: {} }), false);
+  assert.equal(isMultipartRequest({}), false);
+});
+
+test('maybeHandleImageUpload preserves JSON bodies when request is not multipart', async () => {
+  const req = {
+    headers: { 'content-type': 'application/json' },
+    body: { imageUrl: 'https://example.com/example.jpg', caption: 'Sample' },
+  };
+  const res = {};
+
+  let nextCalls = 0;
+  await new Promise((resolve, reject) => {
+    maybeHandleImageUpload(req, res, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      nextCalls += 1;
+      resolve();
+    });
+  });
+
+  assert.equal(nextCalls, 1);
+  assert.deepEqual(req.body, { imageUrl: 'https://example.com/example.jpg', caption: 'Sample' });
 });
 
 test('property image upload removes orphaned files when access is denied', async () => {
