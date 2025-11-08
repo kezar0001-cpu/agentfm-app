@@ -207,7 +207,10 @@ const propertyImagesIncludeConfig = {
   ],
 };
 
+const PROPERTY_IMAGES_CHECK_TTL_MS = 30 * 1000;
+
 let propertyImagesFeatureCache = null;
+let propertyImagesFeatureLastCheck = 0;
 let propertyImagesFeatureLogged = false;
 
 const logPropertyImagesUnavailable = () => {
@@ -227,32 +230,50 @@ const isPropertyImagesMissingError = (error) => {
   return message.includes('propertyimage');
 };
 
+const shouldRecheckPropertyImagesSupport = () => {
+  if (propertyImagesFeatureCache === null) {
+    return true;
+  }
+
+  if (propertyImagesFeatureCache === true) {
+    return false;
+  }
+
+  const age = Date.now() - propertyImagesFeatureLastCheck;
+  return age >= PROPERTY_IMAGES_CHECK_TTL_MS;
+};
+
+const markPropertyImagesSupported = () => {
+  propertyImagesFeatureCache = true;
+  propertyImagesFeatureLastCheck = Date.now();
+};
+
 const markPropertyImagesUnsupported = () => {
   if (propertyImagesFeatureCache !== false) {
-    propertyImagesFeatureCache = false;
     logPropertyImagesUnavailable();
   }
+  propertyImagesFeatureCache = false;
+  propertyImagesFeatureLastCheck = Date.now();
 };
 
 const propertyImagesFeatureAvailable = async () => {
-  if (propertyImagesFeatureCache !== null) {
-    return propertyImagesFeatureCache;
+  if (!shouldRecheckPropertyImagesSupport()) {
+    return propertyImagesFeatureCache === true;
   }
 
   try {
-    const result = await prisma.$queryRaw`
-      SELECT to_regclass('public."PropertyImage"') AS table_name;
-    `;
-    const exists = Boolean(result?.[0]?.table_name);
-    propertyImagesFeatureCache = exists;
-    if (!exists) {
-      logPropertyImagesUnavailable();
-    }
-    return propertyImagesFeatureCache;
+    await prisma.propertyImage.findFirst({ select: { id: true } });
+    markPropertyImagesSupported();
+    return true;
   } catch (error) {
-    console.warn('Failed to verify property images table. Assuming unavailable:', error.message);
-    markPropertyImagesUnsupported();
-    return propertyImagesFeatureCache;
+    if (isPropertyImagesMissingError(error)) {
+      markPropertyImagesUnsupported();
+      return false;
+    }
+
+    console.warn('Failed to verify property images support:', error.message);
+    propertyImagesFeatureLastCheck = Date.now();
+    throw error;
   }
 };
 
