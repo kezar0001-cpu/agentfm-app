@@ -539,6 +539,51 @@ const normalizePropertyImages = (property) => {
     }));
 };
 
+const resolvePrimaryImageUrl = (images = []) => {
+  if (!Array.isArray(images) || images.length === 0) {
+    return null;
+  }
+
+  const [bestMatch] = images
+    .filter((image) => {
+      if (!image) return false;
+      if (typeof image.imageUrl !== 'string') return false;
+      return image.imageUrl.trim().length > 0;
+    })
+    .sort((a, b) => {
+      const aPrimary = Boolean(a.isPrimary);
+      const bPrimary = Boolean(b.isPrimary);
+      if (aPrimary !== bPrimary) {
+        return aPrimary ? -1 : 1;
+      }
+
+      const orderDiff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return aDate - bDate;
+    });
+
+  return bestMatch?.imageUrl?.trim() || null;
+};
+
+const syncPropertyCoverImage = async (tx, propertyId) => {
+  const images = await tx.propertyImage.findMany({
+    where: { propertyId },
+    select: { imageUrl: true, isPrimary: true, displayOrder: true, createdAt: true },
+  });
+
+  const nextImageUrl = resolvePrimaryImageUrl(images);
+
+  await tx.property.update({
+    where: { id: propertyId },
+    data: { imageUrl: nextImageUrl },
+  });
+
+  return nextImageUrl;
+};
+
 const toPublicProperty = (property) => {
   if (!property) return property;
 
@@ -1050,6 +1095,8 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
         });
       }
 
+      await syncPropertyCoverImage(tx, propertyId);
+
       return image;
     });
 
@@ -1113,6 +1160,8 @@ propertyImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (
           data: { isPrimary: false },
         });
       }
+
+      await syncPropertyCoverImage(tx, propertyId);
 
       return result;
     });
@@ -1178,6 +1227,8 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
         }
       }
 
+      await syncPropertyCoverImage(tx, propertyId);
+
       return existing;
     });
 
@@ -1237,6 +1288,8 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
         })
       )
     );
+
+    await syncPropertyCoverImage(prisma, propertyId);
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
@@ -1368,6 +1421,7 @@ router._test = {
   applyLegacyAliases,
   toPublicProperty,
   normalizePropertyImages,
+  resolvePrimaryImageUrl,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
