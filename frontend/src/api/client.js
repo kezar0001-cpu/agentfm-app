@@ -12,7 +12,6 @@ const apiClient = axios.create({
   baseURL,
   // Don't use withCredentials when using Bearer tokens - it can cause CORS issues
   withCredentials: false,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 let refreshRequest = null;
@@ -107,13 +106,58 @@ apiClient.interceptors.request.use(
       return config;
     }
 
+    const ensureHeadersObject = () => {
+      if (!config.headers) {
+        config.headers = {};
+      }
+      return config.headers;
+    };
+
+    const normaliseHeaderAccess = (headers) => ({
+      set(name, value) {
+        if (typeof headers.set === 'function') {
+          headers.set(name, value);
+        } else {
+          headers[name] = value;
+        }
+      },
+      delete(name) {
+        if (typeof headers.delete === 'function') {
+          headers.delete(name);
+        } else {
+          delete headers[name];
+          delete headers[name?.toLowerCase?.()];
+        }
+      },
+      get(name) {
+        if (typeof headers.get === 'function') {
+          return headers.get(name);
+        }
+        return headers[name] ?? headers[name?.toLowerCase?.()];
+      },
+    });
+
+    const headers = normaliseHeaderAccess(ensureHeadersObject());
+
+    const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+    if (isFormData) {
+      headers.delete('Content-Type');
+    } else if (
+      config.data !== undefined &&
+      config.data !== null &&
+      typeof config.data === 'object' &&
+      !(config.data instanceof URLSearchParams)
+    ) {
+      headers.set('Content-Type', 'application/json');
+    }
+
     // Attach the auth token to the request
     try {
       const token = getAuthToken();
       if (token) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
-        
+        headers.set('Authorization', `Bearer ${token}`);
+
         // Debug logging in development
         if (import.meta.env.DEV) {
           console.log('[API Client] Request:', {
