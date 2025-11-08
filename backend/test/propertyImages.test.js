@@ -15,6 +15,7 @@ const {
   propertyImagesRouter,
   maybeHandleImageUpload,
   isMultipartRequest,
+  determineNewImagePrimaryFlag,
 } = propertiesRouter._test;
 
 test('property images router is exposed and configured with merge params', () => {
@@ -74,6 +75,32 @@ test('propertyImageReorderSchema enforces non-empty ordered ids array', () => {
   assert.equal(failure.success, false);
   const success = propertyImageReorderSchema.safeParse({ orderedImageIds: ['img-1', 'img-2'] });
   assert.equal(success.success, true);
+});
+
+test('determineNewImagePrimaryFlag promotes first upload even when explicitly false', () => {
+  assert.equal(
+    determineNewImagePrimaryFlag(false, { hasExistingImages: false, hasExistingPrimary: false }),
+    true
+  );
+});
+
+test('determineNewImagePrimaryFlag keeps existing primary unless explicitly overridden', () => {
+  assert.equal(
+    determineNewImagePrimaryFlag(undefined, { hasExistingImages: true, hasExistingPrimary: true }),
+    false
+  );
+  assert.equal(
+    determineNewImagePrimaryFlag(false, { hasExistingImages: true, hasExistingPrimary: true }),
+    false
+  );
+  assert.equal(
+    determineNewImagePrimaryFlag(true, { hasExistingImages: true, hasExistingPrimary: true }),
+    true
+  );
+  assert.equal(
+    determineNewImagePrimaryFlag(false, { hasExistingImages: true, hasExistingPrimary: false }),
+    true
+  );
 });
 
 test('isMultipartRequest detects multipart form submissions', () => {
