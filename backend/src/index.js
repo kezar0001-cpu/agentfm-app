@@ -53,12 +53,27 @@ const dynamicOriginMatchers = [
 
 const corsOptions = {
   origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowlist.has(origin)) return cb(null, true);
-    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+    // No origin (same-origin requests, Postman, etc.)
+    if (!origin) {
+      logger.debug('CORS: No origin header, allowing request');
       return cb(null, true);
     }
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
+
+    // Check allowlist
+    if (allowlist.has(origin)) {
+      logger.debug(`CORS: Origin ${origin} found in allowlist`);
+      return cb(null, true);
+    }
+
+    // Check dynamic matchers (e.g., *.vercel.app)
+    if (dynamicOriginMatchers.some((regex) => regex.test(origin))) {
+      logger.debug(`CORS: Origin ${origin} matched dynamic pattern`);
+      return cb(null, true);
+    }
+
+    // Reject origin (but don't throw error - this ensures CORS headers are still sent)
+    logger.warn(`CORS: Blocked origin: ${origin}`);
+    return cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -70,18 +85,52 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Explicit OPTIONS handler for all routes to ensure preflight requests work
+app.options('*', cors(corsOptions));
+
 // ---- Security Middleware
 // Helmet helps secure Express apps by setting various HTTP headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
+const connectSrc = new Set(["'self'", 'https:', 'wss:']);
+
+function normaliseOrigin(origin) {
+  if (!origin) return null;
+  return origin.trim().replace(/\/$/, '') || null;
+}
+
+function addOriginWithWebsocketVariants(origin) {
+  const normalised = normaliseOrigin(origin);
+  if (!normalised) return;
+  connectSrc.add(normalised);
+  if (normalised.startsWith('http')) {
+    connectSrc.add(normalised.replace(/^http/, 'ws'));
+  }
+}
+
+addOriginWithWebsocketVariants(process.env.API_URL);
+addOriginWithWebsocketVariants(process.env.APP_URL);
+addOriginWithWebsocketVariants(process.env.FRONTEND_URL);
+addOriginWithWebsocketVariants(process.env.VITE_API_BASE_URL);
+addOriginWithWebsocketVariants('https://agentfm-backend.onrender.com');
+addOriginWithWebsocketVariants('https://api.buildstate.com.au');
+
+for (const origin of allowlist) {
+  addOriginWithWebsocketVariants(origin);
+}
+
+const contentSecurityPolicy = {
+  directives: {
+    defaultSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    scriptSrc: ["'self'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: Array.from(connectSrc),
   },
+};
+
+app.use(helmet({
+  contentSecurityPolicy,
   crossOriginEmbedderPolicy: false, // Allow embedding for OAuth
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Rate limiting to prevent brute force attacks
