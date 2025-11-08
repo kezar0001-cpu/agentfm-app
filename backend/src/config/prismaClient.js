@@ -23,6 +23,9 @@ try {
   // Create a stub Prisma client that will fail gracefully
   prisma = new Proxy({}, {
     get(target, prop) {
+      if (prop in target) {
+        return target[prop];
+      }
       if (prop === '$connect') {
         return async () => {
           throw new Error('Prisma Client not properly initialized. Run: npx prisma generate');
@@ -37,13 +40,20 @@ try {
         };
       }
       return new Proxy({}, {
-        get() {
+        get(innerTarget, innerProp) {
+          if (innerProp in innerTarget) {
+            return innerTarget[innerProp];
+          }
           return () => {
             throw new Error('Prisma Client not properly initialized. Run: npx prisma generate');
           };
         }
       });
-    }
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    },
   });
 }
 

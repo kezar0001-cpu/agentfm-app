@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import prisma from '../src/config/prismaClient.js';
 
 import propertiesRouter from '../src/routes/properties.js';
 
@@ -68,4 +72,62 @@ test('propertyImageReorderSchema enforces non-empty ordered ids array', () => {
   assert.equal(failure.success, false);
   const success = propertyImageReorderSchema.safeParse({ orderedImageIds: ['img-1', 'img-2'] });
   assert.equal(success.success, true);
+});
+
+test('property image upload removes orphaned files when access is denied', async () => {
+  const uploadDir = path.join(process.cwd(), 'uploads');
+  fs.mkdirSync(uploadDir, { recursive: true });
+
+  const tempFilename = `test-upload-${Date.now()}.png`;
+  const tempFilePath = path.join(uploadDir, tempFilename);
+  fs.writeFileSync(tempFilePath, 'test');
+
+  const originalPropertyDelegate = prisma.property;
+  prisma.property = {
+    async findUnique() {
+      return { id: 'prop-denied', managerId: 'other-manager', owners: [] };
+    },
+  };
+
+  const routeLayer = propertyImagesRouter.stack.find(
+    (layer) => layer.route?.path === '/' && layer.route.methods?.post
+  );
+
+  assert.ok(routeLayer?.route?.stack?.length >= 1, 'Upload route handler should be registered');
+
+  const handlerLayer = routeLayer.route.stack[routeLayer.route.stack.length - 1];
+  const handler = handlerLayer.handle;
+
+  const req = {
+    params: { id: 'prop-denied' },
+    body: {},
+    file: { path: tempFilePath, filename: tempFilename },
+    user: { id: 'manager-1', role: 'PROPERTY_MANAGER' },
+  };
+
+  let statusCode = null;
+  let payload = null;
+  const res = {
+    status(code) {
+      statusCode = code;
+      return this;
+    },
+    json(data) {
+      payload = data;
+      return data;
+    },
+  };
+
+  try {
+    await handler(req, res);
+
+    assert.equal(statusCode, 403);
+    assert.equal(payload?.success, false);
+    assert.equal(fs.existsSync(tempFilePath), false);
+  } finally {
+    prisma.property = originalPropertyDelegate;
+    if (fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+  }
 });
