@@ -574,17 +574,17 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         coverImageUrl={basicInfo.imageUrl}
         propertyName={basicInfo.name}
         onChange={handleUploadedImagesChange}
-        onUploadStatusChange={setIsUploadingImages}
       />
 
       <TextField
-        fullWidth
-        id="onboarding-property-image-url"
-        label="Cover image URL (optional)"
-        value={basicInfo.imageUrl}
-        onChange={handleBasicInfoChange('imageUrl')}
-        helperText="Uploaded images appear above. Paste an external URL if you need to link from elsewhere."
-      />
+          fullWidth
+          id="onboarding-property-image-url"
+          label="Cover image URL (optional)"
+          value={basicInfo.imageUrl}
+          onChange={handleBasicInfoChange('imageUrl')}
+          helperText="Uploaded images appear above. Paste an external URL if you need to link from elsewhere."
+        />
+      </Stack>
     </Stack>
   );
 

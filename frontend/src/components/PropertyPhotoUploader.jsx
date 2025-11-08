@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import {
   Box,
   Button,
@@ -26,25 +26,10 @@ const PropertyPhotoUploader = ({
   onChange,
   allowAltText = false,
   disabled = false,
-  onUploadStatusChange,
 }) => {
   const fileInputId = useId();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (typeof onUploadStatusChange === 'function') {
-      onUploadStatusChange(isUploading);
-    }
-  }, [isUploading, onUploadStatusChange]);
-
-  useEffect(() => {
-    return () => {
-      if (typeof onUploadStatusChange === 'function') {
-        onUploadStatusChange(false);
-      }
-    };
-  }, [onUploadStatusChange]);
 
   const safeImages = Array.isArray(images) && images.length > 0 ? images : [];
   const hasImages = safeImages.length > 0;
@@ -250,7 +235,6 @@ PropertyPhotoUploader.propTypes = {
   onChange: PropTypes.func,
   allowAltText: PropTypes.bool,
   disabled: PropTypes.bool,
-  onUploadStatusChange: PropTypes.func,
 };
 
 export default PropertyPhotoUploader;

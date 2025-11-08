@@ -785,13 +785,30 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         });
 
         if (includeImages && imageUpdates) {
+          const existingImages = await tx.propertyImage.findMany({
+            where: { propertyId: property.id },
+            select: { imageUrl: true, caption: true },
+            orderBy: [
+              { displayOrder: 'asc' },
+              { createdAt: 'asc' },
+            ],
+          });
+
+          const existingImagesByUrl = existingImages.reduce((map, image) => {
+            if (!map.has(image.imageUrl)) {
+              map.set(image.imageUrl, []);
+            }
+            map.get(image.imageUrl).push(image);
+            return map;
+          }, new Map());
+
           await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
 
           if (imageUpdates.length) {
             const records = imageUpdates.map((imageUrl, index) => ({
               propertyId: property.id,
               imageUrl,
-              caption: null,
+              caption: existingImagesByUrl.get(imageUrl)?.shift()?.caption ?? null,
               isPrimary: index === 0,
               displayOrder: index,
               uploadedById: req.user.id,
@@ -810,17 +827,24 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
       const withImages = await prisma.property.findUnique({
         where: { id: property.id },
-        include: buildPropertyImagesInclude(true),
+        include: {
+          owners: {
+            select: { ownerId: true },
+          },
+          ...buildPropertyImagesInclude(true),
+        },
       });
 
       return { property: result, propertyWithImages: withImages };
     });
 
     // Invalidate property and dashboard caches for all affected users
-    const cacheUserIds = collectPropertyCacheUserIds(propertyWithImages ?? updatedProperty, req.user.id);
+    const propertyForCache = propertyWithImages ?? { ...updatedProperty, owners: property.owners };
+    const cacheUserIds = collectPropertyCacheUserIds(propertyForCache, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
 
-    res.json({ success: true, property: toPublicProperty(propertyWithImages ?? updatedProperty) });
+    const propertyForResponse = propertyWithImages ?? { ...updatedProperty, owners: property.owners };
+    res.json({ success: true, property: toPublicProperty(propertyForResponse) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
