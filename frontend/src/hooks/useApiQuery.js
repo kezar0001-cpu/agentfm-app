@@ -10,12 +10,14 @@ const useApiQuery = ({ queryKey, url, enabled = true }) => {
   const [isFetching, setIsFetching] = useState(false);
 
   const didInitRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   const fetchData = useCallback(async () => {
     if (!enabled || !url) return;
-    if (isFetching) return;
+    if (isFetchingRef.current) return;
 
     setIsFetching(true);
+    isFetchingRef.current = true;
     setIsError(false);
     setError(null);
 
@@ -30,8 +32,9 @@ const useApiQuery = ({ queryKey, url, enabled = true }) => {
     } finally {
       setIsLoading(false);
       setIsFetching(false);
+      isFetchingRef.current = false;
     }
-  }, [enabled, url, isFetching]);
+  }, [enabled, url]);
 
   useEffect(() => {
     if (didInitRef.current) {
