@@ -93,12 +93,17 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
 
     try {
       setUploadError('');
+      const payload = {
+        imageUrl: imageUrl.trim(),
+        caption: altText.trim() || null,
+      };
+
+      if (images.length === 0) {
+        payload.isPrimary = true;
+      }
+
       await addImageMutation.mutateAsync({
-        data: {
-          imageUrl: imageUrl.trim(),
-          caption: altText.trim() || null,
-          isPrimary: images.length === 0, // First image is primary by default
-        },
+        data: payload,
       });
       setUploadDialogOpen(false);
       setImageUrl('');
@@ -178,12 +183,17 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       for (let index = 0; index < uploaded.length; index += 1) {
         const file = uploaded[index];
         try {
+          const payload = {
+            imageUrl: file.url,
+            caption: null,
+          };
+
+          if (images.length === 0 && index === 0) {
+            payload.isPrimary = true;
+          }
+
           await addImageMutation.mutateAsync({
-            data: {
-              imageUrl: file.url,
-              caption: null,
-              isPrimary: images.length === 0 && index === 0,
-            },
+            data: payload,
           });
         } catch (error) {
           setBulkUploadError(

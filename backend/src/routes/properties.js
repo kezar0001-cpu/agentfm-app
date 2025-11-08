@@ -400,6 +400,22 @@ const propertyImageCreateSchema = z.object({
   isPrimary: booleanLike().optional(),
 });
 
+const determineNewImagePrimaryFlag = (requestedIsPrimary, { hasExistingImages, hasExistingPrimary } = {}) => {
+  if (requestedIsPrimary === true) {
+    return true;
+  }
+
+  if (!hasExistingImages) {
+    return true;
+  }
+
+  if (!hasExistingPrimary) {
+    return true;
+  }
+
+  return false;
+};
+
 const propertyImageUpdateSchema = z
   .object({
     caption: optionalString(),
@@ -1064,14 +1080,24 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
 
     const parsed = propertyImageCreateSchema.parse(body);
 
-    const existingImages = await prisma.propertyImage.findMany({
-      where: { propertyId },
-      orderBy: { displayOrder: 'desc' },
-      take: 1,
-    });
+    const [existingImages, existingPrimary] = await Promise.all([
+      prisma.propertyImage.findMany({
+        where: { propertyId },
+        select: { id: true, displayOrder: true },
+        orderBy: { displayOrder: 'desc' },
+        take: 1,
+      }),
+      prisma.propertyImage.findFirst({
+        where: { propertyId, isPrimary: true },
+        select: { id: true },
+      }),
+    ]);
 
     const nextDisplayOrder = existingImages.length ? (existingImages[0].displayOrder ?? 0) + 1 : 0;
-    const shouldBePrimary = parsed.isPrimary ?? existingImages.length === 0;
+    const shouldBePrimary = determineNewImagePrimaryFlag(parsed.isPrimary, {
+      hasExistingImages: existingImages.length > 0,
+      hasExistingPrimary: Boolean(existingPrimary),
+    });
 
     const createdImage = await prisma.$transaction(async (tx) => {
       const image = await tx.propertyImage.create({
@@ -1422,6 +1448,7 @@ router._test = {
   toPublicProperty,
   normalizePropertyImages,
   resolvePrimaryImageUrl,
+  determineNewImagePrimaryFlag,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
