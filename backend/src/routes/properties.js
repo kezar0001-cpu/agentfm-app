@@ -746,10 +746,16 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    const { managerId: managerIdInput, postcode, type, coverImage, images, ...data } = parsed;
+    const { managerId: managerIdInput, postcode, type, coverImage, images: rawImages, ...data } = parsed;
 
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
+
+    const imageUpdates = Array.isArray(rawImages)
+      ? rawImages
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => isValidImageLocation(value))
+      : null;
 
     // Ensure converted fields are included in the data
     const updateData = {
@@ -761,16 +767,60 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
     };
 
-    const updated = await prisma.property.update({
-      where: { id: property.id },
-      data: updateData,
+    if (imageUpdates) {
+      if (imageUpdates.length > 0) {
+        if (parsed.imageUrl === undefined) {
+          updateData.imageUrl = imageUpdates[0];
+        }
+      } else if (parsed.imageUrl === undefined) {
+        updateData.imageUrl = null;
+      }
+    }
+
+    const { property: updatedProperty, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
+      const result = await prisma.$transaction(async (tx) => {
+        const updatedRecord = await tx.property.update({
+          where: { id: property.id },
+          data: updateData,
+        });
+
+        if (includeImages && imageUpdates) {
+          await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
+
+          if (imageUpdates.length) {
+            const records = imageUpdates.map((imageUrl, index) => ({
+              propertyId: property.id,
+              imageUrl,
+              caption: null,
+              isPrimary: index === 0,
+              displayOrder: index,
+              uploadedById: req.user.id,
+            }));
+
+            await tx.propertyImage.createMany({ data: records });
+          }
+        }
+
+        return updatedRecord;
+      });
+
+      if (!includeImages) {
+        return { property: result, propertyWithImages: null };
+      }
+
+      const withImages = await prisma.property.findUnique({
+        where: { id: property.id },
+        include: buildPropertyImagesInclude(true),
+      });
+
+      return { property: result, propertyWithImages: withImages };
     });
 
     // Invalidate property and dashboard caches for all affected users
-    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    const cacheUserIds = collectPropertyCacheUserIds(propertyWithImages ?? updatedProperty, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
 
-    res.json({ success: true, property: toPublicProperty(updated) });
+    res.json({ success: true, property: toPublicProperty(propertyWithImages ?? updatedProperty) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());

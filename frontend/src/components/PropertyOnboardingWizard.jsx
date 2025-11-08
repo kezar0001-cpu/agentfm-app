@@ -24,21 +24,18 @@ import {
   Chip,
   Switch,
   FormControlLabel,
-  LinearProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
   DeleteOutline as DeleteOutlineIcon,
   CheckCircle as CheckCircleIcon,
-  CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import useApiMutation from '../hooks/useApiMutation.js';
 import { COUNTRIES } from '../lib/countries.js';
 import { queryKeys } from '../utils/queryKeys.js';
-import apiClient from '../api/client.js';
-import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
+import PropertyPhotoUploader from './PropertyPhotoUploader.jsx';
 import { inviteOwnersToProperty } from '../utils/inviteOwners.js';
 
 const PROPERTY_TYPES = [
@@ -123,10 +120,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   const [completed, setCompleted] = useState({});
   const [basicInfoErrors, setBasicInfoErrors] = useState({});
   const [createdProperty, setCreatedProperty] = useState(null);
-  const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [imageUploadError, setImageUploadError] = useState('');
   const [isSendingOwnerInvites, setIsSendingOwnerInvites] = useState(false);
   const [ownerInviteResults, setOwnerInviteResults] = useState(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const createPropertyMutation = useApiMutation({
     url: '/properties',
@@ -140,10 +136,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setCompleted({});
       setBasicInfoErrors({});
       setCreatedProperty(null);
-      setImageUploadError('');
-      setIsUploadingImages(false);
       setIsSendingOwnerInvites(false);
       setOwnerInviteResults(null);
+      setIsUploadingImages(false);
     }
   }, [open]);
 
@@ -165,85 +160,14 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
     }));
   };
 
-  const handlePropertyImagesUpload = async (event) => {
-    const files = Array.from(event?.target?.files || []);
-    if (!files.length) {
-      return;
-    }
-
-    setIsUploadingImages(true);
-    setImageUploadError('');
-
-    try {
-      const formData = new FormData();
-      files.forEach((file) => formData.append('files', file));
-
-      const response = await apiClient.post('/uploads/multiple', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const urls = response?.data?.urls || [];
-      if (!urls.length) {
-        throw new Error('Upload failed');
-      }
-
-      setFormState((prev) => {
-        const existing = Array.isArray(prev.images) ? prev.images : [];
-        const nextImages = [
-          ...existing,
-          ...urls.map((url, index) => ({
-            url,
-            name: files[index]?.name || `Image ${existing.length + index + 1}`,
-          })),
-        ];
-
-        const currentCover = prev.basicInfo.imageUrl?.trim();
-        const coverImageUrl = currentCover || nextImages[0]?.url || '';
-
-        return {
-          ...prev,
-          basicInfo: {
-            ...prev.basicInfo,
-            imageUrl: coverImageUrl,
-          },
-          images: nextImages,
-        };
-      });
-    } catch (error) {
-      const message = error?.response?.data?.message || error.message || 'Failed to upload images';
-      setImageUploadError(message);
-    } finally {
-      setIsUploadingImages(false);
-      if (event?.target) {
-        event.target.value = '';
-      }
-    }
-  };
-
-  const handleRemoveUploadedImage = (url) => {
-    setFormState((prev) => {
-      const nextImages = (prev.images || []).filter((image) => image.url !== url);
-      const currentCover = prev.basicInfo.imageUrl?.trim();
-      const nextCover = currentCover === url ? nextImages[0]?.url || '' : currentCover || '';
-
-      return {
-        ...prev,
-        basicInfo: {
-          ...prev.basicInfo,
-          imageUrl: nextCover,
-        },
-        images: nextImages,
-      };
-    });
-  };
-
-  const handleSetCoverImage = (url) => {
+  const handleUploadedImagesChange = (nextImages = [], nextCover = '') => {
     setFormState((prev) => ({
       ...prev,
       basicInfo: {
         ...prev.basicInfo,
-        imageUrl: url,
+        imageUrl: nextCover || nextImages[0]?.url || '',
       },
+      images: nextImages,
     }));
   };
 
@@ -645,112 +569,22 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         onChange={handleBasicInfoChange('description')}
       />
 
-      <Stack spacing={1.5}>
-        <Typography variant="subtitle2">Property photos</Typography>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-        >
-          <Button
-            component="label"
-            variant="outlined"
-            startIcon={<CloudUploadIcon />}
-            disabled={isUploadingImages}
-          >
-            {isUploadingImages ? 'Uploading…' : 'Upload photos'}
-            <input type="file" hidden multiple accept="image/*" onChange={handlePropertyImagesUpload} />
-          </Button>
-          <Typography variant="body2" color="text.secondary">
-            Showcase the property with high-quality photos. Each file can be up to 10MB.
-          </Typography>
-        </Stack>
+      <PropertyPhotoUploader
+        images={uploadedImages}
+        coverImageUrl={basicInfo.imageUrl}
+        propertyName={basicInfo.name}
+        onChange={handleUploadedImagesChange}
+        onUploadStatusChange={setIsUploadingImages}
+      />
 
-        {isUploadingImages && <LinearProgress />}
-
-        {imageUploadError && (
-          <Alert severity="error" onClose={() => setImageUploadError('')}>
-            {imageUploadError}
-          </Alert>
-        )}
-
-        {uploadedImages.length > 0 && (
-          <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-            {uploadedImages.map((image) => {
-              const resolvedUrl = resolvePropertyImageUrl(image.url, basicInfo.name);
-              const isCover = basicInfo.imageUrl?.trim() === image.url;
-              return (
-                <Box
-                  key={image.url}
-                  sx={{
-                    position: 'relative',
-                    width: 110,
-                    height: 80,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                    border: '2px solid',
-                    borderColor: isCover ? 'primary.main' : 'divider',
-                    boxShadow: isCover ? 4 : 1,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => handleSetCoverImage(image.url)}
-                >
-                  <Box
-                    component="img"
-                    src={resolvedUrl}
-                    alt={image.name || 'Property image'}
-                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleRemoveUploadedImage(image.url);
-                    }}
-                    sx={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      bgcolor: 'rgba(0,0,0,0.55)',
-                      color: 'common.white',
-                      '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
-                    }}
-                    aria-label={`Remove ${image.name || 'uploaded image'}`}
-                  >
-                    <DeleteOutlineIcon fontSize="inherit" />
-                  </IconButton>
-                  <Chip
-                    size="small"
-                    color={isCover ? 'primary' : 'default'}
-                    label={isCover ? 'Cover photo' : 'Make cover'}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSetCoverImage(image.url);
-                    }}
-                    clickable={!isCover}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 4,
-                      left: 4,
-                      bgcolor: isCover ? 'primary.main' : 'rgba(255,255,255,0.9)',
-                      color: isCover ? 'primary.contrastText' : 'text.primary',
-                    }}
-                  />
-                </Box>
-              );
-            })}
-          </Stack>
-        )}
-
-        <TextField
-          fullWidth
-          id="onboarding-property-image-url"
-          label="Cover image URL (optional)"
-          value={basicInfo.imageUrl}
-          onChange={handleBasicInfoChange('imageUrl')}
-          helperText="Uploaded images appear above. Paste an external URL if you need to link from elsewhere."
-        />
-      </Stack>
+      <TextField
+        fullWidth
+        id="onboarding-property-image-url"
+        label="Cover image URL (optional)"
+        value={basicInfo.imageUrl}
+        onChange={handleBasicInfoChange('imageUrl')}
+        helperText="Uploaded images appear above. Paste an external URL if you need to link from elsewhere."
+      />
     </Stack>
   );
 

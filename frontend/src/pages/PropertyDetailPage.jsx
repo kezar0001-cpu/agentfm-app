@@ -63,6 +63,7 @@ import {
   formatPropertyAddressLine,
   formatPropertyLocality,
 } from '../utils/formatPropertyLocation';
+import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
 import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
@@ -601,7 +602,7 @@ export default function PropertyDetailPage() {
             {property.imageUrl ? (
               <Box
                 component="img"
-                src={property.imageUrl}
+                src={resolvePropertyImageUrl(property.imageUrl, property.name)}
                 alt={property.name}
                 sx={{
                   width: '100%',
