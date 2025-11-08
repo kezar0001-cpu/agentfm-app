@@ -91,16 +91,47 @@ app.options('*', cors(corsOptions));
 
 // ---- Security Middleware
 // Helmet helps secure Express apps by setting various HTTP headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
+const connectSrc = new Set(["'self'", 'https:', 'wss:']);
+
+function normaliseOrigin(origin) {
+  if (!origin) return null;
+  return origin.trim().replace(/\/$/, '') || null;
+}
+
+function addOriginWithWebsocketVariants(origin) {
+  const normalised = normaliseOrigin(origin);
+  if (!normalised) return;
+  connectSrc.add(normalised);
+  if (normalised.startsWith('http')) {
+    connectSrc.add(normalised.replace(/^http/, 'ws'));
+  }
+}
+
+addOriginWithWebsocketVariants(process.env.API_URL);
+addOriginWithWebsocketVariants(process.env.APP_URL);
+addOriginWithWebsocketVariants(process.env.FRONTEND_URL);
+addOriginWithWebsocketVariants(process.env.VITE_API_BASE_URL);
+addOriginWithWebsocketVariants('https://agentfm-backend.onrender.com');
+addOriginWithWebsocketVariants('https://api.buildstate.com.au');
+
+for (const origin of allowlist) {
+  addOriginWithWebsocketVariants(origin);
+}
+
+const contentSecurityPolicy = {
+  directives: {
+    defaultSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    scriptSrc: ["'self'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: Array.from(connectSrc),
   },
+};
+
+app.use(helmet({
+  contentSecurityPolicy,
   crossOriginEmbedderPolicy: false, // Allow embedding for OAuth
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Rate limiting to prevent brute force attacks
