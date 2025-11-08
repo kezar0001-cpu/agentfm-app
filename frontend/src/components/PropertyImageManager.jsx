@@ -39,24 +39,36 @@ import { useNotification } from '../hooks/useNotification.js';
 import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
 import { uploadPropertyImages } from '../utils/uploadPropertyImages.js';
 
-const PropertyImageManager = ({ propertyId, canEdit = false }) => {
+const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) => {
   const { showSuccess, showError } = useNotification();
   const { data: imagesData, isLoading, refetch } = usePropertyImages(propertyId);
   const addImageMutation = useAddPropertyImage(propertyId, () => {
     showSuccess('Image added successfully');
     refetch();
+    if (typeof onImagesUpdated === 'function') {
+      onImagesUpdated();
+    }
   });
   const updateImageMutation = useUpdatePropertyImage(propertyId, () => {
     showSuccess('Image updated successfully');
     refetch();
+    if (typeof onImagesUpdated === 'function') {
+      onImagesUpdated();
+    }
   });
   const deleteImageMutation = useDeletePropertyImage(propertyId, () => {
     showSuccess('Image deleted successfully');
     refetch();
+    if (typeof onImagesUpdated === 'function') {
+      onImagesUpdated();
+    }
   });
   const reorderImagesMutation = useReorderPropertyImages(propertyId, () => {
     showSuccess('Images reordered successfully');
     refetch();
+    if (typeof onImagesUpdated === 'function') {
+      onImagesUpdated();
+    }
   });
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
