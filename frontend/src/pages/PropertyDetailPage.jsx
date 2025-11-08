@@ -48,7 +48,7 @@ import apiClient from '../api/client';
 import useApiQuery from '../hooks/useApiQuery';
 import useApiMutation from '../hooks/useApiMutation';
 import DataState from '../components/DataState';
-import { formatDate, formatDateTime } from '../utils/date';
+import { formatDateTime } from '../utils/date';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
@@ -66,6 +66,61 @@ import ensureArray from '../utils/ensureArray';
 import { getCurrentUser } from '../lib/auth';
 
 const UNITS_PAGE_SIZE = 50;
+
+const PARKING_TYPE_LABELS = {
+  NONE: 'No dedicated parking',
+  STREET: 'Street Parking',
+  DRIVEWAY: 'Driveway',
+  GARAGE: 'Garage',
+  COVERED: 'Covered Parking',
+  UNCOVERED: 'Uncovered Parking',
+};
+
+const AMENITY_LABELS = {
+  utilities: [
+    { key: 'water', label: 'Water' },
+    { key: 'gas', label: 'Gas' },
+    { key: 'electricity', label: 'Electricity' },
+    { key: 'internet', label: 'Internet' },
+    { key: 'trash', label: 'Trash' },
+    { key: 'sewer', label: 'Sewer' },
+    { key: 'cable', label: 'Cable' },
+  ],
+  features: [
+    { key: 'pool', label: 'Pool' },
+    { key: 'gym', label: 'Fitness Center' },
+    { key: 'laundry', label: 'Laundry' },
+    { key: 'elevator', label: 'Elevator' },
+    { key: 'doorman', label: 'Doorman' },
+    { key: 'storage', label: 'Storage' },
+    { key: 'balcony', label: 'Balcony' },
+    { key: 'patio', label: 'Patio' },
+    { key: 'yard', label: 'Yard' },
+    { key: 'fireplace', label: 'Fireplace' },
+    { key: 'airConditioning', label: 'Air Conditioning' },
+    { key: 'heating', label: 'Heating' },
+    { key: 'dishwasher', label: 'Dishwasher' },
+    { key: 'microwave', label: 'Microwave' },
+    { key: 'refrigerator', label: 'Refrigerator' },
+    { key: 'washerDryer', label: 'Washer & Dryer' },
+  ],
+  security: [
+    { key: 'gated', label: 'Gated Access' },
+    { key: 'cameras', label: 'Security Cameras' },
+    { key: 'alarm', label: 'Alarm System' },
+    { key: 'accessControl', label: 'Access Control' },
+    { key: 'securityGuard', label: 'Security Guard' },
+    { key: 'intercom', label: 'Intercom' },
+  ],
+  accessibility: [
+    { key: 'wheelchairAccessible', label: 'Wheelchair Accessible' },
+    { key: 'elevator', label: 'Elevator Access' },
+    { key: 'ramps', label: 'Ramps' },
+    { key: 'wideHallways', label: 'Wide Hallways' },
+    { key: 'accessibleBathroom', label: 'Accessible Bathroom' },
+    { key: 'accessibleParking', label: 'Accessible Parking' },
+  ],
+};
 
 export default function PropertyDetailPage() {
   const { id } = useParams();
@@ -181,6 +236,141 @@ export default function PropertyDetailPage() {
   const propertyManagerName = propertyManager
     ? [propertyManager.firstName, propertyManager.lastName].filter(Boolean).join(' ')
     : null;
+
+  const amenities = property?.amenities ?? {};
+
+  const parseNumericValue = (value) => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const formatNumberValue = (value, options) => {
+    const numeric = parseNumericValue(value);
+    if (numeric === null) {
+      return 'N/A';
+    }
+    return numeric.toLocaleString(undefined, options);
+  };
+
+  const formatCurrencyValue = (value) => {
+    const numeric = parseNumericValue(value);
+    if (numeric === null) {
+      return 'N/A';
+    }
+
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numeric);
+  };
+
+  const formatDateOnly = (value) => {
+    if (!value) {
+      return 'N/A';
+    }
+
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return 'N/A';
+      }
+
+      return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
+  const formatStatusLabel = (status) => {
+    if (!status) {
+      return 'Unknown';
+    }
+
+    return status
+      .toString()
+      .toLowerCase()
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const getAmenityLabels = (sectionKey) => {
+    const section = amenities?.[sectionKey] ?? {};
+    return (AMENITY_LABELS[sectionKey] || [])
+      .filter((item) => Boolean(section?.[item.key]))
+      .map((item) => item.label);
+  };
+
+  const formatSquareFeet = (value) => {
+    const formatted = formatNumberValue(value, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return formatted === 'N/A' ? 'N/A' : `${formatted} sq ft`;
+  };
+
+  const utilitiesIncluded = getAmenityLabels('utilities');
+  const featureHighlights = getAmenityLabels('features');
+  const securityHighlights = getAmenityLabels('security');
+  const accessibilityHighlights = getAmenityLabels('accessibility');
+
+  const parkingDetails = amenities?.parking ?? {};
+  const petDetails = amenities?.pets ?? {};
+  const petDeposit = parseNumericValue(petDetails?.deposit);
+  const petWeightLimit = parseNumericValue(petDetails?.weightLimit);
+  const hasPetPolicy =
+    typeof petDetails?.allowed === 'boolean' ||
+    petDeposit !== null ||
+    petWeightLimit !== null ||
+    Boolean(petDetails?.restrictions) ||
+    Boolean(petDetails?.catsAllowed) ||
+    Boolean(petDetails?.dogsAllowed);
+
+  const purchasePrice = parseNumericValue(property?.purchasePrice);
+  const currentMarketValue = parseNumericValue(property?.currentMarketValue);
+  const annualPropertyTax = parseNumericValue(property?.annualPropertyTax);
+  const annualInsurance = parseNumericValue(property?.annualInsurance);
+  const monthlyHOA = parseNumericValue(property?.monthlyHOA);
+
+  const monthlyCarryingCost =
+    annualPropertyTax !== null || annualInsurance !== null || monthlyHOA !== null
+      ? (annualPropertyTax ?? 0) / 12 + (annualInsurance ?? 0) / 12 + (monthlyHOA ?? 0)
+      : null;
+
+  const annualCarryingCost =
+    annualPropertyTax !== null || annualInsurance !== null || monthlyHOA !== null
+      ? (annualPropertyTax ?? 0) + (annualInsurance ?? 0) + (monthlyHOA ?? 0) * 12
+      : null;
+
+  const equityGain =
+    purchasePrice !== null && currentMarketValue !== null
+      ? currentMarketValue - purchasePrice
+      : null;
+
+  const equityGainPercentage =
+    equityGain !== null && purchasePrice && purchasePrice !== 0
+      ? (equityGain / purchasePrice) * 100
+      : null;
+
+  const equityGainColor =
+    equityGain === null
+      ? 'text.primary'
+      : equityGain > 0
+      ? 'success.main'
+      : equityGain < 0
+      ? 'error.main'
+      : 'text.primary';
 
   // Check if current user can edit this property
   const canEdit = user?.role === 'PROPERTY_MANAGER' && property?.managerId === user?.id;
@@ -513,38 +703,97 @@ export default function PropertyDetailPage() {
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
+                      <Grid item xs={12} md={6} lg={4}>
                         <Typography variant="body2" color="text.secondary">
                           Address
                         </Typography>
-                        <Typography variant="body1">
-                          {property.address}
-                        </Typography>
+                        <Typography variant="body1">{property.address || 'N/A'}</Typography>
                       </Grid>
-                      <Grid item xs={12} sm={6}>
+                      <Grid item xs={12} md={6} lg={4}>
                         <Typography variant="body2" color="text.secondary">
                           Locality
                         </Typography>
                         <Typography variant="body1">
-                          {formatPropertyLocality(property)}
+                          {formatPropertyLocality(property) || 'N/A'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={12} sm={6}>
+                      <Grid item xs={12} md={6} lg={4}>
                         <Typography variant="body2" color="text.secondary">
                           Country
                         </Typography>
-                        <Typography variant="body1">{property.country}</Typography>
+                        <Typography variant="body1">{property.country || 'N/A'}</Typography>
                       </Grid>
-                      {property.totalArea && (
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="body2" color="text.secondary">
-                            Total Area
-                          </Typography>
-                          <Typography variant="body1">
-                            {property.totalArea.toLocaleString()}
-                          </Typography>
-                        </Grid>
-                      )}
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Status
+                        </Typography>
+                        <Chip
+                          label={formatStatusLabel(propertyStatus)}
+                          color={getStatusColor(propertyStatus)}
+                          size="small"
+                          sx={{ mt: 0.5 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Property Type
+                        </Typography>
+                        <Typography variant="body1">{property.propertyType || 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Year Built
+                        </Typography>
+                        <Typography variant="body1">{formatNumberValue(property.yearBuilt)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Units
+                        </Typography>
+                        <Typography variant="body1">{formatNumberValue(property.totalUnits)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Area
+                        </Typography>
+                        <Typography variant="body1">{formatSquareFeet(property.totalArea)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Lot Size
+                        </Typography>
+                        <Typography variant="body1">{formatSquareFeet(property.lotSize)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Building Size
+                        </Typography>
+                        <Typography variant="body1">{formatSquareFeet(property.buildingSize)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Number of Floors
+                        </Typography>
+                        <Typography variant="body1">{formatNumberValue(property.numberOfFloors)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Construction Type
+                        </Typography>
+                        <Typography variant="body1">{property.constructionType || 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Heating System
+                        </Typography>
+                        <Typography variant="body1">{property.heatingSystem || 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} md={6} lg={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Cooling System
+                        </Typography>
+                        <Typography variant="body1">{property.coolingSystem || 'N/A'}</Typography>
+                      </Grid>
                       <Grid item xs={12}>
                         <Typography variant="body2" color="text.secondary">
                           Description
@@ -561,20 +810,318 @@ export default function PropertyDetailPage() {
                       Property Manager
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <Typography variant="body1">
-                      {propertyManagerName || 'No manager assigned'}
-                    </Typography>
-                    {propertyManager && (
-                      <>
-                        <Typography variant="body2" color="text.secondary">
-                          {propertyManager.email}
-                        </Typography>
-                        {propertyManager.phone && (
+                    {propertyManager ? (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={4}>
                           <Typography variant="body2" color="text.secondary">
-                            {propertyManager.phone}
+                            Name
+                          </Typography>
+                          <Typography variant="body1">{propertyManagerName}</Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Email
+                          </Typography>
+                          <Typography variant="body1">{propertyManager.email}</Typography>
+                        </Grid>
+                        {propertyManager.phone && (
+                          <Grid item xs={12} sm={6} md={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              Phone
+                            </Typography>
+                            <Typography variant="body1">{propertyManager.phone}</Typography>
+                          </Grid>
+                        )}
+                      </Grid>
+                    ) : (
+                      <Typography variant="body1">No manager assigned</Typography>
+                    )}
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                      Amenities & Features
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Parking
+                        </Typography>
+                        {parkingDetails?.available ? (
+                          <Stack spacing={1.5}>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Type
+                              </Typography>
+                              <Typography variant="body1">
+                                {PARKING_TYPE_LABELS[parkingDetails.type] || 'Parking available'}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Spaces
+                              </Typography>
+                              <Typography variant="body1">{formatNumberValue(parkingDetails.spaces)}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Covered
+                              </Typography>
+                              <Typography variant="body1">{parkingDetails.covered ? 'Yes' : 'No'}</Typography>
+                            </Box>
+                          </Stack>
+                        ) : parkingDetails?.available === false ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Parking is not available
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No parking details provided
                           </Typography>
                         )}
-                      </>
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Pet Policy
+                        </Typography>
+                        {petDetails?.allowed ? (
+                          <Stack spacing={1.5}>
+                            {petDeposit !== null && (
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Pet Deposit
+                                </Typography>
+                                <Typography variant="body1">{formatCurrencyValue(petDeposit)}</Typography>
+                              </Box>
+                            )}
+                            {petWeightLimit !== null && (
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Weight Limit
+                                </Typography>
+                                <Typography variant="body1">{`${formatNumberValue(petWeightLimit)} lbs`}</Typography>
+                              </Box>
+                            )}
+                            {petDetails?.restrictions && (
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Restrictions
+                                </Typography>
+                                <Typography variant="body1">{petDetails.restrictions}</Typography>
+                              </Box>
+                            )}
+                            {(petDetails?.catsAllowed || petDetails?.dogsAllowed) && (
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {petDetails?.catsAllowed && <Chip label="Cats allowed" size="small" variant="outlined" />}
+                                {petDetails?.dogsAllowed && <Chip label="Dogs allowed" size="small" variant="outlined" />}
+                              </Stack>
+                            )}
+                          </Stack>
+                        ) : hasPetPolicy ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Pets are not allowed
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No pet policy details
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Utilities Included
+                        </Typography>
+                        {utilitiesIncluded.length ? (
+                          <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+                            {utilitiesIncluded.map((label) => (
+                              <Chip key={`utility-${label}`} label={label} size="small" color="primary" variant="outlined" />
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No utilities included
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Property Features
+                        </Typography>
+                        {featureHighlights.length ? (
+                          <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+                            {featureHighlights.map((label) => (
+                              <Chip key={`feature-${label}`} label={label} size="small" color="success" variant="outlined" />
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No additional features listed
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Security
+                        </Typography>
+                        {securityHighlights.length ? (
+                          <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+                            {securityHighlights.map((label) => (
+                              <Chip key={`security-${label}`} label={label} size="small" color="warning" variant="outlined" />
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No security features recorded
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Accessibility
+                        </Typography>
+                        {accessibilityHighlights.length ? (
+                          <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+                            {accessibilityHighlights.map((label) => (
+                              <Chip key={`accessibility-${label}`} label={label} size="small" variant="outlined" />
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No accessibility information provided
+                          </Typography>
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                      Financial Information
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Purchase Price
+                        </Typography>
+                        <Typography variant="body1">{formatCurrencyValue(purchasePrice)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Purchase Date
+                        </Typography>
+                        <Typography variant="body1">{formatDateOnly(property?.purchaseDate)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Current Market Value
+                        </Typography>
+                        <Typography variant="body1">{formatCurrencyValue(currentMarketValue)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Annual Property Tax
+                        </Typography>
+                        <Typography variant="body1">{formatCurrencyValue(annualPropertyTax)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Annual Insurance
+                        </Typography>
+                        <Typography variant="body1">{formatCurrencyValue(annualInsurance)}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Monthly HOA Fees
+                        </Typography>
+                        <Typography variant="body1">
+                          {monthlyHOA !== null
+                            ? `${formatCurrencyValue(monthlyHOA)} / month`
+                            : 'N/A'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+
+                    {(monthlyCarryingCost !== null || annualCarryingCost !== null) && (
+                      <Box
+                        sx={{
+                          mt: 3,
+                          p: 2,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'background.default',
+                        }}
+                      >
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Carrying Cost Summary
+                        </Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} useFlexGap>
+                          {monthlyCarryingCost !== null && (
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Estimated Monthly Cost
+                              </Typography>
+                              <Typography variant="h6" color="primary.main">
+                                {formatCurrencyValue(monthlyCarryingCost)}
+                              </Typography>
+                            </Box>
+                          )}
+                          {annualCarryingCost !== null && (
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Estimated Annual Cost
+                              </Typography>
+                              <Typography variant="h6" color="primary.main">
+                                {formatCurrencyValue(annualCarryingCost)}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {equityGain !== null && (
+                      <Box
+                        sx={{
+                          mt: 3,
+                          p: 2,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Equity Summary
+                        </Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} useFlexGap>
+                          <Box>
+                            <Typography variant="body2" color="text.secondary">
+                              Estimated Equity Gain/Loss
+                            </Typography>
+                            <Typography variant="h6" sx={{ color: equityGainColor }}>
+                              {formatCurrencyValue(equityGain)}
+                            </Typography>
+                          </Box>
+                          {equityGainPercentage !== null && (
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Percentage Change
+                              </Typography>
+                              <Typography variant="h6" sx={{ color: equityGainColor }}>
+                                {`${equityGainPercentage.toFixed(2)}%`}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Stack>
+                      </Box>
                     )}
                   </Box>
                 </Stack>
