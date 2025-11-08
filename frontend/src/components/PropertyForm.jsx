@@ -31,6 +31,8 @@ import PropertyAmenitiesForm from './PropertyAmenitiesForm';
 import PropertyFinancials from './PropertyFinancials';
 import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
 import { queryKeys } from '../utils/queryKeys';
+import PropertyPhotoUploader from './PropertyPhotoUploader.jsx';
+import { normaliseUploadedImages } from '../utils/uploadPropertyImages.js';
 
 const PROPERTY_STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
@@ -54,11 +56,16 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
     reset,
     setFocus,
     formState: { errors, isSubmitting },
+    setValue,
+    watch,
   } = useForm({
     resolver: zodResolver(propertySchema),
     defaultValues: propertyDefaultValues,
     mode: 'onBlur',
   });
+
+  const [photoSelections, setPhotoSelections] = useState([]);
+  const [coverImage, setCoverImage] = useState('');
 
   // Create/Update mutation
   const mutation = useApiMutation({
@@ -70,6 +77,13 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   // Initialize form with property data if editing
   useEffect(() => {
     if (property) {
+      const normalisedImages = normaliseUploadedImages(
+        property.images?.length ? property.images : property.imageUrl ? [{ imageUrl: property.imageUrl }] : []
+      );
+      setPhotoSelections(normalisedImages);
+      const initialCover = property.imageUrl || normalisedImages[0]?.url || '';
+      setCoverImage(initialCover);
+
       reset({
         name: property.name || '',
         address: property.address || '',
@@ -83,7 +97,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         totalArea: property.totalArea?.toString() || '',
         status: property.status || 'ACTIVE',
         description: property.description || '',
-        imageUrl: property.imageUrl || '',
+        imageUrl: initialCover || '',
         // Enhanced property details
         lotSize: property.lotSize?.toString() || '',
         buildingSize: property.buildingSize?.toString() || '',
@@ -102,6 +116,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       });
     } else {
       reset(propertyDefaultValues);
+      setPhotoSelections([]);
+      setCoverImage('');
     }
   }, [property, open, reset]);
 
@@ -112,6 +128,22 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       setFocus(firstErrorField);
     }
   }, [errors, setFocus]);
+
+  const propertyName = watch('name');
+  const imageUrlValue = watch('imageUrl');
+
+  useEffect(() => {
+    if (typeof imageUrlValue === 'string') {
+      setCoverImage(imageUrlValue);
+    }
+  }, [imageUrlValue]);
+
+  const handleImagesChange = (nextImages = [], nextCover = '') => {
+    setPhotoSelections(nextImages);
+    const resolvedCover = nextCover || nextImages[0]?.url || '';
+    setCoverImage(resolvedCover);
+    setValue('imageUrl', resolvedCover || '', { shouldDirty: true, shouldValidate: true });
+  };
 
   const onSubmit = async (data) => {
     try {
@@ -130,6 +162,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           status: data.status,
           description: data.description || null,
           imageUrl: data.imageUrl || null,
+          images: photoSelections.map((image) => image.url).filter(Boolean),
           // Enhanced property details
           lotSize: data.lotSize,
           buildingSize: data.buildingSize,
@@ -191,6 +224,14 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                     </Grid>
                     <Grid item xs={12}>
                       <PropertyLocation control={control} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <PropertyPhotoUploader
+                        images={photoSelections}
+                        coverImageUrl={coverImage}
+                        onChange={handleImagesChange}
+                        propertyName={propertyName}
+                      />
                     </Grid>
                     <Grid item xs={12}>
                       <PropertyManagement control={control} />
