@@ -214,6 +214,85 @@ const optionalFloat = () =>
     .nullable()
     .optional();
 
+const extractImageUrlFromInput = (input) => {
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    return trimmed.length ? trimmed : null;
+  }
+
+  if (input && typeof input === 'object') {
+    const candidates = [input.imageUrl, input.url];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed.length) {
+          return trimmed;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+const normaliseSubmittedPropertyImages = (input) => {
+  if (!Array.isArray(input) || !input.length) {
+    return [];
+  }
+
+  const collected = input
+    .map((item) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (!trimmed || !isValidImageLocation(trimmed)) {
+          return null;
+        }
+        return {
+          imageUrl: trimmed,
+          caption: null,
+          captionProvided: false,
+          isPrimary: undefined,
+        };
+      }
+
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const imageUrl = extractImageUrlFromInput(item);
+      if (!imageUrl || !isValidImageLocation(imageUrl)) {
+        return null;
+      }
+
+      const altTextRaw = typeof item.altText === 'string' ? item.altText : undefined;
+      const captionRaw = typeof item.caption === 'string' ? item.caption : undefined;
+      const providedCaption = altTextRaw !== undefined ? altTextRaw : captionRaw;
+      const trimmedCaption = typeof providedCaption === 'string' ? providedCaption.trim() : '';
+
+      return {
+        imageUrl,
+        caption: trimmedCaption ? trimmedCaption : null,
+        captionProvided: providedCaption !== undefined,
+        isPrimary: item.isPrimary === true ? true : item.isPrimary === false ? false : undefined,
+      };
+    })
+    .filter(Boolean);
+
+  if (!collected.length) {
+    return [];
+  }
+
+  const explicitPrimaryIndex = collected.findIndex((image) => image.isPrimary === true);
+  const primaryIndex = explicitPrimaryIndex >= 0 ? explicitPrimaryIndex : 0;
+
+  return collected.map((image, index) => ({
+    imageUrl: image.imageUrl,
+    caption: image.caption,
+    captionProvided: image.captionProvided,
+    isPrimary: index === primaryIndex,
+  }));
+};
+
 const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
 
 const propertyImagesIncludeConfig = {
@@ -343,6 +422,16 @@ const buildPropertyDetailInclude = (includeImages) => ({
   ...buildPropertyImagesInclude(includeImages),
 });
 
+const propertyImageInputObjectSchema = z.object({
+  url: optionalImageLocation(),
+  imageUrl: optionalImageLocation(),
+  caption: optionalString(),
+  altText: optionalString(),
+  isPrimary: booleanLike().optional(),
+});
+
+const propertyImageInputSchema = z.union([z.string(), propertyImageInputObjectSchema]);
+
 const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
     address: requiredString('Address is required'),
@@ -370,7 +459,7 @@ const basePropertySchema = z.object({
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
-    images: z.array(z.string()).optional(),
+    images: z.array(propertyImageInputSchema).optional(),
   });
 
 const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
@@ -394,11 +483,18 @@ const unitSchema = z.object({
   status: optionalString(),
 });
 
-const propertyImageCreateSchema = z.object({
-  imageUrl: requiredImageLocation(),
-  caption: optionalString(),
-  isPrimary: booleanLike().optional(),
-});
+const propertyImageCreateSchema = z
+  .object({
+    imageUrl: requiredImageLocation(),
+    caption: optionalString(),
+    altText: optionalString(),
+    isPrimary: booleanLike().optional(),
+  })
+  .transform((data) => ({
+    imageUrl: data.imageUrl,
+    caption: data.caption !== undefined ? data.caption : data.altText ?? null,
+    isPrimary: data.isPrimary,
+  }));
 
 const determineNewImagePrimaryFlag = (requestedIsPrimary, { hasExistingImages, hasExistingPrimary } = {}) => {
   if (requestedIsPrimary === true) {
@@ -419,11 +515,21 @@ const determineNewImagePrimaryFlag = (requestedIsPrimary, { hasExistingImages, h
 const propertyImageUpdateSchema = z
   .object({
     caption: optionalString(),
+    altText: optionalString(),
     isPrimary: booleanLike().optional(),
   })
-  .refine((data) => data.caption !== undefined || data.isPrimary !== undefined, {
+  .refine((data) => data.caption !== undefined || data.altText !== undefined || data.isPrimary !== undefined, {
     message: 'No updates provided',
-  });
+  })
+  .transform((data) => ({
+    caption:
+      data.caption !== undefined
+        ? data.caption
+        : data.altText !== undefined
+          ? data.altText
+          : undefined,
+    isPrimary: data.isPrimary,
+  }));
 
 const propertyImageReorderSchema = z.object({
   orderedImageIds: z.array(z.string().min(1)).min(1, 'At least one image id is required'),
@@ -500,7 +606,9 @@ const applyLegacyAliases = (input = {}) => {
   }
   if (!data.imageUrl && (data.coverImage || data.images?.length)) {
     const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
-    const firstUrl = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    const firstUrl = candidates
+      .map((value) => extractImageUrlFromInput(value))
+      .find((value) => value && isValidImageLocation(value));
     if (firstUrl) {
       data.imageUrl = firstUrl;
     }
@@ -763,13 +871,10 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
 
-    const initialImages = Array.isArray(rawImages)
-      ? rawImages
-          .map((value) => (typeof value === 'string' ? value.trim() : ''))
-          .filter((value) => isValidImageLocation(value))
-      : [];
+    const initialImages = normaliseSubmittedPropertyImages(rawImages);
 
-    const coverImageUrl = data.imageUrl ?? initialImages[0] ?? null;
+    const primaryImageCandidate = initialImages.find((image) => image.isPrimary) || initialImages[0] || null;
+    const coverImageUrl = data.imageUrl ?? primaryImageCandidate?.imageUrl ?? null;
 
     // Ensure converted fields are included in the data
     const propertyData = {
@@ -788,10 +893,12 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         });
 
         if (includeImages && initialImages.length) {
-          const records = buildPropertyImageRecords({
+          const records = initialImages.map((image, index) => ({
             propertyId: newProperty.id,
-            imageUrls: initialImages,
-            preferredPrimaryUrl: coverImageUrl,
+            imageUrl: image.imageUrl,
+            caption: image.caption ?? null,
+            isPrimary: image.isPrimary,
+            displayOrder: index,
             uploadedById: req.user.id,
           });
 
@@ -888,11 +995,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
 
-    const imageUpdates = Array.isArray(rawImages)
-      ? rawImages
-          .map((value) => (typeof value === 'string' ? value.trim() : ''))
-          .filter((value) => isValidImageLocation(value))
-      : null;
+    const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
     // Ensure converted fields are included in the data
     const updateData = {
@@ -904,10 +1007,11 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
     };
 
-    if (imageUpdates) {
+    if (imageUpdates !== undefined) {
       if (imageUpdates.length > 0) {
         if (parsed.imageUrl === undefined) {
-          updateData.imageUrl = imageUpdates[0];
+          const primaryImage = imageUpdates.find((image) => image.isPrimary) || imageUpdates[0];
+          updateData.imageUrl = primaryImage?.imageUrl ?? null;
         }
       } else if (parsed.imageUrl === undefined) {
         updateData.imageUrl = null;
@@ -921,7 +1025,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
           data: updateData,
         });
 
-        if (includeImages && imageUpdates) {
+        if (includeImages && imageUpdates !== undefined) {
           const existingImages = await tx.propertyImage.findMany({
             where: { propertyId: property.id },
             select: { imageUrl: true, caption: true },
@@ -931,26 +1035,32 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
             ],
           });
 
-          const existingImagesByUrl = existingImages.reduce((map, image) => {
+          const existingCaptionsByUrl = existingImages.reduce((map, image) => {
             if (!map.has(image.imageUrl)) {
               map.set(image.imageUrl, []);
             }
-            map.get(image.imageUrl).push(image);
+            map.get(image.imageUrl).push(image.caption ?? null);
             return map;
           }, new Map());
 
           await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
 
           if (imageUpdates.length) {
-            const preferredPrimaryUrl =
-              parsed.imageUrl !== undefined ? parsed.imageUrl : imageUpdates[0] ?? null;
+            const records = imageUpdates.map((image, index) => {
+              const previousCaptions = existingCaptionsByUrl.get(image.imageUrl) || [];
+              const fallbackCaption = previousCaptions.length ? previousCaptions.shift() : null;
+              const captionToUse = image.captionProvided
+                ? image.caption ?? null
+                : fallbackCaption ?? image.caption ?? null;
 
-            const records = buildPropertyImageRecords({
-              propertyId: property.id,
-              imageUrls: imageUpdates,
-              preferredPrimaryUrl,
-              getCaption: (imageUrl) => existingImagesByUrl.get(imageUrl)?.shift()?.caption ?? null,
-              uploadedById: req.user.id,
+              return {
+                propertyId: property.id,
+                imageUrl: image.imageUrl,
+                caption: captionToUse,
+                isPrimary: image.isPrimary,
+                displayOrder: index,
+                uploadedById: req.user.id,
+              };
             });
 
             if (records.length) {
@@ -1492,8 +1602,8 @@ router._test = {
   normalizePropertyImages,
   resolvePrimaryImageUrl,
   determineNewImagePrimaryFlag,
-  determinePrimaryImageIndex,
-  buildPropertyImageRecords,
+  extractImageUrlFromInput,
+  normaliseSubmittedPropertyImages,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
