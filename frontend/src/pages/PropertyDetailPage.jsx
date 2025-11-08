@@ -285,7 +285,10 @@ export default function PropertyDetailPage() {
         return 'N/A';
       }
 
-      return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date);
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeZone: 'UTC',
+      }).format(date);
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'N/A';
