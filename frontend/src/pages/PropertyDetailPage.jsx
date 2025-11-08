@@ -31,6 +31,8 @@ import {
   TableCell,
   TableBody,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import {
   ArrowBack as ArrowBackIcon,
   Edit as EditIcon,
@@ -127,6 +129,8 @@ export default function PropertyDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = getCurrentUser();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
 
   const [currentTab, setCurrentTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -1144,8 +1148,8 @@ export default function PropertyDetailPage() {
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={handleAddUnit}
-                    fullWidth
-                    sx={{ maxWidth: { xs: '100%', md: 'auto' } }}
+                    fullWidth={isSmallScreen}
+                    sx={{ alignSelf: { xs: 'stretch', md: 'flex-start' } }}
                   >
                     Add Unit
                   </Button>
