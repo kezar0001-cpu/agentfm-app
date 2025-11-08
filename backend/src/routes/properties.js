@@ -46,6 +46,22 @@ const imageUpload = multer({
   },
 });
 
+const imageUploadMiddleware = imageUpload.single('image');
+
+const isMultipartRequest = (req) => {
+  const header = req?.headers?.['content-type'];
+  if (!header) return false;
+  const [type] = header.split(';', 1);
+  return type?.trim().toLowerCase() === 'multipart/form-data';
+};
+
+const maybeHandleImageUpload = (req, res, next) => {
+  if (isMultipartRequest(req)) {
+    return imageUploadMiddleware(req, res, next);
+  }
+  return next();
+};
+
 const propertyImagesListSelection = {
   select: {
     id: true,
@@ -968,7 +984,7 @@ propertyImagesRouter.get('/', async (req, res) => {
   }
 });
 
-propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), imageUpload.single('image'), async (req, res) => {
+propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImageUpload, async (req, res) => {
   const propertyId = req.params.id;
 
   const cleanupUploadedFile = () => {
@@ -1357,6 +1373,8 @@ router._test = {
   propertyListSelect,
   collectPropertyCacheUserIds,
   propertyImagesRouter,
+  maybeHandleImageUpload,
+  isMultipartRequest,
 };
 
 export default router;
