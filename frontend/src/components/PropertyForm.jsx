@@ -147,6 +147,23 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
 
   const onSubmit = async (data) => {
     try {
+      const coverFromForm = typeof data.imageUrl === 'string' ? data.imageUrl.trim() : '';
+      const imagePayload = photoSelections
+        .map((image, index) => {
+          if (!image || !image.url) {
+            return null;
+          }
+
+          const trimmedAltText = typeof image.altText === 'string' ? image.altText.trim() : '';
+
+          return {
+            imageUrl: image.url,
+            caption: trimmedAltText ? trimmedAltText : null,
+            isPrimary: coverFromForm ? image.url === coverFromForm : index === 0,
+          };
+        })
+        .filter(Boolean);
+
       await mutation.mutateAsync({
         data: {
           name: data.name,
@@ -161,8 +178,8 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           totalArea: data.totalArea,
           status: data.status,
           description: data.description || null,
-          imageUrl: data.imageUrl || null,
-          images: photoSelections.map((image) => image.url).filter(Boolean),
+          imageUrl: coverFromForm || null,
+          images: imagePayload,
           // Enhanced property details
           lotSize: data.lotSize,
           buildingSize: data.buildingSize,
@@ -231,6 +248,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                         coverImageUrl={coverImage}
                         onChange={handleImagesChange}
                         propertyName={propertyName}
+                        allowAltText
                       />
                     </Grid>
                     <Grid item xs={12}>
