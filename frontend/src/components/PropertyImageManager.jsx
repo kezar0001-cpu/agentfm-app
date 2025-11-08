@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  Stack,
   IconButton,
   TextField,
   Typography,
@@ -18,6 +19,7 @@ import {
   Alert,
 } from '@mui/material';
 import {
+  Add as AddIcon,
   Delete as DeleteIcon,
   Star as StarIcon,
   StarBorder as StarBorderIcon,
@@ -35,6 +37,7 @@ import {
 } from '../hooks/usePropertyImages.js';
 import { useNotification } from '../hooks/useNotification.js';
 import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
+import { uploadPropertyImages } from '../utils/uploadPropertyImages.js';
 
 const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   const { showSuccess, showError } = useNotification();
@@ -61,8 +64,10 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
-  const [caption, setCaption] = useState('');
+  const [altText, setAltText] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [bulkUploadError, setBulkUploadError] = useState('');
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
@@ -79,31 +84,31 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
       await addImageMutation.mutateAsync({
         data: {
           imageUrl: imageUrl.trim(),
-          caption: caption.trim() || null,
+          caption: altText.trim() || null,
           isPrimary: images.length === 0, // First image is primary by default
         },
       });
       setUploadDialogOpen(false);
       setImageUrl('');
-      setCaption('');
+      setAltText('');
     } catch (error) {
       setUploadError(error.response?.data?.message || 'Failed to add image');
     }
   };
 
-  const handleUpdateCaption = async () => {
+  const handleUpdateAltText = async () => {
     if (!selectedImage) return;
 
     try {
       await updateImageMutation.mutateAsync({
         url: `/properties/${propertyId}/images/${selectedImage.id}`,
         data: {
-          caption: caption.trim() || null,
+          caption: altText.trim() || null,
         },
       });
       setEditDialogOpen(false);
       setSelectedImage(null);
-      setCaption('');
+      setAltText('');
     } catch (error) {
       showError(error.response?.data?.message || 'Failed to update image');
     }
@@ -140,13 +145,49 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
 
   const openEditDialog = (image) => {
     setSelectedImage(image);
-    setCaption(image.caption || '');
+    setAltText(image.caption || '');
     setEditDialogOpen(true);
   };
 
   const openDeleteDialog = (image) => {
     setSelectedImage(image);
     setDeleteDialogOpen(true);
+  };
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+
+    setIsUploadingFiles(true);
+    setBulkUploadError('');
+
+    try {
+      const uploaded = await uploadPropertyImages(files);
+      for (let index = 0; index < uploaded.length; index += 1) {
+        const file = uploaded[index];
+        try {
+          await addImageMutation.mutateAsync({
+            data: {
+              imageUrl: file.url,
+              caption: null,
+              isPrimary: images.length === 0 && index === 0,
+            },
+          });
+        } catch (error) {
+          setBulkUploadError(
+            error?.response?.data?.message || error?.message || 'Failed to add uploaded image'
+          );
+          break;
+        }
+      }
+    } catch (error) {
+      setBulkUploadError(error?.response?.data?.message || error?.message || 'Failed to upload images');
+    } finally {
+      setIsUploadingFiles(false);
+      if (event?.target) {
+        event.target.value = '';
+      }
+    }
   };
 
   // Drag and drop handlers
@@ -209,15 +250,32 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
   return (
     <Box>
       {canEdit && (
-        <Box mb={2}>
-          <Button
-            variant="contained"
-            startIcon={<CloudUploadIcon />}
-            onClick={() => setUploadDialogOpen(true)}
-          >
-            Add Image
-          </Button>
-        </Box>
+        <Stack spacing={1.5} mb={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            <Button
+              component="label"
+              variant="outlined"
+              startIcon={<CloudUploadIcon />}
+              disabled={isUploadingFiles}
+            >
+              {isUploadingFiles ? 'Uploading…' : 'Upload photos'}
+              <input type="file" hidden multiple accept="image/*" onChange={handleFileUpload} />
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setUploadDialogOpen(true)}
+              disabled={addImageMutation.isPending}
+            >
+              Add via URL
+            </Button>
+          </Stack>
+          {bulkUploadError && (
+            <Alert severity="error" onClose={() => setBulkUploadError('')}>
+              {bulkUploadError}
+            </Alert>
+          )}
+        </Stack>
       )}
 
       {images.length === 0 ? (
@@ -295,7 +353,7 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
                 </Box>
                 <CardContent>
                   <Typography variant="body2" color="text.secondary" noWrap>
-                    {image.caption || 'No caption'}
+                    {image.caption || 'No alt text'}
                   </Typography>
                   {canEdit && (
                     <Box display="flex" gap={1} mt={1}>
@@ -310,7 +368,7 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
                       <IconButton
                         size="small"
                         onClick={() => openEditDialog(image)}
-                        title="Edit caption"
+                        title="Edit alt text"
                       >
                         <EditIcon />
                       </IconButton>
@@ -357,19 +415,19 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
             fullWidth
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
-            helperText="Enter the URL of the image (upload images via the Uploads page first)"
+            helperText="Paste a direct image URL. Use the Upload photos button above for local files."
             required
           />
           <TextField
             margin="dense"
-            label="Caption (Optional)"
+            label="Alt text (optional)"
             type="text"
             fullWidth
             multiline
             rows={2}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            helperText="Add a description for this image"
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
+            helperText="Describe the image for accessibility"
           />
         </DialogContent>
         <DialogActions>
@@ -384,30 +442,30 @@ const PropertyImageManager = ({ propertyId, canEdit = false }) => {
         </DialogActions>
       </Dialog>
 
-      {/* Edit Caption Dialog */}
+      {/* Edit Alt Text Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Image Caption</DialogTitle>
+        <DialogTitle>Edit Image Alt Text</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Caption"
+            label="Alt text"
             type="text"
             fullWidth
             multiline
             rows={2}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
           <Button
-            onClick={handleUpdateCaption}
+            onClick={handleUpdateAltText}
             variant="contained"
             disabled={updateImageMutation.isPending}
           >
-            {updateImageMutation.isPending ? 'Updating...' : 'Update'}
+            {updateImageMutation.isPending ? 'Updating...' : 'Save Alt Text'}
           </Button>
         </DialogActions>
       </Dialog>
