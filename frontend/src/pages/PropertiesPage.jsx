@@ -45,6 +45,7 @@ import {
   ViewModule as ViewModuleIcon,
   ViewList as ViewListIcon,
   TableChart as TableChartIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -121,6 +122,14 @@ export default function PropertiesPage() {
   useEffect(() => {
     setPaginationError(null);
   }, [debouncedSearchTerm, filterStatus]);
+
+  // Bug Fix: Auto-dismiss pagination errors after 5 seconds for better UX
+  useEffect(() => {
+    if (paginationError) {
+      const timer = setTimeout(() => setPaginationError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [paginationError]);
 
   // Update search params when they change
   const updateSearchParam = (key, value) => {
@@ -316,7 +325,12 @@ export default function PropertiesPage() {
     }
   };
 
+  // Bug Fix: Validate property ID before navigation to prevent broken URLs
   const handleCardClick = (propertyId) => {
+    if (!propertyId) {
+      console.error('Invalid property ID:', propertyId);
+      return;
+    }
     navigate(`/properties/${propertyId}`);
   };
 
@@ -415,6 +429,19 @@ export default function PropertiesPage() {
                   startAdornment: (
                     <InputAdornment position="start">
                       <SearchIcon />
+                    </InputAdornment>
+                  ),
+                  // Bug Fix: Add clear button for better UX
+                  endAdornment: searchTerm && (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="clear search"
+                        onClick={() => updateSearchParam('search', '')}
+                        edge="end"
+                        size="small"
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
                     </InputAdornment>
                   ),
                 }}
@@ -576,9 +603,11 @@ export default function PropertiesPage() {
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>
                               {property.name}
                             </Typography>
+                            {/* Bug Fix: Add ARIA label for accessibility */}
                             <IconButton
                               size="small"
                               onClick={(e) => handleMenuOpen(e, property)}
+                              aria-label={`Actions for ${property.name}`}
                             >
                               <MoreVertIcon />
                             </IconButton>
@@ -712,9 +741,11 @@ export default function PropertiesPage() {
                               </Typography>
                             </Box>
                           </Box>
+                          {/* Bug Fix: Add ARIA label for accessibility */}
                           <IconButton
                             size="small"
                             onClick={(e) => handleMenuOpen(e, property)}
+                            aria-label={`Actions for ${property.name}`}
                           >
                             <MoreVertIcon />
                           </IconButton>
@@ -857,9 +888,11 @@ export default function PropertiesPage() {
                               />
                             </TableCell>
                             <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                              {/* Bug Fix: Add ARIA label for accessibility */}
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleMenuOpen(e, property)}
+                                aria-label={`Actions for ${property.name}`}
                               >
                                 <MoreVertIcon />
                               </IconButton>
@@ -882,7 +915,16 @@ export default function PropertiesPage() {
                     disabled={isFetchingNextPage}
                     startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
                   >
-                    {isFetchingNextPage ? 'Loading...' : 'Load More'}
+                    {/* Bug Fix: Show remaining count for better user awareness */}
+                    {(() => {
+                      const totalFetched = data?.pages?.reduce((sum, page) => sum + (page.items?.length || 0), 0) || 0;
+                      const total = data?.pages?.[0]?.total;
+                      const remaining = total && total > totalFetched ? total - totalFetched : null;
+
+                      if (isFetchingNextPage) return 'Loading...';
+                      if (remaining !== null && remaining > 0) return `Load More (${remaining} remaining)`;
+                      return 'Load More';
+                    })()}
                   </Button>
                 </Box>
               )}
