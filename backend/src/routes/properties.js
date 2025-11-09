@@ -761,16 +761,25 @@ const calculateOccupancyStats = (property) => {
     return null;
   }
 
-  const occupiedCount = property.units.filter(u => u.status === 'OCCUPIED').length;
-  const vacantCount = property.units.filter(u => u.status === 'VACANT').length;
-  const maintenanceCount = property.units.filter(u => u.status === 'MAINTENANCE').length;
+  // Use a single reduce operation instead of 3 separate filter calls for better performance
+  const stats = property.units.reduce((acc, unit) => {
+    if (unit.status === 'OCCUPIED') {
+      acc.occupied++;
+    } else if (unit.status === 'VACANT') {
+      acc.vacant++;
+    } else if (unit.status === 'MAINTENANCE') {
+      acc.maintenance++;
+    }
+    return acc;
+  }, { occupied: 0, vacant: 0, maintenance: 0 });
+
   const totalUnits = property.units.length || property.totalUnits || 0;
-  const occupancyRate = totalUnits > 0 ? ((occupiedCount / totalUnits) * 100) : 0;
+  const occupancyRate = totalUnits > 0 ? ((stats.occupied / totalUnits) * 100) : 0;
 
   return {
-    occupied: occupiedCount,
-    vacant: vacantCount,
-    maintenance: maintenanceCount,
+    occupied: stats.occupied,
+    vacant: stats.vacant,
+    maintenance: stats.maintenance,
     total: totalUnits,
     occupancyRate: parseFloat(occupancyRate.toFixed(1)),
   };
