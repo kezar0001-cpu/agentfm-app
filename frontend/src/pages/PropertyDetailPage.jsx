@@ -401,8 +401,8 @@ export default function PropertyDetailPage() {
     const rawUrl = typeof image === 'string' ? image : image.imageUrl;
     if (!rawUrl) return '';
 
-    return resolvePropertyImageUrl(rawUrl, propertyName);
-  }, [propertyName]);
+    return resolvePropertyImageUrl(rawUrl, property?.name);
+  }, [property?.name]);
 
   // Bug Fix #2: Helper function to safely get image caption
   const getImageCaption = useCallback((image, index = 0) => {
