@@ -46,7 +46,7 @@ import {
   ViewList as ViewListIcon,
   TableChart as TableChartIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
@@ -65,18 +65,32 @@ export default function PropertiesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'table'
+  // Bug Fix #2: Use URL search params for search and filter state
+  // This allows bookmarking, sharing, and proper back/forward navigation
+  const searchTerm = searchParams.get('search') || '';
+  const filterStatus = searchParams.get('status') || 'all';
+
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  // Bug Fix #3: Persist view mode preference in localStorage
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem('properties-view-mode');
+      return stored && ['grid', 'list', 'table'].includes(stored) ? stored : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
-  // Debounce search term to avoid excessive API calls (Bug Fix #2)
+  // Debounce search term to avoid excessive API calls
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -84,6 +98,19 @@ export default function PropertiesPage() {
 
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
+
+  // Update search params when they change
+  const updateSearchParam = (key, value) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      if (value && value !== 'all') {
+        newParams.set(key, value);
+      } else {
+        newParams.delete(key);
+      }
+      return newParams;
+    });
+  };
 
   useEffect(() => {
     if (!location.state?.openCreateDialog) {
@@ -189,6 +216,12 @@ export default function PropertiesPage() {
   const handleViewModeChange = (_event, nextView) => {
     if (nextView !== null) {
       setViewMode(nextView);
+      // Bug Fix #3: Save view mode preference to localStorage
+      try {
+        localStorage.setItem('properties-view-mode', nextView);
+      } catch (error) {
+        console.warn('Failed to save view mode preference:', error);
+      }
     }
   };
 
@@ -303,7 +336,7 @@ export default function PropertiesPage() {
                 name="searchTerm"
                 placeholder="Search properties by name, address, or city..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => updateSearchParam('search', e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -322,7 +355,7 @@ export default function PropertiesPage() {
                   name="filterStatus"
                   value={filterStatus}
                   label="Status"
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => updateSearchParam('status', e.target.value)}
                 >
                   <MenuItem value="all">All Statuses</MenuItem>
                   <MenuItem value="ACTIVE">Active</MenuItem>
