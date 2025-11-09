@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import fs from 'fs';
+import multer from 'multer';
+import path from 'path';
 import prisma from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler, sendError, ErrorCodes } from '../utils/errorHandler.js';
@@ -17,6 +20,122 @@ const UNIT_STATUSES = [
   'PENDING_MOVE_IN',
   'PENDING_MOVE_OUT',
 ];
+
+// Nested unit image routes
+const unitImagesRouter = Router({ mergeParams: true });
+router.use(':id/images', unitImagesRouter);
+
+// Multer configuration for image uploads
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '-');
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}-${sanitizedName}`);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed'));
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+const maybeHandleImageUpload = (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return upload.single('image')(req, res, next);
+  }
+  next();
+};
+
+// Unit image validation schemas
+const unitImageCreateSchema = z.object({
+  imageUrl: z.string().min(1),
+  caption: z.string().optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+const unitImageUpdateSchema = z.object({
+  caption: z.string().optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+const unitImageReorderSchema = z.object({
+  orderedImageIds: z.array(z.string()).min(1),
+});
+
+// Helper functions for unit images
+const determineNewImagePrimaryFlag = (requested, context) => {
+  if (requested === true) return true;
+  if (!context.hasExistingImages) return true;
+  if (!context.hasExistingPrimary) return true;
+  return false;
+};
+
+const normalizeUnitImages = (unit) => {
+  if (!unit) return [];
+
+  if (Array.isArray(unit.unitImages) && unit.unitImages.length > 0) {
+    return unit.unitImages.map((img) => ({
+      id: img.id,
+      imageUrl: img.imageUrl,
+      caption: img.caption,
+      isPrimary: img.isPrimary,
+      displayOrder: img.displayOrder,
+      createdAt: img.createdAt,
+      updatedAt: img.updatedAt,
+    }));
+  }
+
+  if (unit.imageUrl) {
+    return [{
+      id: `legacy-${unit.id}`,
+      imageUrl: unit.imageUrl,
+      caption: null,
+      isPrimary: true,
+      displayOrder: 0,
+      createdAt: unit.createdAt,
+      updatedAt: unit.updatedAt,
+    }];
+  }
+
+  return [];
+};
+
+const syncUnitCoverImage = async (tx, unitId) => {
+  const primaryImage = await tx.unitImage.findFirst({
+    where: { unitId, isPrimary: true },
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+  });
+
+  const fallbackImage = !primaryImage ? await tx.unitImage.findFirst({
+    where: { unitId },
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+  }) : null;
+
+  const targetUrl = primaryImage?.imageUrl || fallbackImage?.imageUrl || null;
+
+  await tx.unit.update({
+    where: { id: unitId },
+    data: { imageUrl: targetUrl },
+  });
+};
 
 const tenantIncludeSelection = {
   include: {
@@ -847,5 +966,300 @@ router.post(
     }
   })
 );
+
+// =============================================================================
+// Unit Images Endpoints
+// =============================================================================
+
+// GET /units/:id/images - Get all images for a unit
+unitImagesRouter.get('/', async (req, res) => {
+  const unitId = req.params.id;
+
+  try {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: { property: { include: { owners: { select: { ownerId: true } } } } },
+    });
+
+    if (!unit) {
+      return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    const images = await prisma.unitImage.findMany({
+      where: { unitId },
+      orderBy: [
+        { displayOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    res.json({ success: true, images: normalizeUnitImages({ ...unit, unitImages: images }) });
+  } catch (error) {
+    console.error('Get unit images error:', error);
+    return sendError(res, 500, 'Failed to fetch unit images', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /units/:id/images - Add a new image to a unit
+unitImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImageUpload, async (req, res) => {
+  const unitId = req.params.id;
+
+  const cleanupUploadedFile = () => {
+    if (req.file?.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Failed to remove uploaded file after error:', cleanupError);
+      }
+    }
+  };
+
+  try {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: { property: { include: { owners: { select: { ownerId: true } } } } },
+    });
+
+    if (!unit) {
+      cleanupUploadedFile();
+      return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    const body = { ...(req.body ?? {}) };
+    if (req.file?.filename) {
+      body.imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const parsed = unitImageCreateSchema.parse(body);
+
+    const [existingImages, existingPrimary] = await Promise.all([
+      prisma.unitImage.findMany({
+        where: { unitId },
+        select: { id: true, displayOrder: true },
+        orderBy: { displayOrder: 'desc' },
+        take: 1,
+      }),
+      prisma.unitImage.findFirst({
+        where: { unitId, isPrimary: true },
+        select: { id: true },
+      }),
+    ]);
+
+    const nextDisplayOrder = existingImages.length ? (existingImages[0].displayOrder ?? 0) + 1 : 0;
+    const shouldBePrimary = determineNewImagePrimaryFlag(parsed.isPrimary, {
+      hasExistingImages: existingImages.length > 0,
+      hasExistingPrimary: Boolean(existingPrimary),
+    });
+
+    const createdImage = await prisma.$transaction(async (tx) => {
+      const image = await tx.unitImage.create({
+        data: {
+          unitId,
+          imageUrl: parsed.imageUrl,
+          caption: parsed.caption ?? null,
+          isPrimary: shouldBePrimary,
+          displayOrder: nextDisplayOrder,
+          uploadedById: req.user.id,
+        },
+      });
+
+      if (shouldBePrimary) {
+        await tx.unitImage.updateMany({
+          where: {
+            unitId,
+            NOT: { id: image.id },
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      await syncUnitCoverImage(tx, unitId);
+
+      return image;
+    });
+
+    res.status(201).json({ success: true, image: normalizeUnitImages({ ...unit, unitImages: [createdImage] })[0] });
+  } catch (error) {
+    cleanupUploadedFile();
+
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Create unit image error:', error);
+    return sendError(res, 500, 'Failed to add unit image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// PATCH /units/:id/images/:imageId - Update a unit image
+unitImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const unitId = req.params.id;
+  const imageId = req.params.imageId;
+
+  try {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: { property: { include: { owners: { select: { ownerId: true } } } } },
+    });
+
+    if (!unit) {
+      return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    const parsed = unitImageUpdateSchema.parse(req.body ?? {});
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.unitImage.findUnique({ where: { id: imageId } });
+      if (!existing || existing.unitId !== unitId) {
+        return null;
+      }
+
+      const updateData = {};
+      if (parsed.caption !== undefined) updateData.caption = parsed.caption ?? null;
+      if (parsed.isPrimary !== undefined) updateData.isPrimary = parsed.isPrimary;
+
+      const result = await tx.unitImage.update({
+        where: { id: imageId },
+        data: updateData,
+      });
+
+      if (parsed.isPrimary) {
+        await tx.unitImage.updateMany({
+          where: {
+            unitId,
+            NOT: { id: imageId },
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      await syncUnitCoverImage(tx, unitId);
+
+      return result;
+    });
+
+    if (!updated) {
+      return sendError(res, 404, 'Unit image not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    res.json({ success: true, image: normalizeUnitImages({ ...unit, unitImages: [updated] })[0] });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Update unit image error:', error);
+    return sendError(res, 500, 'Failed to update unit image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DELETE /units/:id/images/:imageId - Delete a unit image
+unitImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const unitId = req.params.id;
+  const imageId = req.params.imageId;
+
+  try {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: { property: { include: { owners: { select: { ownerId: true } } } } },
+    });
+
+    if (!unit) {
+      return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    const deleted = await prisma.$transaction(async (tx) => {
+      const existing = await tx.unitImage.findUnique({ where: { id: imageId } });
+      if (!existing || existing.unitId !== unitId) {
+        return null;
+      }
+
+      await tx.unitImage.delete({ where: { id: imageId } });
+
+      if (existing.isPrimary) {
+        const nextPrimary = await tx.unitImage.findFirst({
+          where: { unitId },
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+        });
+
+        if (nextPrimary) {
+          await tx.unitImage.update({
+            where: { id: nextPrimary.id },
+            data: { isPrimary: true },
+          });
+        }
+      }
+
+      await syncUnitCoverImage(tx, unitId);
+
+      return existing;
+    });
+
+    if (!deleted) {
+      return sendError(res, 404, 'Unit image not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete unit image error:', error);
+    return sendError(res, 500, 'Failed to delete unit image', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /units/:id/images/reorder - Reorder unit images
+unitImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const unitId = req.params.id;
+
+  try {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: { property: { include: { owners: { select: { ownerId: true } } } } },
+    });
+
+    if (!unit) {
+      return sendError(res, 404, 'Unit not found', ErrorCodes.RES_UNIT_NOT_FOUND);
+    }
+
+    const parsed = unitImageReorderSchema.parse(req.body ?? {});
+
+    const existingImages = await prisma.unitImage.findMany({
+      where: { unitId },
+      orderBy: [
+        { displayOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    const existingIds = existingImages.map((img) => img.id);
+    const providedIds = parsed.orderedImageIds;
+
+    if (existingIds.length !== providedIds.length || !providedIds.every((id) => existingIds.includes(id))) {
+      return sendError(res, 400, 'Ordered image ids do not match existing images', ErrorCodes.VAL_VALIDATION_ERROR);
+    }
+
+    await prisma.$transaction(
+      providedIds.map((id, index) =>
+        prisma.unitImage.update({
+          where: { id },
+          data: { displayOrder: index },
+        })
+      )
+    );
+
+    await syncUnitCoverImage(prisma, unitId);
+
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    console.error('Reorder unit images error:', error);
+    return sendError(res, 500, 'Failed to reorder unit images', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
 
 export default router;

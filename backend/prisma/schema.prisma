@@ -169,6 +169,23 @@ model PropertyImage {
   @@index([displayOrder])
 }
 
+model UnitImage {
+  id           String   @id @default(cuid())
+  unitId       String
+  imageUrl     String
+  caption      String?
+  isPrimary    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([displayOrder])
+}
+
 model PropertyOwner {
   id                  String    @id @default(cuid())
   propertyId          String
@@ -207,6 +224,7 @@ model Unit {
   serviceRequests ServiceRequest[]
   property        Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenants         UnitTenant[]
+  unitImages      UnitImage[]
 
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
