@@ -100,11 +100,10 @@ const propertyListSelect = {
   createdAt: true,
   updatedAt: true,
   propertyImages: propertyImagesListSelection,
-  units: {
-    select: {
-      status: true,
-    },
-  },
+  // Note: units are NOT loaded here for performance reasons
+  // Loading all units just to calculate occupancy stats is inefficient
+  // Occupancy stats require full unit data, so they're only calculated
+  // in detail views where we load the full property with units
   _count: {
     select: {
       units: true,
@@ -1592,8 +1591,6 @@ router.get('/:id/activity', async (req, res) => {
         }
       }
     }
-
-    const propertyId = req.params.id;
 
     const rows = await prisma.propertyActivity.findMany({
       where: {

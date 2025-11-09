@@ -565,19 +565,6 @@ export default function PropertyDetailPage() {
     return colors[priority] || 'default';
   }, []);
 
-  const formatDate = useCallback((date) => {
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) {
-        return 'Invalid date';
-      }
-      return d.toLocaleString();
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date';
-    }
-  }, []);
-
   return (
     <Box sx={{ py: { xs: 2, md: 4 } }}>
       <DataState
@@ -718,7 +705,8 @@ export default function PropertyDetailPage() {
                         gap: 1,
                       }}
                     >
-                      {carouselImages.slice(1, 5).map((image, idx) => {
+                      {/* Fix: When >5 images, show only images 1-3 to make room for "+N more" tile */}
+                      {carouselImages.slice(1, carouselImages.length > 5 ? 4 : 5).map((image, idx) => {
                         const imageUrl = typeof image === 'string' ? image : image.imageUrl;
                         const caption = typeof image === 'object' ? image.caption : null;
                         const actualIndex = idx + 1;
@@ -759,7 +747,7 @@ export default function PropertyDetailPage() {
                         );
                       })}
 
-                      {/* "+N more" tile - shown in last position if there are more than 5 images */}
+                      {/* "+N more" tile - shown in 4th position if there are more than 5 images */}
                       {carouselImages.length > 5 && (
                         <Paper
                           sx={{
@@ -775,8 +763,8 @@ export default function PropertyDetailPage() {
                             '&:hover': {
                               bgcolor: 'rgba(0,0,0,0.85)',
                             },
-                            // If we have exactly 5 images, show the 5th image with overlay
-                            ...(carouselImages.length > 5 && carouselImages[4] && {
+                            // Show the 4th image (index 4) as background with dark overlay
+                            ...(carouselImages[4] && {
                               backgroundImage: `url(${typeof carouselImages[4] === 'string' ? carouselImages[4] : carouselImages[4].imageUrl})`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
@@ -1595,7 +1583,7 @@ export default function PropertyDetailPage() {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                                {formatDate(po.startDate)}
+                                {formatDateOnly(po.startDate)}
                               </Typography>
                             </TableCell>
                           </TableRow>
