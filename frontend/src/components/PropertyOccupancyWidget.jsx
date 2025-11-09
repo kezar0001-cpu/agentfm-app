@@ -30,7 +30,8 @@ import {
 const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = null, compact = false }) => {
   // Calculate occupancy statistics
   const calculateStats = () => {
-    // If pre-calculated stats are provided, use them
+    // Bug Fix: Always prefer pre-calculated stats from backend for accuracy
+    // This ensures consistency, especially for properties with >100 units
     if (occupancyStats) {
       const total = occupancyStats.total ?? 0;
       const occupied = occupancyStats.occupied ?? 0;
@@ -58,10 +59,11 @@ const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = 
     }
 
     // Fallback to calculating from units array (for backward compatibility)
+    // Bug Fix: Prefer units.length over totalUnits prop for accuracy
     const occupied = units.filter((u) => u.status === 'OCCUPIED').length;
     const vacant = units.filter((u) => u.status === 'VACANT').length;
     const maintenance = units.filter((u) => u.status === 'MAINTENANCE').length;
-    const total = units.length || totalUnits || 0;
+    const total = units.length > 0 ? units.length : totalUnits || 0;
     const occupancyRate = total > 0 ? ((occupied / total) * 100).toFixed(1) : 0;
     const vacancyRate = total > 0 ? ((vacant / total) * 100).toFixed(1) : 0;
 

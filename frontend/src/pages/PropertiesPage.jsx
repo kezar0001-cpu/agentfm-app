@@ -116,6 +116,12 @@ export default function PropertiesPage() {
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
+  // Bug Fix: Clear pagination errors when search or filter changes
+  // This prevents stale error messages from persisting after user changes query
+  useEffect(() => {
+    setPaginationError(null);
+  }, [debouncedSearchTerm, filterStatus]);
+
   // Update search params when they change
   const updateSearchParam = (key, value) => {
     setSearchParams((prev) => {
@@ -142,7 +148,8 @@ export default function PropertiesPage() {
 
   // Fetch properties with infinite query (Bug Fix #1: Server-side search and filter)
   const PROPERTIES_PAGE_SIZE = 50;
-  const PROPERTIES_MAX_PAGES = 20; // Limit to 1000 properties in memory (Bug Fix: Prevent memory accumulation)
+  // Note: We rely on gcTime to manage memory instead of limiting page count
+  // React Query v4+ removed maxPages option; gcTime handles cleanup of old data
   const {
     data,
     isLoading,
@@ -177,8 +184,7 @@ export default function PropertiesPage() {
       return lastPage.hasMore ? totalFetched : undefined;
     },
     initialPageParam: 0,
-    maxPages: PROPERTIES_MAX_PAGES, // Bug Fix: Limit cached pages to prevent unbounded memory growth
-    gcTime: 5 * 60 * 1000, // Bug Fix: Garbage collect unused queries after 5 minutes
+    gcTime: 5 * 60 * 1000, // Bug Fix: Garbage collect unused queries after 5 minutes to prevent memory growth
   });
 
   // Delete mutation
@@ -192,10 +198,25 @@ export default function PropertiesPage() {
     },
   });
 
-  // Helper function to get total units consistently across all views
+  // Bug Fix: Always use _count.units as source of truth for accurate unit counts
+  // The totalUnits field may be stale if units are added/deleted, but _count is always current
   const getTotalUnits = (property) => {
-    return property?.totalUnits ?? property?._count?.units ?? 0;
+    return property?._count?.units ?? property?.totalUnits ?? 0;
   };
+
+  // Bug Fix: Memoize containerSx objects to prevent PropertyImageCarousel re-renders
+  const gridCarouselContainerSx = useMemo(() => ({
+    borderBottom: '1px solid',
+    borderColor: 'divider',
+  }), []);
+
+  const listCarouselContainerSx = useMemo(() => ({
+    width: '100%',
+    height: '100%',
+    borderRight: { md: '1px solid' },
+    borderBottom: { xs: '1px solid', md: 'none' },
+    borderColor: 'divider',
+  }), []);
 
   // Flatten all pages into a single array and memoize to prevent unnecessary re-renders
   // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
@@ -539,10 +560,7 @@ export default function PropertiesPage() {
                           showDots={property.hasMultipleImages}
                           showArrows={property.hasMultipleImages}
                           showCounter={property.hasMultipleImages}
-                          containerSx={{
-                            borderBottom: '1px solid',
-                            borderColor: 'divider',
-                          }}
+                          containerSx={gridCarouselContainerSx}
                         />
 
                         <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -661,13 +679,7 @@ export default function PropertiesPage() {
                           showDots={property.hasMultipleImages}
                           showArrows={property.hasMultipleImages}
                           showCounter={property.hasMultipleImages}
-                          containerSx={{
-                            width: '100%',
-                            height: '100%',
-                            borderRight: { md: '1px solid' },
-                            borderBottom: { xs: '1px solid', md: 'none' },
-                            borderColor: 'divider',
-                          }}
+                          containerSx={listCarouselContainerSx}
                         />
                       </Box>
 
