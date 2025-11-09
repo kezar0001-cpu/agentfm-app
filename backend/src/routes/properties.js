@@ -4,6 +4,7 @@ import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { randomUUID } from 'crypto';
 import prisma from '../config/prismaClient.js';
 import { redisGet, redisSet } from '../config/redisClient.js';
 import { requireAuth, requireRole, requireActiveSubscription } from '../middleware/auth.js';
@@ -18,17 +19,70 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+// Bug Fix #5: Add rate limiting for image uploads to prevent abuse
+// Prevents spam uploads that could fill disk space or overload server
+const uploadRateLimits = new Map();
+const UPLOAD_RATE_LIMIT = 20; // Max 20 uploads per window
+const UPLOAD_RATE_WINDOW = 60 * 1000; // 1 minute window
+
+const checkUploadRateLimit = (userId) => {
+  const now = Date.now();
+  const userLimits = uploadRateLimits.get(userId) || { count: 0, windowStart: now };
+
+  // Reset window if expired
+  if (now - userLimits.windowStart > UPLOAD_RATE_WINDOW) {
+    userLimits.count = 0;
+    userLimits.windowStart = now;
+  }
+
+  userLimits.count++;
+  uploadRateLimits.set(userId, userLimits);
+
+  // Clean up old entries periodically to prevent memory leak
+  if (uploadRateLimits.size > 10000) {
+    const threshold = now - UPLOAD_RATE_WINDOW;
+    for (const [key, value] of uploadRateLimits.entries()) {
+      if (value.windowStart < threshold) {
+        uploadRateLimits.delete(key);
+      }
+    }
+  }
+
+  return userLimits.count <= UPLOAD_RATE_LIMIT;
+};
+
+const rateLimitUpload = (req, res, next) => {
+  if (!req.user?.id) {
+    return next();
+  }
+
+  if (!checkUploadRateLimit(req.user.id)) {
+    return sendError(
+      res,
+      429,
+      `Too many uploads. Maximum ${UPLOAD_RATE_LIMIT} uploads per minute.`,
+      ErrorCodes.RATE_LIMIT_EXCEEDED
+    );
+  }
+
+  next();
+};
+
 const imageStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname || '');
-    const base =
-      path
-        .basename(file.originalname || 'image', ext)
-        .toLowerCase()
-        .replace(/[^a-z0-9-_]+/g, '-')
-        .slice(0, 40) || 'image';
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    // Bug Fix #10: Sanitize filename to prevent path traversal attacks
+    // Remove any path separators and null bytes that could be used maliciously
+    const sanitizedName = path.basename(file.originalname || 'image', ext)
+      .replace(/[\/\\.\x00]/g, '') // Remove slashes, dots, null bytes
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .slice(0, 40) || 'image';
+    const base = sanitizedName || 'image';
+    // Bug Fix #1: Use UUID instead of Date.now() + random to prevent filename collisions
+    // This eliminates race conditions when multiple images are uploaded simultaneously
+    const unique = randomUUID();
     cb(null, `${base}-${unique}${ext}`);
   },
 });
@@ -39,9 +93,19 @@ const imageUpload = multer({
     fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
+    // Bug Fix #3: Validate both MIME type AND file extension to prevent bypass
+    // Ensures .jpg.exe or similar malicious files are rejected
     if (!file.mimetype || !file.mimetype.startsWith('image/')) {
       return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'image'));
     }
+
+    // Bug Fix #4: Validate file extension matches allowed image types
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Invalid file extension. Only jpg, jpeg, png, gif, webp allowed'));
+    }
+
     cb(null, true);
   },
 });
@@ -158,9 +222,32 @@ const isValidImageLocation = (value) => {
   if (!value.trim()) return false;
   // Bug Fix: Validate URL length to prevent malicious extremely long URLs
   if (value.length > MAX_IMAGE_URL_LENGTH) return false;
+
+  // Bug Fix #8: Prevent XSS via javascript:, data:text/html, and other malicious URL schemes
+  // Only allow safe protocols: http(s) for external URLs, /uploads/ for local files
+  const lowerValue = value.toLowerCase().trim();
+
+  // Block javascript:, vbscript:, file:, and other dangerous protocols
+  const dangerousProtocols = ['javascript:', 'vbscript:', 'file:', 'about:', 'blob:'];
+  if (dangerousProtocols.some(protocol => lowerValue.startsWith(protocol))) {
+    return false;
+  }
+
+  // Only allow data: URLs for images (not HTML/scripts)
+  if (lowerValue.startsWith('data:')) {
+    // Must be an image MIME type
+    if (!lowerValue.startsWith('data:image/')) {
+      return false;
+    }
+    return true;
+  }
+
+  // Allow HTTPS/HTTP URLs
   if (/^https?:\/\//i.test(value)) return true;
-  if (value.startsWith('data:')) return true;
+
+  // Allow relative /uploads/ paths
   if (value.startsWith('/uploads/')) return true;
+
   return false;
 };
 
@@ -1628,22 +1715,45 @@ propertyImagesRouter.get('/', async (req, res) => {
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    const images = await prisma.propertyImage.findMany({
-      where: { propertyId },
-      orderBy: [
-        { displayOrder: 'asc' },
-        { createdAt: 'asc' },
-      ],
-    });
+    // Bug Fix #7: Add pagination support for properties with many images
+    // Prevents loading hundreds of images at once, improving performance
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
 
-    res.json({ success: true, images: normalizePropertyImages({ ...property, propertyImages: images }) });
+    const [images, totalCount] = await Promise.all([
+      prisma.propertyImage.findMany({
+        where: { propertyId },
+        orderBy: [
+          { displayOrder: 'asc' },
+          { createdAt: 'asc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.propertyImage.count({
+        where: { propertyId },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      images: normalizePropertyImages({ ...property, propertyImages: images }),
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: skip + images.length < totalCount,
+      },
+    });
   } catch (error) {
     console.error('Get property images error:', error);
     return sendError(res, 500, 'Failed to fetch property images', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
-propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImageUpload, async (req, res) => {
+propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUpload, maybeHandleImageUpload, async (req, res) => {
   const propertyId = req.params.id;
 
   const cleanupUploadedFile = () => {
@@ -1742,8 +1852,13 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
 
+    // Bug Fix #9: Don't leak internal error details to client
+    // Log full error server-side but return generic message to user
     console.error('Create property image error:', error);
-    return sendError(res, 500, 'Failed to add property image', ErrorCodes.ERR_INTERNAL_SERVER);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to add property image. Please try again.'
+      : `Failed to add property image: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -1814,8 +1929,12 @@ propertyImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
 
+    // Bug Fix #9: Don't leak internal error details to client
     console.error('Update property image error:', error);
-    return sendError(res, 500, 'Failed to update property image', ErrorCodes.ERR_INTERNAL_SERVER);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to update property image. Please try again.'
+      : `Failed to update property image: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -1875,13 +1994,34 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
       return sendError(res, 404, 'Property image not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
     }
 
+    // Bug Fix #2: Clean up physical file from disk when deleting image from database
+    // This prevents orphaned files from accumulating and wasting disk space
+    if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
+      const filename = deleted.imageUrl.replace('/uploads/', '');
+      const filePath = path.join(UPLOAD_DIR, filename);
+
+      // Asynchronously delete file without blocking response
+      // Errors are logged but don't fail the response since DB delete succeeded
+      fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') {
+          console.error('Failed to delete image file:', filePath, err);
+        } else if (!err) {
+          console.log('✅ Deleted image file:', filePath);
+        }
+      });
+    }
+
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
 
     res.json({ success: true });
   } catch (error) {
+    // Bug Fix #9: Don't leak internal error details to client
     console.error('Delete property image error:', error);
-    return sendError(res, 500, 'Failed to delete property image', ErrorCodes.ERR_INTERNAL_SERVER);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to delete property image. Please try again.'
+      : `Failed to delete property image: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 
@@ -1946,8 +2086,12 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
       return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
     }
 
+    // Bug Fix #9: Don't leak internal error details to client
     console.error('Reorder property images error:', error);
-    return sendError(res, 500, 'Failed to reorder property images', ErrorCodes.ERR_INTERNAL_SERVER);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to reorder property images. Please try again.'
+      : `Failed to reorder property images: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

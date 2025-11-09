@@ -2,6 +2,37 @@ import { API_BASE } from '../lib/auth.js';
 
 const PLACEHOLDER_BASE = 'https://placehold.co';
 
+// Bug Fix #12: Sanitize image URLs to prevent XSS attacks
+// Only allow safe URL schemes: http(s), data:image/*, and relative paths
+const isSafeImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+
+  const lowerUrl = url.toLowerCase().trim();
+
+  // Block dangerous protocols
+  const dangerousProtocols = ['javascript:', 'vbscript:', 'file:', 'about:', 'blob:'];
+  if (dangerousProtocols.some(protocol => lowerUrl.startsWith(protocol))) {
+    return false;
+  }
+
+  // Only allow data URLs for images
+  if (lowerUrl.startsWith('data:')) {
+    return lowerUrl.startsWith('data:image/');
+  }
+
+  // Allow http(s), relative paths, and placeholder URLs
+  return true;
+};
+
+const sanitizeImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  if (!isSafeImageUrl(url)) {
+    console.warn('Unsafe image URL blocked:', url);
+    return null;
+  }
+  return url;
+};
+
 const normalizePlaceholderValue = (value) => {
   if (!value || typeof value !== 'string') return null;
 
@@ -41,18 +72,22 @@ export const resolvePropertyImageUrl = (value, name, size = '600x320') => {
   const trimmedValue = value.trim();
   if (!trimmedValue) return placeholder;
 
-  const placeholderParts = normalizePlaceholderValue(trimmedValue);
+  // Bug Fix #12: Sanitize URL before processing
+  const sanitizedValue = sanitizeImageUrl(trimmedValue);
+  if (!sanitizedValue) return placeholder;
+
+  const placeholderParts = normalizePlaceholderValue(sanitizedValue);
   if (placeholderParts) {
     const targetSize = placeholderParts.size || size;
     const text = placeholderParts.text || name || 'Property';
     return buildPropertyPlaceholder(text, targetSize);
   }
 
-  if (/^https?:\/\//i.test(trimmedValue) || trimmedValue.startsWith('data:')) {
-    return trimmedValue;
+  if (/^https?:\/\//i.test(sanitizedValue) || sanitizedValue.startsWith('data:image/')) {
+    return sanitizedValue;
   }
 
-  const normalised = trimmedValue.startsWith('/') ? trimmedValue : `/${trimmedValue}`;
+  const normalised = sanitizedValue.startsWith('/') ? sanitizedValue : `/${sanitizedValue}`;
   return `${API_BASE}${normalised}`;
 };
 
