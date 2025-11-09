@@ -82,8 +82,11 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
   const [bulkUploadError, setBulkUploadError] = useState('');
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  // Bug Fix: Add optimistic state for drag-and-drop reordering
+  // Provides immediate visual feedback instead of waiting for server response
+  const [optimisticallyReorderedImages, setOptimisticallyReorderedImages] = useState(null);
 
-  const images = imagesData?.images || [];
+  const images = optimisticallyReorderedImages || imagesData?.images || [];
 
   const handleAddImage = async () => {
     if (!imageUrl.trim()) {
@@ -236,10 +239,15 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       return;
     }
 
+    // Bug Fix: Optimistic update - immediately show reordered images for better UX
     // Reorder the images array
-    const reorderedImages = [...images];
+    const baseImages = imagesData?.images || [];
+    const reorderedImages = [...baseImages];
     const [draggedImage] = reorderedImages.splice(draggedIndex, 1);
     reorderedImages.splice(dropIndex, 0, draggedImage);
+
+    // Set optimistic state for immediate visual feedback
+    setOptimisticallyReorderedImages(reorderedImages);
 
     // Create the ordered array of image IDs
     const orderedImageIds = reorderedImages.map(img => img.id);
@@ -248,7 +256,11 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       await reorderImagesMutation.mutateAsync({
         data: { orderedImageIds },
       });
+      // Clear optimistic state on success - real data will be fetched
+      setOptimisticallyReorderedImages(null);
     } catch (error) {
+      // Rollback optimistic update on error
+      setOptimisticallyReorderedImages(null);
       showError(error.response?.data?.message || 'Failed to reorder images');
     }
 
