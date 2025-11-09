@@ -71,7 +71,7 @@ router.post('/single', requireAuth, upload.single('file'), (req, res) => {
  * Returns: { urls: ["/uploads/<filename1>", "/uploads/<filename2>"] }
  * Requires authentication
  */
-router.post('/multiple', requireAuth, upload.array('files', 5), (req, res) => {
+router.post('/multiple', requireAuth, upload.array('files', 50), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return sendError(res, 400, 'No files uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);

@@ -523,7 +523,9 @@ export default function UnitDetailPage() {
                     <Box
                       sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+                        gridTemplateColumns: unitCarouselImages.length === 1
+                          ? '1fr'
+                          : { xs: '1fr', md: '2fr 1fr' },
                         gap: 1,
                         borderRadius: 3,
                         overflow: 'hidden',
