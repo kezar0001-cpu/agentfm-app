@@ -854,6 +854,24 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
+    // Parse search and filter parameters (Bug Fix #1: Server-side search)
+    const search = req.query.search?.trim() || '';
+    const status = req.query.status?.trim().toUpperCase() || '';
+
+    // Add search filter
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Add status filter
+    if (status && status !== 'ALL' && STATUS_VALUES.includes(status)) {
+      where.status = status;
+    }
+
     const { items: properties, total } = await withPropertyImagesSupport(async (includeImages) => {
       const select = buildPropertyListSelect(includeImages);
 
