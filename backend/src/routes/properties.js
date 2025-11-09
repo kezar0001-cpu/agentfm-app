@@ -692,6 +692,30 @@ const invalidatePropertyCaches = async (userIdentifiers, helpers = {}) => {
   await Promise.all(tasks);
 };
 
+// Bug Fix: Deep merge amenities to prevent data loss during partial updates
+// When updating amenities, merge new values with existing ones instead of replacing
+const deepMergeAmenities = (existing, updates) => {
+  if (!existing && !updates) return null;
+  if (!existing) return updates;
+  if (!updates) return existing;
+
+  // Deep merge each amenities category
+  const merged = { ...existing };
+
+  const categories = ['utilities', 'features', 'security', 'accessibility', 'parking', 'pets'];
+
+  for (const category of categories) {
+    if (updates[category]) {
+      merged[category] = {
+        ...(existing[category] || {}),
+        ...updates[category],
+      };
+    }
+  }
+
+  return merged;
+};
+
 const applyLegacyAliases = (input = {}) => {
   const data = { ...input };
   if (!data.zipCode && data.postcode) {
@@ -879,12 +903,51 @@ const calculateOccupancyStats = (property) => {
   };
 };
 
+// Bug Fix: Calculate occupancy stats using database aggregation for accuracy with large properties
+// This ensures correct stats even for properties with >100 units (where units array is paginated)
+const calculateOccupancyStatsFromDB = async (propertyId) => {
+  try {
+    const [stats, totalCount] = await Promise.all([
+      prisma.unit.groupBy({
+        by: ['status'],
+        where: { propertyId },
+        _count: { id: true },
+      }),
+      prisma.unit.count({ where: { propertyId } }),
+    ]);
+
+    const statsByStatus = stats.reduce((acc, item) => {
+      acc[item.status] = item._count.id;
+      return acc;
+    }, {});
+
+    const occupied = statsByStatus.OCCUPIED || 0;
+    const vacant = statsByStatus.VACANT || 0;
+    const maintenance = statsByStatus.MAINTENANCE || 0;
+    const total = totalCount;
+    const occupancyRate = total > 0 ? ((occupied / total) * 100) : 0;
+
+    return {
+      occupied,
+      vacant,
+      maintenance,
+      total,
+      occupancyRate: parseFloat(occupancyRate.toFixed(1)),
+    };
+  } catch (error) {
+    console.error('Failed to calculate occupancy stats:', error);
+    return null;
+  }
+};
+
 const toPublicProperty = (property) => {
   if (!property) return property;
 
   const { propertyImages, units, ...rest } = property;
 
-  const occupancyStats = calculateOccupancyStats(property);
+  // Bug Fix: Prefer pre-calculated occupancyStats if available (from DB aggregation)
+  // Fall back to calculating from units array only if not provided
+  const occupancyStats = property.occupancyStats || calculateOccupancyStats(property);
 
   return {
     ...rest,
@@ -1140,7 +1203,12 @@ router.get('/:id', async (req, res) => {
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    res.json({ success: true, property: toPublicProperty(property) });
+    // Bug Fix: Use DB-based occupancy calculation for accurate stats on large properties
+    // This ensures properties with >100 units get correct occupancy data
+    const occupancyStats = await calculateOccupancyStatsFromDB(property.id);
+    const propertyWithStats = occupancyStats ? { ...property, occupancyStats } : property;
+
+    res.json({ success: true, property: toPublicProperty(propertyWithStats) });
   } catch (error) {
     console.error('Get property error:', {
       message: error?.message,
@@ -1154,7 +1222,7 @@ router.get('/:id', async (req, res) => {
 // PATCH /:id - Update property (PROPERTY_MANAGER only, must be property manager)
 router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
   try {
-    const property = await prisma.property.findUnique({ 
+    const property = await prisma.property.findUnique({
       where: { id: req.params.id },
       include: {
         owners: {
@@ -1178,6 +1246,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       coverImage,
       imageMetadata,
       images: legacyImages,
+      amenities: amenitiesUpdate,
       ...data
     } = parsed;
 
@@ -1188,6 +1257,11 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
+    // Bug Fix: Deep merge amenities to preserve existing data during partial updates
+    const mergedAmenities = amenitiesUpdate !== undefined
+      ? deepMergeAmenities(property.amenities, amenitiesUpdate)
+      : undefined;
+
     // Ensure converted fields are included in the data
     const updateData = {
       ...data,
@@ -1196,6 +1270,8 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
       ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
       ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
+      // Include merged amenities if amenities were updated
+      ...(mergedAmenities !== undefined && { amenities: mergedAmenities }),
     };
 
     if (imageUpdates !== undefined) {
