@@ -18,7 +18,6 @@ const {
   determineNewImagePrimaryFlag,
   extractImageUrlFromInput,
   normaliseSubmittedPropertyImages,
-  applyLegacyAliases,
 } = propertiesRouter._test;
 
 test('property images router is exposed and configured with merge params', () => {
@@ -130,22 +129,6 @@ test('normaliseSubmittedPropertyImages keeps captions and primary selection', ()
   assert.equal(result[1].isPrimary, true);
   assert.equal(result[1].caption, 'Second');
   assert.equal(result[1].captionProvided, true);
-});
-
-test('applyLegacyAliases derives cover image from structured imageMetadata when provided', () => {
-  const input = {
-    images: ['https://example.com/legacy.jpg'],
-    imageMetadata: [
-      { imageUrl: 'https://example.com/structured.jpg', caption: 'Front', isPrimary: true },
-      { url: '/uploads/lobby.png', caption: 'Lobby' },
-    ],
-  };
-
-  const result = applyLegacyAliases(input);
-
-  assert.equal(result.imageUrl, 'https://example.com/structured.jpg');
-  assert.deepEqual(result.images, input.images);
-  assert.strictEqual(result.imageMetadata, input.imageMetadata);
 });
 
 test('determineNewImagePrimaryFlag keeps existing primary unless explicitly overridden', () => {

@@ -164,8 +164,6 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
         })
         .filter(Boolean);
 
-      const imageUrls = imagePayload.map((image) => image.imageUrl);
-
       await mutation.mutateAsync({
         data: {
           name: data.name,
@@ -181,8 +179,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           status: data.status,
           description: data.description || null,
           imageUrl: coverFromForm || null,
-          images: imageUrls,
-          imageMetadata: imagePayload,
+          images: imagePayload,
           // Enhanced property details
           lotSize: data.lotSize,
           buildingSize: data.buildingSize,

@@ -431,7 +431,6 @@ const propertyImageInputObjectSchema = z.object({
 });
 
 const propertyImageInputSchema = z.union([z.string(), propertyImageInputObjectSchema]);
-const propertyImageInputArraySchema = z.array(propertyImageInputSchema).optional();
 
 const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
@@ -460,8 +459,7 @@ const basePropertySchema = z.object({
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
-    images: propertyImageInputArraySchema,
-    imageMetadata: propertyImageInputArraySchema,
+    images: z.array(propertyImageInputSchema).optional(),
   });
 
 const withAliasValidation = (schema, { requireCoreFields = true } = {}) =>
@@ -606,18 +604,15 @@ const applyLegacyAliases = (input = {}) => {
   if (!data.propertyType && data.type) {
     data.propertyType = data.type;
   }
-
-  if (!data.imageUrl) {
-    const candidates = [
-      data.coverImage,
-      ...(Array.isArray(data.imageMetadata) ? data.imageMetadata : []),
-      ...(Array.isArray(data.images) ? data.images : []),
-    ];
-
+  if (Array.isArray(data.imageMetadata)) {
+    data.images = data.imageMetadata;
+    delete data.imageMetadata;
+  }
+  if (!data.imageUrl && (data.coverImage || data.images?.length)) {
+    const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
     const firstUrl = candidates
       .map((value) => extractImageUrlFromInput(value))
       .find((value) => value && isValidImageLocation(value));
-
     if (firstUrl) {
       data.imageUrl = firstUrl;
     }
@@ -671,6 +666,45 @@ const normalizePropertyImages = (property) => {
       createdAt: image.createdAt ?? null,
       updatedAt: image.updatedAt ?? null,
     }));
+};
+
+const normalizeImageRecordValue = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const determinePrimaryImageIndex = (imageUrls = [], preferredPrimaryUrl) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const preferred = normalizeImageRecordValue(preferredPrimaryUrl);
+
+  if (preferred) {
+    const matchIndex = urls.findIndex((url) => normalizeImageRecordValue(url) === preferred);
+    if (matchIndex !== -1) {
+      return matchIndex;
+    }
+  }
+
+  return urls.length > 0 ? 0 : -1;
+};
+
+const buildPropertyImageRecords = ({
+  propertyId,
+  imageUrls = [],
+  preferredPrimaryUrl,
+  getCaption,
+  uploadedById,
+}) => {
+  const urls = Array.isArray(imageUrls) ? imageUrls : [];
+  const primaryIndex = determinePrimaryImageIndex(urls, preferredPrimaryUrl);
+
+  return urls.map((imageUrl, index) => {
+    const caption = typeof getCaption === 'function' ? getCaption(imageUrl, index) : null;
+    return {
+      propertyId,
+      imageUrl,
+      caption: caption ?? null,
+      isPrimary: index === primaryIndex,
+      displayOrder: index,
+      uploadedById,
+    };
+  });
 };
 
 const resolvePrimaryImageUrl = (images = []) => {
@@ -850,7 +884,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
 
-    const rawImages = imageMetadata !== undefined ? imageMetadata : legacyImages;
     const initialImages = normaliseSubmittedPropertyImages(rawImages);
 
     const primaryImageCandidate = initialImages.find((image) => image.isPrimary) || initialImages[0] || null;
@@ -880,9 +913,11 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
             isPrimary: image.isPrimary,
             displayOrder: index,
             uploadedById: req.user.id,
-          }));
+          });
 
-          await tx.propertyImage.createMany({ data: records });
+          if (records.length) {
+            await tx.propertyImage.createMany({ data: records });
+          }
         }
 
         return newProperty;
@@ -981,7 +1016,6 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
 
-    const rawImages = imageMetadata !== undefined ? imageMetadata : legacyImages;
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
     // Ensure converted fields are included in the data
@@ -1050,7 +1084,9 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
               };
             });
 
-            await tx.propertyImage.createMany({ data: records });
+            if (records.length) {
+              await tx.propertyImage.createMany({ data: records });
+            }
           }
         }
 
