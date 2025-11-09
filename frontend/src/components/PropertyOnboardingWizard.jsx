@@ -348,11 +348,30 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         imageUrl: basicInfo.imageUrl.trim() || null,
       };
 
-      const uploadedImageUrls = uploadedImages.map((image) => image.url).filter(Boolean);
-      if (uploadedImageUrls.length) {
-        payload.images = uploadedImageUrls;
+      const imagePayload = uploadedImages
+        .map((image, index) => {
+          if (!image || !image.url) {
+            return null;
+          }
+
+          const trimmedAltText = typeof image.altText === 'string' ? image.altText.trim() : '';
+          const coverFromState = typeof basicInfo.imageUrl === 'string' ? basicInfo.imageUrl.trim() : '';
+
+          return {
+            imageUrl: image.url,
+            caption: trimmedAltText ? trimmedAltText : null,
+            isPrimary: coverFromState ? image.url === coverFromState : index === 0,
+          };
+        })
+        .filter(Boolean);
+
+      if (imagePayload.length) {
+        const imageUrls = imagePayload.map((image) => image.imageUrl);
+        payload.imageMetadata = imagePayload;
+        payload.images = imageUrls;
         if (!payload.imageUrl) {
-          payload.imageUrl = uploadedImageUrls[0];
+          const primaryImage = imagePayload.find((image) => image.isPrimary) || imagePayload[0];
+          payload.imageUrl = primaryImage?.imageUrl || null;
         }
       }
 
@@ -574,6 +593,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         coverImageUrl={basicInfo.imageUrl}
         propertyName={basicInfo.name}
         onChange={handleUploadedImagesChange}
+        allowAltText
       />
 
       <TextField
