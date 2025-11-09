@@ -723,8 +723,9 @@ export default function PropertyDetailPage() {
                         gap: 1,
                       }}
                     >
-                      {/* Fix: When >5 images, show only images 1-3 to make room for "+N more" tile */}
-                      {carouselImages.slice(1, carouselImages.length > 5 ? 4 : 5).map((image, idx) => {
+                      {/* Bug Fix: Consistent grid layout - always show 3 thumbnails + "+N more" if needed */}
+                      {/* For 2-4 images: show all as thumbnails. For 5+ images: show 3 thumbnails + "+N more" */}
+                      {carouselImages.slice(1, Math.min(carouselImages.length, carouselImages.length >= 5 ? 4 : carouselImages.length)).map((image, idx) => {
                         const imageUrl = typeof image === 'string' ? image : image.imageUrl;
                         const caption = typeof image === 'object' ? image.caption : null;
                         const actualIndex = idx + 1;

@@ -699,7 +699,7 @@ const invalidatePropertyCaches = async (userIdentifiers, helpers = {}) => {
 
 // Bug Fix: Deep merge amenities to prevent data loss during partial updates
 // When updating amenities, merge new values with existing ones instead of replacing
-// Bug Fix: Properly handle explicit false values and null to allow removing amenities
+// Bug Fix: Keep false values to allow users to explicitly disable/uncheck amenities
 const deepMergeAmenities = (existing, updates) => {
   if (!existing && !updates) return null;
   if (!existing) return updates;
@@ -716,18 +716,12 @@ const deepMergeAmenities = (existing, updates) => {
       if (updates[category] === null) {
         merged[category] = null;
       } else if (typeof updates[category] === 'object') {
-        // Merge individual fields, preserving explicit false values
+        // Merge individual fields, keeping false values (they explicitly disable features)
+        // Previous implementation incorrectly removed false values
         merged[category] = {
           ...(existing[category] || {}),
           ...updates[category],
         };
-        // Bug Fix: Clean up the merged category - remove all fields that are explicitly false
-        // This allows users to "uncheck" amenities by sending false
-        Object.keys(merged[category]).forEach(key => {
-          if (merged[category][key] === false) {
-            delete merged[category][key];
-          }
-        });
         // If category is now empty, set to null
         if (Object.keys(merged[category]).length === 0) {
           merged[category] = null;
@@ -1062,13 +1056,15 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
     const rawSearch = searchInput.length <= 200 ? searchInput : searchInput.substring(0, 200);
     const status = req.query.status?.trim().toUpperCase() || '';
 
-    // Bug Fix: Escape special regex characters to prevent query errors
-    // Prisma's 'contains' mode can have issues with special chars in some databases
-    const escapeRegexChars = (str) => {
-      // Escape regex special characters: . * + ? ^ $ { } ( ) | [ ] \
-      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    };
-    const search = rawSearch ? escapeRegexChars(rawSearch) : '';
+    // Bug Fix: Log warning when search string is truncated so admins are aware
+    if (searchInput.length > 200) {
+      console.warn(`[Properties API] Search string truncated from ${searchInput.length} to 200 characters. Original: "${searchInput.substring(0, 50)}..."`);
+    }
+
+    // Bug Fix: Remove unnecessary regex escaping
+    // Prisma's 'contains' mode uses SQL LIKE/ILIKE, not regex, so escaping breaks searches
+    // For example, searching "Smith & Co." would fail with escaping
+    const search = rawSearch;
 
     // Add search filter
     if (search) {
