@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { randomUUID } from 'crypto';
 import { requireAuth } from '../middleware/auth.js';
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 
@@ -22,19 +23,27 @@ const storage = multer.diskStorage({
         .toLowerCase()
         .replace(/[^a-z0-9-_]+/g, '-')
         .slice(0, 40) || 'file';
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    // Bug Fix: Use UUID instead of Date.now() + random to prevent filename collisions
+    const unique = randomUUID();
     cb(null, `${base}-${unique}${ext}`);
   },
 });
 
-// 👇 MINIMAL CHANGE: Increased file size limit to 10MB to prevent "request entity too large" error.
+// Bug Fix: Add MIME type validation to prevent non-image uploads
 const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit per file
   },
+  fileFilter: (_req, file, cb) => {
+    // Bug Fix: Validate MIME type to ensure only images are uploaded
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!file.mimetype || !allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
+      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Only image files (JPEG, PNG, GIF, WebP) are allowed'));
+    }
+    cb(null, true);
+  },
 });
-// ---
 
 /**
  * POST /uploads/single
@@ -86,7 +95,10 @@ router.post('/multiple', requireAuth, upload.array('files', 50), (req, res) => {
     if (req.files) {
       req.files.forEach(file => {
         try {
-          fs.unlinkSync(file.path);
+          // Bug Fix: Check if file exists before attempting to delete
+          if (file.path && fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
         } catch (cleanupError) {
           console.error('Failed to clean up file:', cleanupError);
         }

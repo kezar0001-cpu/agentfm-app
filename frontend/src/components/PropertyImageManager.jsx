@@ -175,6 +175,33 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
     const files = Array.from(event?.target?.files || []);
     if (!files.length) return;
 
+    // Bug Fix: Client-side validation before upload to save bandwidth
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+    const invalidFiles = files.filter(file => {
+      if (file.size > MAX_FILE_SIZE) return true;
+      if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) return true;
+      return false;
+    });
+
+    if (invalidFiles.length > 0) {
+      const oversized = invalidFiles.filter(f => f.size > MAX_FILE_SIZE);
+      const wrongType = invalidFiles.filter(f => !ALLOWED_TYPES.includes(f.type.toLowerCase()));
+
+      let errorMsg = '';
+      if (oversized.length > 0) {
+        errorMsg += `${oversized.length} file(s) exceed 10MB limit. `;
+      }
+      if (wrongType.length > 0) {
+        errorMsg += `${wrongType.length} file(s) are not valid images (JPEG, PNG, GIF, WebP only).`;
+      }
+
+      setBulkUploadError(errorMsg.trim());
+      if (event?.target) event.target.value = '';
+      return;
+    }
+
     setIsUploadingFiles(true);
     setBulkUploadError('');
 
@@ -233,8 +260,14 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       setBulkUploadError(error?.response?.data?.message || error?.message || 'Failed to upload images');
     } finally {
       setIsUploadingFiles(false);
+      // Bug Fix: Clear file input and release file references to prevent memory leaks
       if (event?.target) {
         event.target.value = '';
+      }
+      // Bug Fix: Force garbage collection of file references
+      // This prevents memory leaks from large image files staying in memory
+      if (typeof window !== 'undefined' && window.gc) {
+        setTimeout(() => window.gc(), 100);
       }
     }
   };
@@ -266,6 +299,15 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
     // Bug Fix: Optimistic update - immediately show reordered images for better UX
     // Reorder the images array
     const baseImages = imagesData?.images || [];
+
+    // Bug Fix: Validate that we have enough images before attempting reorder
+    if (!baseImages.length || draggedIndex >= baseImages.length || dropIndex >= baseImages.length) {
+      showError('Cannot reorder: Invalid image position');
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
     const reorderedImages = [...baseImages];
     const [draggedImage] = reorderedImages.splice(draggedIndex, 1);
     reorderedImages.splice(dropIndex, 0, draggedImage);
@@ -276,6 +318,15 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
     // Create the ordered array of image IDs
     const orderedImageIds = reorderedImages.map(img => img.id);
 
+    // Bug Fix: Validate that all IDs are present before sending request
+    if (orderedImageIds.some(id => !id)) {
+      showError('Cannot reorder: Invalid image data');
+      setOptimisticallyReorderedImages(null);
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
     try {
       await reorderImagesMutation.mutateAsync({
         data: { orderedImageIds },
@@ -283,9 +334,10 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       // Clear optimistic state on success - real data will be fetched
       setOptimisticallyReorderedImages(null);
     } catch (error) {
-      // Rollback optimistic update on error
+      // Bug Fix: Rollback optimistic update on error with proper error message
       setOptimisticallyReorderedImages(null);
-      showError(error.response?.data?.message || 'Failed to reorder images');
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to reorder images';
+      showError(errorMsg);
     }
 
     setDraggedIndex(null);

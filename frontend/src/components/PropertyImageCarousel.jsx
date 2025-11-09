@@ -79,11 +79,14 @@ const PropertyImageCarousel = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+  // Bug Fix: Track image loading errors to show fallback
+  const [imageErrors, setImageErrors] = useState(new Set());
 
-  // Bug Fix: Reset currentIndex and autoplay when images change
+  // Bug Fix: Reset currentIndex, autoplay, and error tracking when images change
   useEffect(() => {
     setCurrentIndex(0);
     setAutoplayEnabled(true);
+    setImageErrors(new Set());
   }, [items]);
 
   // Memoize handleStep to prevent recreating the function on every render
@@ -143,10 +146,17 @@ const PropertyImageCarousel = ({
   }, [fullscreenOpen, handleStep]);
 
   const currentItem = items[currentIndex] || { imageUrl: null, caption: null };
+  // Bug Fix: Use placeholder if current image has failed to load
+  const hasError = imageErrors.has(currentIndex);
   const currentImage =
-    items.length > 0
+    items.length > 0 && !hasError
       ? resolvePropertyImageUrl(currentItem.imageUrl, fallbackText, placeholderSize)
       : buildPropertyPlaceholder(fallbackText, placeholderSize);
+
+  // Bug Fix: Handle image loading errors
+  const handleImageError = useCallback((index) => {
+    setImageErrors(prev => new Set(prev).add(index));
+  }, []);
 
   return (
     <>
@@ -164,6 +174,7 @@ const PropertyImageCarousel = ({
           src={currentImage}
           alt={currentItem.caption || fallbackText || 'Property image'}
           sx={{ ...defaultImageSx, ...imageSx }}
+          onError={() => handleImageError(currentIndex)}
         />
 
         {/* Image Counter */}
@@ -308,12 +319,13 @@ const PropertyImageCarousel = ({
               <Box
                 key={index}
                 component="img"
-                src={resolvePropertyImageUrl(item.imageUrl, fallbackText, '100x100')}
+                src={imageErrors.has(index) ? buildPropertyPlaceholder(fallbackText, '100x100') : resolvePropertyImageUrl(item.imageUrl, fallbackText, '100x100')}
                 alt={item.caption || `Thumbnail ${index + 1}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   handleThumbnailClick(index);
                 }}
+                onError={() => handleImageError(index)}
                 sx={{
                   width: 60,
                   height: 60,
@@ -377,6 +389,7 @@ const PropertyImageCarousel = ({
                 objectFit: 'contain',
                 margin: 'auto',
               }}
+              onError={() => handleImageError(currentIndex)}
             />
 
             {/* Fullscreen Navigation */}

@@ -42,6 +42,31 @@ export async function uploadPropertyImages(files) {
     if (error.response?.status === 413) {
       throw new Error('Files are too large. Maximum size is 10MB per file.');
     }
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      throw new Error('You do not have permission to upload images. Please log in again.');
+    }
+    if (error.response?.status === 415) {
+      throw new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+    }
+    if (error.response?.status === 400) {
+      const serverMsg = error.response?.data?.message || '';
+      if (serverMsg.toLowerCase().includes('limit')) {
+        throw new Error('File size or count limit exceeded. Maximum 10MB per file, up to 50 files.');
+      }
+      if (serverMsg.toLowerCase().includes('image')) {
+        throw new Error('Only image files are allowed (JPEG, PNG, GIF, WebP).');
+      }
+      throw new Error(serverMsg || 'Invalid upload request. Please check your files.');
+    }
+    if (error.response?.status === 500 || error.response?.status === 503) {
+      throw new Error('Server error. Please try again later or contact support.');
+    }
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      throw new Error('Upload timeout. Your connection may be slow or files are too large.');
+    }
+    if (error.code === 'ERR_NETWORK' || !navigator.onLine) {
+      throw new Error('Network error. Please check your internet connection and try again.');
+    }
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     }
