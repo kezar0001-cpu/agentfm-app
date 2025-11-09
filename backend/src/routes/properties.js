@@ -617,6 +617,7 @@ const applyLegacyAliases = (input = {}) => {
       data.imageUrl = firstUrl;
     }
   }
+
   return data;
 };
 
@@ -870,7 +871,15 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    const { managerId: managerIdInput, postcode, type, coverImage, images: rawImages, ...data } = parsed;
+    const {
+      managerId: managerIdInput,
+      postcode,
+      type,
+      coverImage,
+      imageMetadata,
+      images: legacyImages,
+      ...data
+    } = parsed;
 
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
@@ -994,7 +1003,15 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    const { managerId: managerIdInput, postcode, type, coverImage, images: rawImages, ...data } = parsed;
+    const {
+      managerId: managerIdInput,
+      postcode,
+      type,
+      coverImage,
+      imageMetadata,
+      images: legacyImages,
+      ...data
+    } = parsed;
 
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
