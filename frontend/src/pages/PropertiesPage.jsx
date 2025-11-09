@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -227,6 +227,10 @@ export default function PropertiesPage() {
     borderColor: 'divider',
   }), []);
 
+  // Bug Fix: Use ref to maintain stable property object references across renders
+  // This prevents unnecessary re-renders when new pages load - only new properties are created
+  const propertyCacheRef = useRef(new Map());
+
   // Flatten all pages into a single array and memoize to prevent unnecessary re-renders
   // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
   // Bug Fix: Memoize properties list with pre-processed images to avoid re-processing on every render
@@ -239,9 +243,17 @@ export default function PropertiesPage() {
       .flatMap(page => page?.items || [])
       .filter(property => property != null);
 
-    // Bug Fix: Pre-process images and compute derived values once
-    // Use property.id as stable reference to maintain object identity
-    return flattenedProperties.map(property => {
+    // Bug Fix: Maintain stable object references using Map cache keyed by property.id
+    // Only create new objects for new/changed properties
+    const result = flattenedProperties.map(property => {
+      const cached = propertyCacheRef.current.get(property.id);
+
+      // Check if we can reuse cached object (property hasn't changed)
+      // Compare updatedAt timestamp to detect changes
+      if (cached && cached.updatedAt === property.updatedAt) {
+        return cached;
+      }
+
       // Process images array
       const processedImages = (() => {
         if (Array.isArray(property.images) && property.images.length > 0) {
@@ -260,7 +272,7 @@ export default function PropertiesPage() {
       const formattedStatus = formatStatusText(property.status || '');
       const formattedAddress = formatPropertyAddressLine(property);
 
-      return {
+      const processed = {
         ...property,
         // Derived properties computed once
         processedImages,
@@ -270,7 +282,22 @@ export default function PropertiesPage() {
         formattedStatus,
         formattedAddress,
       };
+
+      // Update cache with new processed object
+      propertyCacheRef.current.set(property.id, processed);
+
+      return processed;
     });
+
+    // Clean up cache: remove properties that are no longer in the list
+    const currentIds = new Set(flattenedProperties.map(p => p.id));
+    for (const [id] of propertyCacheRef.current) {
+      if (!currentIds.has(id)) {
+        propertyCacheRef.current.delete(id);
+      }
+    }
+
+    return result;
   }, [data?.pages]);
 
   const handleMenuOpen = (event, property) => {
