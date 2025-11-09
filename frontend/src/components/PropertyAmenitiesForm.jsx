@@ -94,12 +94,27 @@ const PropertyAmenitiesForm = ({ value = {}, onChange, disabled = false }) => {
     ...value,
   });
 
+  // Bug Fix: Deep merge amenities to prevent losing nested defaults
+  // Shallow merge replaces entire nested objects, losing default values like parking.spaces: 0
   useEffect(() => {
     if (value && typeof value === 'object') {
-      setAmenities((prev) => ({
-        ...prev,
-        ...value,
-      }));
+      setAmenities((prev) => {
+        const merged = { ...prev };
+
+        // Deep merge each category to preserve nested defaults
+        const categories = ['utilities', 'features', 'security', 'accessibility', 'parking', 'pets'];
+
+        for (const category of categories) {
+          if (value[category] && typeof value[category] === 'object') {
+            merged[category] = {
+              ...prev[category],
+              ...value[category],
+            };
+          }
+        }
+
+        return merged;
+      });
     }
   }, [value]);
 
