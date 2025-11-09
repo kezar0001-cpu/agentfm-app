@@ -366,9 +366,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         .filter(Boolean);
 
       if (imagePayload.length) {
-        const imageUrls = imagePayload.map((image) => image.imageUrl);
-        payload.imageMetadata = imagePayload;
-        payload.images = imageUrls;
+        payload.images = imagePayload;
         if (!payload.imageUrl) {
           const primaryImage = imagePayload.find((image) => image.isPrimary) || imagePayload[0];
           payload.imageUrl = primaryImage?.imageUrl || null;
