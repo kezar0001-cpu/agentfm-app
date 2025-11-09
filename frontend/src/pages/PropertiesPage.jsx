@@ -301,6 +301,7 @@ export default function PropertiesPage() {
                   id="properties-filter-status"
                   name="filterStatus"
                   value={filterStatus}
+                  label="Status"
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <MenuItem value="all">All Statuses</MenuItem>
@@ -691,6 +692,9 @@ export default function PropertiesPage() {
                           Inspections
                         </TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">
+                          Actions
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -739,6 +743,14 @@ export default function PropertiesPage() {
                                 color={getStatusColor(property.status || '')}
                                 sx={{ textTransform: 'capitalize' }}
                               />
+                            </TableCell>
+                            <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleMenuOpen(e, property)}
+                              >
+                                <MoreVertIcon />
+                              </IconButton>
                             </TableCell>
                           </TableRow>
                         );
