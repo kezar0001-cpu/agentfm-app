@@ -101,8 +101,8 @@ export default function PropertiesPage() {
       const response = await apiClient.get(`/properties?limit=50&offset=${pageParam}`);
       return response.data;
     },
-    getNextPageParam: (lastPage) => {
-      return lastPage.hasMore ? lastPage.page * 50 : undefined;
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.hasMore ? allPages.length * 50 : undefined;
     },
     initialPageParam: 0,
   });
