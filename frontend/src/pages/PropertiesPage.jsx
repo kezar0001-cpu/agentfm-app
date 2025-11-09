@@ -174,17 +174,28 @@ export default function PropertiesPage() {
     },
   });
 
+  // Helper function to get total units consistently across all views
+  const getTotalUnits = (property) => {
+    return property?.totalUnits ?? property?._count?.units ?? 0;
+  };
+
   // Flatten all pages into a single array and memoize to prevent unnecessary re-renders
   // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
   // Bug Fix: Memoize properties list with pre-processed images to avoid re-processing on every render
+  // Bug Fix: Maintain stable object references to prevent unnecessary re-renders when new pages load
   const properties = useMemo(() => {
-    const flattenedProperties = data?.pages?.flatMap(page => page.items) || [];
+    if (!data?.pages) return [];
 
-    // Pre-process images for each property to avoid recalculating on every render
-    return flattenedProperties.map(property => ({
-      ...property,
-      processedImages: (() => {
-        if (!property) return [];
+    // Bug Fix: Filter out undefined/null items and safely flatten pages
+    const flattenedProperties = data.pages
+      .flatMap(page => page?.items || [])
+      .filter(property => property != null);
+
+    // Bug Fix: Pre-process images and compute derived values once
+    // Use property.id as stable reference to maintain object identity
+    return flattenedProperties.map(property => {
+      // Process images array
+      const processedImages = (() => {
         if (Array.isArray(property.images) && property.images.length > 0) {
           return property.images;
         }
@@ -192,8 +203,24 @@ export default function PropertiesPage() {
           return [property.imageUrl];
         }
         return [];
-      })(),
-    }));
+      })();
+
+      // Pre-compute values to avoid inline calculations during render
+      const hasMultipleImages = processedImages.length > 1;
+      const totalUnits = getTotalUnits(property);
+      const statusColor = getStatusColor(property.status || '');
+      const formattedAddress = formatPropertyAddressLine(property);
+
+      return {
+        ...property,
+        // Derived properties computed once
+        processedImages,
+        hasMultipleImages,
+        totalUnits,
+        statusColor,
+        formattedAddress,
+      };
+    });
   }, [data?.pages]);
 
   const handleMenuOpen = (event, property) => {
@@ -443,216 +470,63 @@ export default function PropertiesPage() {
               {/* Grid View */}
               {viewMode === 'grid' && (
                 <Grid container spacing={3}>
-                  {properties.map((property) => {
-                    // Bug Fix: Use pre-processed images to avoid recalculating on every render
-                    const propertyImages = property.processedImages;
-                    const hasMultipleImages = propertyImages.length > 1;
-
-                    return (
-                      <Grid item xs={12} sm={6} md={4} key={property.id}>
-                        <Card
-                          sx={{
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            cursor: 'pointer',
-                            borderRadius: 3,
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
-                            overflow: 'hidden',
-                            position: 'relative',
-                            '&::before': {
-                              content: '""',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: '4px',
-                              background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
-                              opacity: 0,
-                              transition: 'opacity 0.3s ease-in-out',
-                            },
-                            '&:hover::before': {
-                              opacity: 1,
-                            },
-                          }}
-                          onClick={() => handleCardClick(property.id)}
-                        >
-                          <PropertyImageCarousel
-                            images={propertyImages}
-                            fallbackText={property.name}
-                            height={{ xs: 180, sm: 200 }}
-                            showDots={hasMultipleImages}
-                            showArrows={hasMultipleImages}
-                            showCounter={hasMultipleImages}
-                            containerSx={{
-                              borderBottom: '1px solid',
-                              borderColor: 'divider',
-                            }}
-                          />
-
-                          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                gap: 1,
-                                flexWrap: 'wrap',
-                              }}
-                            >
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                {property.name}
-                              </Typography>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleMenuOpen(e, property)}
-                              >
-                                <MoreVertIcon />
-                              </IconButton>
-                            </Box>
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <LocationIcon fontSize="small" color="action" />
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ flexGrow: 1, minWidth: 0 }}
-                              >
-                                {formatPropertyAddressLine(property)}
-                              </Typography>
-                            </Box>
-
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                              <Chip
-                                size="small"
-                                label={property.status?.replace('_', ' ') || ''}
-                                color={getStatusColor(property.status || '')}
-                              />
-                              <Chip
-                                size="small"
-                                icon={<ApartmentIcon />}
-                                label={`${property.totalUnits ?? 0} units`}
-                                variant="outlined"
-                              />
-                            </Box>
-
-                            {property.description && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                {property.description}
-                              </Typography>
-                            )}
-                          </CardContent>
-
-                          <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
-                            <Stack spacing={0.5} sx={{ width: '100%' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                Type: {property.propertyType || 'N/A'}
-                              </Typography>
-                              {property._count && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
-                                </Typography>
-                              )}
-                            </Stack>
-                          </CardActions>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-              </Grid>
-              )}
-
-              {/* List View */}
-              {viewMode === 'list' && (
-                <Stack spacing={2}>
-                  {properties.map((property) => {
-                    // Bug Fix: Use pre-processed images to avoid recalculating on every render
-                    const propertyImages = property.processedImages;
-                    const hasMultipleImages = propertyImages.length > 1;
-
-                    return (
+                  {properties.map((property) => (
+                    <Grid item xs={12} sm={6} md={4} key={property.id}>
                       <Card
-                        key={property.id}
                         sx={{
+                          height: '100%',
                           display: 'flex',
-                          flexDirection: { xs: 'column', md: 'row' },
+                          flexDirection: 'column',
                           cursor: 'pointer',
-                          borderRadius: 2,
+                          borderRadius: 3,
                           border: '1px solid',
                           borderColor: 'divider',
+                          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
                           overflow: 'hidden',
-                          '&:hover': {
-                            boxShadow: 3,
+                          position: 'relative',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '4px',
+                            background: 'linear-gradient(135deg, #f97316 0%, #b91c1c 100%)',
+                            opacity: 0,
+                            transition: 'opacity 0.3s ease-in-out',
+                          },
+                          '&:hover::before': {
+                            opacity: 1,
                           },
                         }}
                         onClick={() => handleCardClick(property.id)}
                       >
-                        {/* Property Image */}
-                        <Box
-                          sx={{
-                            width: { xs: '100%', md: 250 },
-                            height: { xs: 180, md: 'auto' },
-                            minHeight: { md: 200 },
-                            flexShrink: 0,
+                        <PropertyImageCarousel
+                          images={property.processedImages}
+                          fallbackText={property.name}
+                          height={{ xs: 180, sm: 200 }}
+                          showDots={property.hasMultipleImages}
+                          showArrows={property.hasMultipleImages}
+                          showCounter={property.hasMultipleImages}
+                          containerSx={{
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
                           }}
-                        >
-                          <PropertyImageCarousel
-                            images={propertyImages}
-                            fallbackText={property.name}
-                            height={{ xs: 180, md: '100%' }}
-                            showDots={hasMultipleImages}
-                            showArrows={hasMultipleImages}
-                            showCounter={hasMultipleImages}
-                            containerSx={{
-                              width: '100%',
-                              height: '100%',
-                              borderRight: { md: '1px solid' },
-                              borderBottom: { xs: '1px solid', md: 'none' },
-                              borderColor: 'divider',
-                            }}
-                          />
-                        </Box>
+                        />
 
-                        {/* Property Content */}
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            flexGrow: 1,
-                            p: 2,
-                          }}
-                        >
-                          {/* Header */}
+                        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                           <Box
                             sx={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'flex-start',
-                              mb: 1.5,
+                              gap: 1,
+                              flexWrap: 'wrap',
                             }}
                           >
-                            <Box>
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                {property.name}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                <LocationIcon fontSize="small" color="action" />
-                                <Typography variant="body2" color="text.secondary">
-                                  {formatPropertyAddressLine(property)}
-                                </Typography>
-                              </Box>
-                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {property.name}
+                            </Typography>
                             <IconButton
                               size="small"
                               onClick={(e) => handleMenuOpen(e, property)}
@@ -661,13 +535,36 @@ export default function PropertiesPage() {
                             </IconButton>
                           </Box>
 
-                          {/* Description */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <LocationIcon fontSize="small" color="action" />
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ flexGrow: 1, minWidth: 0 }}
+                            >
+                              {property.formattedAddress}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip
+                              size="small"
+                              label={property.status?.replace('_', ' ') || ''}
+                              color={property.statusColor}
+                            />
+                            <Chip
+                              size="small"
+                              icon={<ApartmentIcon />}
+                              label={`${property.totalUnits} units`}
+                              variant="outlined"
+                            />
+                          </Box>
+
                           {property.description && (
                             <Typography
                               variant="body2"
                               color="text.secondary"
                               sx={{
-                                mb: 2,
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
@@ -677,55 +574,173 @@ export default function PropertiesPage() {
                               {property.description}
                             </Typography>
                           )}
+                        </CardContent>
 
-                          {/* Chips and Stats */}
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                            <Chip
-                              size="small"
-                              label={property.status?.replace('_', ' ') || ''}
-                              color={getStatusColor(property.status || '')}
-                            />
-                            <Chip
-                              size="small"
-                              icon={<ApartmentIcon />}
-                              label={`${property.totalUnits ?? 0} units`}
-                              variant="outlined"
-                            />
-                            <Chip
-                              size="small"
-                              label={property.propertyType || 'N/A'}
-                              variant="outlined"
-                            />
-                          </Box>
-
-                          {/* Footer Stats */}
-                          {property._count && (
+                        <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
+                          <Stack spacing={0.5} sx={{ width: '100%' }}>
                             <Typography variant="caption" color="text.secondary">
-                              {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
+                              Type: {property.propertyType || 'N/A'}
                             </Typography>
-                          )}
-                        </Box>
+                            {property._count && (
+                              <Typography variant="caption" color="text.secondary">
+                                {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
+                              </Typography>
+                            )}
+                          </Stack>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
 
-                        {/* Occupancy Widget (List View Only) */}
+              {/* List View */}
+              {viewMode === 'list' && (
+                <Stack spacing={2}>
+                  {properties.map((property) => (
+                    <Card
+                      key={property.id}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        cursor: 'pointer',
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        overflow: 'hidden',
+                        '&:hover': {
+                          boxShadow: 3,
+                        },
+                      }}
+                      onClick={() => handleCardClick(property.id)}
+                    >
+                      {/* Property Image */}
+                      <Box
+                        sx={{
+                          width: { xs: '100%', md: 250 },
+                          height: { xs: 180, md: 'auto' },
+                          minHeight: { md: 200 },
+                          flexShrink: 0,
+                        }}
+                      >
+                        <PropertyImageCarousel
+                          images={property.processedImages}
+                          fallbackText={property.name}
+                          height={{ xs: 180, md: '100%' }}
+                          showDots={property.hasMultipleImages}
+                          showArrows={property.hasMultipleImages}
+                          showCounter={property.hasMultipleImages}
+                          containerSx={{
+                            width: '100%',
+                            height: '100%',
+                            borderRight: { md: '1px solid' },
+                            borderBottom: { xs: '1px solid', md: 'none' },
+                            borderColor: 'divider',
+                          }}
+                        />
+                      </Box>
+
+                      {/* Property Content */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          flexGrow: 1,
+                          p: 2,
+                        }}
+                      >
+                        {/* Header */}
                         <Box
                           sx={{
-                            display: { xs: 'none', lg: 'flex' },
-                            alignItems: 'center',
-                            p: 2,
-                            borderLeft: '1px solid',
-                            borderColor: 'divider',
-                            minWidth: 200,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            mb: 1.5,
                           }}
                         >
-                          <PropertyOccupancyWidget
-                            occupancyStats={property.occupancyStats}
-                            totalUnits={property.totalUnits}
-                            compact={true}
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {property.name}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                              <LocationIcon fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary">
+                                {property.formattedAddress}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, property)}
+                          >
+                            <MoreVertIcon />
+                          </IconButton>
+                        </Box>
+
+                        {/* Description */}
+                        {property.description && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mb: 2,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {property.description}
+                          </Typography>
+                        )}
+
+                        {/* Chips and Stats */}
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                          <Chip
+                            size="small"
+                            label={property.status?.replace('_', ' ') || ''}
+                            color={property.statusColor}
+                          />
+                          <Chip
+                            size="small"
+                            icon={<ApartmentIcon />}
+                            label={`${property.totalUnits} units`}
+                            variant="outlined"
+                          />
+                          <Chip
+                            size="small"
+                            label={property.propertyType || 'N/A'}
+                            variant="outlined"
                           />
                         </Box>
-                      </Card>
-                    );
-                  })}
+
+                        {/* Footer Stats */}
+                        {property._count && (
+                          <Typography variant="caption" color="text.secondary">
+                            {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Occupancy Widget (List View Only) */}
+                      <Box
+                        sx={{
+                          display: { xs: 'none', lg: 'flex' },
+                          alignItems: 'center',
+                          p: 2,
+                          borderLeft: '1px solid',
+                          borderColor: 'divider',
+                          minWidth: 200,
+                        }}
+                      >
+                        <PropertyOccupancyWidget
+                          occupancyStats={property.occupancyStats}
+                          totalUnits={property.totalUnits}
+                          compact={true}
+                        />
+                      </Box>
+                    </Card>
+                  ))}
                 </Stack>
               )}
 
@@ -754,7 +769,6 @@ export default function PropertiesPage() {
                     </TableHead>
                     <TableBody>
                       {properties.map((property) => {
-                        const totalUnits = property.totalUnits ?? property._count?.units ?? 0;
                         const jobsCount = property._count?.jobs ?? 0;
                         const inspectionsCount = property._count?.inspections ?? 0;
 
@@ -777,12 +791,12 @@ export default function PropertiesPage() {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
-                                {formatPropertyAddressLine(property) || '—'}
+                                {property.formattedAddress || '—'}
                               </Typography>
                             </TableCell>
                             <TableCell align="right">
                               <Typography variant="body2" fontWeight={600}>
-                                {totalUnits}
+                                {property.totalUnits}
                               </Typography>
                             </TableCell>
                             <TableCell align="right">
@@ -795,7 +809,7 @@ export default function PropertiesPage() {
                               <Chip
                                 size="small"
                                 label={property.status?.replace('_', ' ') || 'Unknown'}
-                                color={getStatusColor(property.status || '')}
+                                color={property.statusColor}
                                 sx={{ textTransform: 'capitalize' }}
                               />
                             </TableCell>
