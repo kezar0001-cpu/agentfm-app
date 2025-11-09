@@ -305,11 +305,18 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
       ) : (
         <>
           {canEdit && images.length > 1 && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <DragIndicatorIcon fontSize="small" />
-                <Typography variant="body2">
-                  Drag and drop images to reorder them
+            <Alert
+              severity="info"
+              sx={{
+                mb: 2,
+                background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.05) 0%, rgba(33, 150, 243, 0.15) 100%)',
+                border: '1px solid rgba(33, 150, 243, 0.3)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <DragIndicatorIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Drag and drop images to reorder • First image is the cover photo
                 </Typography>
               </Box>
             </Alert>
@@ -325,13 +332,25 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
                   onDrop={(e) => canEdit && handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                   sx={{
-                    cursor: canEdit ? 'move' : 'default',
-                    opacity: draggedIndex === index ? 0.5 : 1,
-                    border: dragOverIndex === index ? '2px dashed' : '1px solid',
+                    cursor: canEdit ? 'grab' : 'default',
+                    opacity: draggedIndex === index ? 0.4 : 1,
+                    transform: draggedIndex === index ? 'scale(0.95) rotate(2deg)' : 'scale(1)',
+                    border: dragOverIndex === index ? '3px dashed' : '1px solid',
                     borderColor: dragOverIndex === index ? 'primary.main' : 'divider',
-                    transition: 'all 0.2s ease-in-out',
+                    backgroundColor: dragOverIndex === index ? 'action.hover' : 'background.paper',
+                    boxShadow: draggedIndex === index ? 6 : dragOverIndex === index ? 4 : 1,
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
                     '&:hover': canEdit ? {
-                      boxShadow: 3,
+                      boxShadow: 4,
+                      transform: 'translateY(-4px)',
+                      borderColor: 'primary.light',
+                      '& .drag-handle': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      },
+                    } : {},
+                    '&:active': canEdit ? {
+                      cursor: 'grabbing',
                     } : {},
                   }}
                 >
@@ -358,18 +377,24 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
                   )}
                   {canEdit && (
                     <Box
+                      className="drag-handle"
                       sx={{
                         position: 'absolute',
                         top: 8,
                         right: 8,
-                        bgcolor: 'rgba(0, 0, 0, 0.6)',
-                        borderRadius: 1,
-                        p: 0.5,
+                        bgcolor: 'rgba(0, 0, 0, 0.7)',
+                        borderRadius: 2,
+                        p: 1,
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(255,255,255,0.1)',
                       }}
                     >
-                      <DragIndicatorIcon sx={{ color: 'white', fontSize: 20 }} />
+                      <DragIndicatorIcon sx={{ color: 'white', fontSize: 24 }} />
                     </Box>
                   )}
                 </Box>
