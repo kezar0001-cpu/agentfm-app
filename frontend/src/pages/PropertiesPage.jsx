@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -67,6 +67,7 @@ export default function PropertiesPage() {
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'table'
   const [anchorEl, setAnchorEl] = useState(null);
@@ -74,6 +75,15 @@ export default function PropertiesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  // Debounce search term to avoid excessive API calls (Bug Fix #2)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (!location.state?.openCreateDialog) {
@@ -86,7 +96,7 @@ export default function PropertiesPage() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state?.openCreateDialog, location.pathname, navigate]);
 
-  // Fetch properties with infinite query
+  // Fetch properties with infinite query (Bug Fix #1: Server-side search and filter)
   const PROPERTIES_PAGE_SIZE = 50;
   const {
     data,
@@ -97,13 +107,28 @@ export default function PropertiesPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.properties.all(),
+    queryKey: queryKeys.properties.list(debouncedSearchTerm, filterStatus),
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await apiClient.get(`/properties?limit=${PROPERTIES_PAGE_SIZE}&offset=${pageParam}`);
+      const params = new URLSearchParams({
+        limit: PROPERTIES_PAGE_SIZE.toString(),
+        offset: pageParam.toString(),
+      });
+
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+
+      if (filterStatus && filterStatus !== 'all') {
+        params.append('status', filterStatus);
+      }
+
+      const response = await apiClient.get(`/properties?${params.toString()}`);
       return response.data;
     },
     getNextPageParam: (lastPage, allPages) => {
-      return lastPage.hasMore ? allPages.length * PROPERTIES_PAGE_SIZE : undefined;
+      // Calculate actual offset based on items fetched (Bug Fix: Accurate pagination)
+      const totalFetched = allPages.reduce((sum, page) => sum + (page.items?.length || 0), 0);
+      return lastPage.hasMore ? totalFetched : undefined;
     },
     initialPageParam: 0,
   });
@@ -120,24 +145,8 @@ export default function PropertiesPage() {
   });
 
   // Flatten all pages into a single array
+  // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
   const properties = data?.pages?.flatMap(page => page.items) || [];
-
-  // Filter properties (memoized for performance)
-  const filteredProperties = useMemo(() => {
-    const searchLower = (searchTerm || '').toLowerCase();
-
-    return properties.filter((property) => {
-      const matchesSearch =
-        (property.name || '').toLowerCase().includes(searchLower) ||
-        (property.address || '').toLowerCase().includes(searchLower) ||
-        (property.city || '').toLowerCase().includes(searchLower);
-
-      const matchesStatus =
-        filterStatus === 'all' || (property.status || '') === filterStatus;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [properties, searchTerm, filterStatus]);
 
   const handleMenuOpen = (event, property) => {
     event.stopPropagation();
@@ -374,24 +383,24 @@ export default function PropertiesPage() {
           error={error}
           isEmpty={false}
         >
-          {filteredProperties.length === 0 ? (
+          {properties.length === 0 ? (
             <EmptyState
               icon={HomeIcon}
-              title={searchTerm || filterStatus !== 'all' ? 'No properties match your filters' : 'No properties yet'}
+              title={debouncedSearchTerm || filterStatus !== 'all' ? 'No properties match your filters' : 'No properties yet'}
               description={
-                searchTerm || filterStatus !== 'all'
+                debouncedSearchTerm || filterStatus !== 'all'
                   ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
                   : 'Get started by adding your first property. You can manage units, track maintenance, and monitor inspections all in one place.'
               }
-              actionLabel={searchTerm || filterStatus !== 'all' ? undefined : 'Add First Property'}
-              onAction={searchTerm || filterStatus !== 'all' ? undefined : handleCreate}
+              actionLabel={debouncedSearchTerm || filterStatus !== 'all' ? undefined : 'Add First Property'}
+              onAction={debouncedSearchTerm || filterStatus !== 'all' ? undefined : handleCreate}
             />
           ) : (
             <Stack spacing={3} sx={{ animation: 'fade-in 0.7s ease-out' }}>
               {/* Grid View */}
               {viewMode === 'grid' && (
                 <Grid container spacing={3}>
-                  {filteredProperties.map((property) => {
+                  {properties.map((property) => {
                     const propertyImages = getPropertyImages(property);
                     const hasMultipleImages = propertyImages.length > 1;
 
@@ -480,7 +489,7 @@ export default function PropertiesPage() {
                               <Chip
                                 size="small"
                                 icon={<ApartmentIcon />}
-                                label={`${property.totalUnits} units`}
+                                label={`${property.totalUnits ?? 0} units`}
                                 variant="outlined"
                               />
                             </Box>
@@ -504,11 +513,11 @@ export default function PropertiesPage() {
                           <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
                             <Stack spacing={0.5} sx={{ width: '100%' }}>
                               <Typography variant="caption" color="text.secondary">
-                                Type: {property.propertyType}
+                                Type: {property.propertyType || 'N/A'}
                               </Typography>
                               {property._count && (
                                 <Typography variant="caption" color="text.secondary">
-                                  {(property._count.jobs ?? 0)} active jobs • {(property._count.inspections ?? 0)} inspections
+                                  {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
                                 </Typography>
                               )}
                             </Stack>
@@ -523,7 +532,7 @@ export default function PropertiesPage() {
               {/* List View */}
               {viewMode === 'list' && (
                 <Stack spacing={2}>
-                  {filteredProperties.map((property) => {
+                  {properties.map((property) => {
                     const propertyImages = getPropertyImages(property);
                     const hasMultipleImages = propertyImages.length > 1;
 
@@ -634,12 +643,12 @@ export default function PropertiesPage() {
                             <Chip
                               size="small"
                               icon={<ApartmentIcon />}
-                              label={`${property.totalUnits} units`}
+                              label={`${property.totalUnits ?? 0} units`}
                               variant="outlined"
                             />
                             <Chip
                               size="small"
-                              label={property.propertyType}
+                              label={property.propertyType || 'N/A'}
                               variant="outlined"
                             />
                           </Box>
@@ -647,7 +656,7 @@ export default function PropertiesPage() {
                           {/* Footer Stats */}
                           {property._count && (
                             <Typography variant="caption" color="text.secondary">
-                              {(property._count.jobs ?? 0)} active jobs • {(property._count.inspections ?? 0)} inspections
+                              {property._count.jobs ?? 0} active jobs • {property._count.inspections ?? 0} inspections
                             </Typography>
                           )}
                         </Box>
@@ -699,7 +708,7 @@ export default function PropertiesPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredProperties.map((property) => {
+                      {properties.map((property) => {
                         const totalUnits = property.totalUnits ?? property._count?.units ?? 0;
                         const jobsCount = property._count?.jobs ?? 0;
                         const inspectionsCount = property._count?.inspections ?? 0;
