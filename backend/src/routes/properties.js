@@ -1202,7 +1202,12 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
           }));
 
           if (records.length) {
+            // Bug Fix #11: Use createMany for efficient batch insert
             await tx.propertyImage.createMany({ data: records });
+
+            // Bug Fix #12: Ensure property.imageUrl is synced after creating images
+            // This guarantees the cover image is always set correctly
+            await syncPropertyCoverImage(tx, newProperty.id);
           }
         }
 
@@ -1362,6 +1367,14 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         });
 
         if (includeImages && imageUpdates !== undefined) {
+          // Bug Fix #13: Enhanced logging for debugging image save issues
+          if (process.env.NODE_ENV !== 'test') {
+            console.log(`[PropertyImages] Updating images for property ${property.id}:`, {
+              imageCount: imageUpdates.length,
+              imageUrls: imageUpdates.map(img => img.imageUrl.substring(0, 50)),
+            });
+          }
+
           // Bug Fix: Use efficient update strategy instead of delete-recreate
           // This prevents data loss and reduces database load
           const existingImages = await tx.propertyImage.findMany({
@@ -1389,12 +1402,19 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
             .map(img => img.id);
 
           if (imagesToDelete.length > 0) {
+            if (process.env.NODE_ENV !== 'test') {
+              console.log(`[PropertyImages] Deleting ${imagesToDelete.length} removed images`);
+            }
             await tx.propertyImage.deleteMany({
               where: { id: { in: imagesToDelete } },
             });
           }
 
           // Step 2: Update or create images
+          // Bug Fix #14: Use batch operations for better performance
+          const imagesToUpdate = [];
+          const imagesToCreate = [];
+
           for (let index = 0; index < imageUpdates.length; index++) {
             const imageUpdate = imageUpdates[index];
             const existing = existingByUrl.get(imageUpdate.imageUrl);
@@ -1410,21 +1430,34 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
             };
 
             if (existing) {
-              // Update existing image
-              await tx.propertyImage.update({
-                where: { id: existing.id },
-                data: imageData,
-              });
+              imagesToUpdate.push({ id: existing.id, data: imageData });
             } else {
-              // Create new image
-              await tx.propertyImage.create({
-                data: {
-                  ...imageData,
-                  propertyId: property.id,
-                },
+              imagesToCreate.push({
+                ...imageData,
+                propertyId: property.id,
               });
             }
           }
+
+          // Execute updates in parallel for better performance
+          const updatePromises = imagesToUpdate.map(({ id, data }) =>
+            tx.propertyImage.update({ where: { id }, data })
+          );
+
+          // Create new images in batch
+          let createPromise = Promise.resolve();
+          if (imagesToCreate.length > 0) {
+            if (process.env.NODE_ENV !== 'test') {
+              console.log(`[PropertyImages] Creating ${imagesToCreate.length} new images`);
+            }
+            createPromise = tx.propertyImage.createMany({ data: imagesToCreate });
+          }
+
+          await Promise.all([...updatePromises, createPromise]);
+
+          // Bug Fix #12: Always sync property.imageUrl after image updates
+          // This ensures the cover image is always correct
+          await syncPropertyCoverImage(tx, property.id);
         }
 
         return updatedRecord;
