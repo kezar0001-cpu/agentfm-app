@@ -16,17 +16,38 @@ export async function uploadPropertyImages(files) {
     formData.append('files', file);
   });
 
-  const response = await apiClient.post('/uploads/multiple', formData);
+  // Bug Fix: Add comprehensive error handling for upload endpoint
+  try {
+    const response = await apiClient.post('/uploads/multiple', formData);
 
-  const urls = Array.isArray(response?.data?.urls) ? response.data.urls : [];
-  if (!urls.length) {
-    throw new Error('Upload failed');
+    // Bug Fix: Validate response structure before accessing nested properties
+    if (!response || !response.data) {
+      throw new Error('Invalid response from upload endpoint');
+    }
+
+    const urls = Array.isArray(response.data.urls) ? response.data.urls : [];
+    if (!urls.length) {
+      throw new Error('Upload failed - no URLs returned from server');
+    }
+
+    return urls.map((url, index) => ({
+      url,
+      name: candidates[index]?.name || `Image ${index + 1}`,
+    }));
+  } catch (error) {
+    // Bug Fix: Provide more specific error messages based on error type
+    if (error.response?.status === 404) {
+      throw new Error('Image upload endpoint not available. Please contact support.');
+    }
+    if (error.response?.status === 413) {
+      throw new Error('Files are too large. Maximum size is 10MB per file.');
+    }
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    // Re-throw with original message if available, or generic message
+    throw new Error(error.message || 'Failed to upload images. Please try again.');
   }
-
-  return urls.map((url, index) => ({
-    url,
-    name: candidates[index]?.name || `Image ${index + 1}`,
-  }));
 }
 
 /**
