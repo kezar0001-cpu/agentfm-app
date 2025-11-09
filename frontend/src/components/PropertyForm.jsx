@@ -111,6 +111,7 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   });
 
   // Initialize form with property data if editing
+  // Bug Fix: Also reset photo state when dialog closes without success
   useEffect(() => {
     if (property) {
       const normalisedImages = normaliseUploadedImages(
@@ -156,6 +157,18 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       setCoverImage('');
     }
   }, [property, open, reset]);
+
+  // Bug Fix: Clean up photo state when dialog closes to prevent stale data
+  useEffect(() => {
+    if (!open) {
+      // Use a timeout to prevent flash during close animation
+      const timer = setTimeout(() => {
+        setPhotoSelections([]);
+        setCoverImage('');
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   // Auto-focus on first error field
   useEffect(() => {

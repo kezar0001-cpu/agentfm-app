@@ -38,6 +38,15 @@ const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = 
       const vacant = occupancyStats.vacant ?? 0;
       const maintenance = occupancyStats.maintenance ?? 0;
 
+      // Bug Fix: Validate that stats are internally consistent
+      const calculatedTotal = occupied + vacant + maintenance;
+      if (process.env.NODE_ENV !== 'production' && calculatedTotal !== total) {
+        console.warn(
+          `PropertyOccupancyWidget: Inconsistent stats detected. ` +
+          `Total: ${total}, but occupied(${occupied}) + vacant(${vacant}) + maintenance(${maintenance}) = ${calculatedTotal}`
+        );
+      }
+
       const vacancyRate = total > 0
         ? ((vacant / total) * 100).toFixed(1)
         : 0;

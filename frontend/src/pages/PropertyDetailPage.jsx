@@ -268,21 +268,23 @@ export default function PropertyDetailPage() {
   };
 
   // Bug Fix: Add safety checks to prevent edge cases when images array changes
-  const handleLightboxPrev = () => {
+  // Bug Fix: Memoize functions to prevent stale closures in keyboard event listeners
+  const handleLightboxPrev = useCallback(() => {
     setLightboxIndex((prev) => {
       if (carouselImages.length === 0) return 0;
       return (prev - 1 + carouselImages.length) % carouselImages.length;
     });
-  };
+  }, [carouselImages.length]);
 
-  const handleLightboxNext = () => {
+  const handleLightboxNext = useCallback(() => {
     setLightboxIndex((prev) => {
       if (carouselImages.length === 0) return 0;
       return (prev + 1) % carouselImages.length;
     });
-  };
+  }, [carouselImages.length]);
 
   // Keyboard navigation for lightbox
+  // Bug Fix: Include memoized navigation functions in dependency array
   useEffect(() => {
     if (!lightboxOpen) return undefined;
 
@@ -298,7 +300,7 @@ export default function PropertyDetailPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxOpen, carouselImages.length]);
+  }, [lightboxOpen, handleLightboxPrev, handleLightboxNext]);
 
   // Bug Fix: Close lightbox if current index becomes invalid when images change
   useEffect(() => {
