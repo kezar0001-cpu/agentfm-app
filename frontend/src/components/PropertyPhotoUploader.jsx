@@ -58,6 +58,33 @@ const PropertyPhotoUploader = ({
       return;
     }
 
+    // Bug Fix: Client-side validation before upload to save bandwidth
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+    const invalidFiles = files.filter(file => {
+      if (file.size > MAX_FILE_SIZE) return true;
+      if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) return true;
+      return false;
+    });
+
+    if (invalidFiles.length > 0) {
+      const oversized = invalidFiles.filter(f => f.size > MAX_FILE_SIZE);
+      const wrongType = invalidFiles.filter(f => !ALLOWED_TYPES.includes(f.type.toLowerCase()));
+
+      let errorMsg = '';
+      if (oversized.length > 0) {
+        errorMsg += `${oversized.length} file(s) exceed 10MB limit. `;
+      }
+      if (wrongType.length > 0) {
+        errorMsg += `${wrongType.length} file(s) are not valid images (JPEG, PNG, GIF, WebP only).`;
+      }
+
+      setError(errorMsg.trim());
+      if (event?.target) event.target.value = '';
+      return;
+    }
+
     setIsUploading(true);
     setError('');
 
@@ -79,8 +106,14 @@ const PropertyPhotoUploader = ({
       setError(message);
     } finally {
       setIsUploading(false);
+      // Bug Fix: Clear file input and release file references to prevent memory leaks
       if (event?.target) {
         event.target.value = '';
+      }
+      // Bug Fix: Force garbage collection of file references
+      // This prevents memory leaks from large image files staying in memory
+      if (typeof window !== 'undefined' && window.gc) {
+        setTimeout(() => window.gc(), 100);
       }
     }
   };

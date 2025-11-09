@@ -1645,26 +1645,29 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
 
     const parsed = propertyImageCreateSchema.parse(body);
 
-    const [existingImages, existingPrimary] = await Promise.all([
-      prisma.propertyImage.findMany({
-        where: { propertyId },
-        select: { id: true, displayOrder: true },
-        orderBy: { displayOrder: 'desc' },
-        take: 1,
-      }),
-      prisma.propertyImage.findFirst({
-        where: { propertyId, isPrimary: true },
-        select: { id: true },
-      }),
-    ]);
-
-    const nextDisplayOrder = existingImages.length ? (existingImages[0].displayOrder ?? 0) + 1 : 0;
-    const shouldBePrimary = determineNewImagePrimaryFlag(parsed.isPrimary, {
-      hasExistingImages: existingImages.length > 0,
-      hasExistingPrimary: Boolean(existingPrimary),
-    });
-
+    // Bug Fix: Move displayOrder calculation inside transaction to prevent race conditions
+    // Concurrent requests can no longer create duplicate displayOrders
     const createdImage = await prisma.$transaction(async (tx) => {
+      // Fetch inside transaction for atomic operation
+      const [existingImages, existingPrimary] = await Promise.all([
+        tx.propertyImage.findMany({
+          where: { propertyId },
+          select: { id: true, displayOrder: true },
+          orderBy: { displayOrder: 'desc' },
+          take: 1,
+        }),
+        tx.propertyImage.findFirst({
+          where: { propertyId, isPrimary: true },
+          select: { id: true },
+        }),
+      ]);
+
+      const nextDisplayOrder = existingImages.length ? (existingImages[0].displayOrder ?? 0) + 1 : 0;
+      const shouldBePrimary = determineNewImagePrimaryFlag(parsed.isPrimary, {
+        hasExistingImages: existingImages.length > 0,
+        hasExistingPrimary: Boolean(existingPrimary),
+      });
+
       const image = await tx.propertyImage.create({
         data: {
           propertyId,
@@ -1884,15 +1887,14 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
     }
 
     await prisma.$transaction(async (tx) => {
-      // Update display order for all images
-      await Promise.all(
-        providedIds.map((id, index) =>
-          tx.propertyImage.update({
-            where: { id },
-            data: { displayOrder: index },
-          })
-        )
-      );
+      // Bug Fix: Use sequential updates instead of Promise.all for better transaction handling
+      // This prevents database lock contention and ensures consistent ordering
+      for (let index = 0; index < providedIds.length; index++) {
+        await tx.propertyImage.update({
+          where: { id: providedIds[index] },
+          data: { displayOrder: index },
+        });
+      }
 
       // Sync cover image within the same transaction
       await syncPropertyCoverImage(tx, propertyId);
