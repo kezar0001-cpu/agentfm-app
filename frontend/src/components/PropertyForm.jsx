@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
@@ -43,6 +43,42 @@ const PROPERTY_STATUSES = [
 // Helper function to normalize country values from backend
 const normaliseCountryValue = (country) => {
   return country || '';
+};
+
+// Separate component to handle financial fields without deeply nested Controllers
+const FinancialsSection = ({ control, isSubmitting, isPending }) => {
+  // Use useController hook for each field to avoid nesting
+  const { field: purchasePriceField } = useController({ name: 'purchasePrice', control });
+  const { field: purchaseDateField } = useController({ name: 'purchaseDate', control });
+  const { field: currentMarketValueField } = useController({ name: 'currentMarketValue', control });
+  const { field: annualPropertyTaxField } = useController({ name: 'annualPropertyTax', control });
+  const { field: annualInsuranceField } = useController({ name: 'annualInsurance', control });
+  const { field: monthlyHOAField } = useController({ name: 'monthlyHOA', control });
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <PropertyFinancials
+        value={{
+          purchasePrice: purchasePriceField.value,
+          purchaseDate: purchaseDateField.value,
+          currentMarketValue: currentMarketValueField.value,
+          annualPropertyTax: annualPropertyTaxField.value,
+          annualInsurance: annualInsuranceField.value,
+          monthlyHOA: monthlyHOAField.value,
+        }}
+        onChange={(financials) => {
+          purchasePriceField.onChange(financials.purchasePrice);
+          purchaseDateField.onChange(financials.purchaseDate);
+          currentMarketValueField.onChange(financials.currentMarketValue);
+          annualPropertyTaxField.onChange(financials.annualPropertyTax);
+          annualInsuranceField.onChange(financials.annualInsurance);
+          monthlyHOAField.onChange(financials.monthlyHOA);
+        }}
+        disabled={isSubmitting || isPending}
+        showPrivateInfo={true}
+      />
+    </Box>
+  );
 };
 
 export default function PropertyForm({ open, onClose, property, onSuccess }) {
@@ -294,64 +330,11 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Controller
-                      name="purchasePrice"
-                      control={control}
-                      render={({ field: purchasePriceField }) => (
-                        <Controller
-                          name="purchaseDate"
-                          control={control}
-                          render={({ field: purchaseDateField }) => (
-                            <Controller
-                              name="currentMarketValue"
-                              control={control}
-                              render={({ field: currentMarketValueField }) => (
-                                <Controller
-                                  name="annualPropertyTax"
-                                  control={control}
-                                  render={({ field: annualPropertyTaxField }) => (
-                                    <Controller
-                                      name="annualInsurance"
-                                      control={control}
-                                      render={({ field: annualInsuranceField }) => (
-                                        <Controller
-                                          name="monthlyHOA"
-                                          control={control}
-                                          render={({ field: monthlyHOAField }) => (
-                                            <PropertyFinancials
-                                              value={{
-                                                purchasePrice: purchasePriceField.value,
-                                                purchaseDate: purchaseDateField.value,
-                                                currentMarketValue: currentMarketValueField.value,
-                                                annualPropertyTax: annualPropertyTaxField.value,
-                                                annualInsurance: annualInsuranceField.value,
-                                                monthlyHOA: monthlyHOAField.value,
-                                              }}
-                                              onChange={(financials) => {
-                                                purchasePriceField.onChange(financials.purchasePrice);
-                                                purchaseDateField.onChange(financials.purchaseDate);
-                                                currentMarketValueField.onChange(financials.currentMarketValue);
-                                                annualPropertyTaxField.onChange(financials.annualPropertyTax);
-                                                annualInsuranceField.onChange(financials.annualInsurance);
-                                                monthlyHOAField.onChange(financials.monthlyHOA);
-                                              }}
-                                              disabled={isSubmitting || mutation.isPending}
-                                              showPrivateInfo={true}
-                                            />
-                                          )}
-                                        />
-                                      )}
-                                    />
-                                  )}
-                                />
-                              )}
-                            />
-                          )}
-                        />
-                      )}
-                    />
-                  </Box>
+                  <FinancialsSection
+                    control={control}
+                    isSubmitting={isSubmitting}
+                    isPending={mutation.isPending}
+                  />
                 </AccordionDetails>
               </Accordion>
             </Grid>

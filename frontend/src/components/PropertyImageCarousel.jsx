@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Box, IconButton, Typography, Dialog, DialogContent } from '@mui/material';
 import {
   ArrowBackIos,
@@ -84,6 +84,15 @@ const PropertyImageCarousel = ({
     setCurrentIndex(0);
   }, [items]);
 
+  // Memoize handleStep to prevent recreating the function on every render
+  // This fixes memory leak issues with keyboard event listeners
+  const handleStep = useCallback((direction) => {
+    setCurrentIndex((prev) => {
+      if (items.length === 0) return 0;
+      return (prev + direction + items.length) % items.length;
+    });
+  }, [items.length]);
+
   useEffect(() => {
     if (!autoplayInterval || items.length <= 1 || !autoplayEnabled || fullscreenOpen) return undefined;
 
@@ -92,14 +101,7 @@ const PropertyImageCarousel = ({
     }, autoplayInterval);
 
     return () => clearInterval(intervalId);
-  }, [items, autoplayInterval, autoplayEnabled, fullscreenOpen]);
-
-  const handleStep = (direction) => {
-    setCurrentIndex((prev) => {
-      if (items.length === 0) return 0;
-      return (prev + direction + items.length) % items.length;
-    });
-  };
+  }, [items.length, autoplayInterval, autoplayEnabled, fullscreenOpen]);
 
   const handleDotClick = (index) => {
     setCurrentIndex(index);
@@ -120,6 +122,7 @@ const PropertyImageCarousel = ({
   };
 
   // Keyboard navigation for fullscreen mode
+  // Fixed: Now properly includes handleStep in dependency array (safe because it's memoized)
   useEffect(() => {
     if (!fullscreenOpen) return undefined;
 
@@ -135,7 +138,7 @@ const PropertyImageCarousel = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fullscreenOpen, items.length]);
+  }, [fullscreenOpen, handleStep]);
 
   const currentItem = items[currentIndex] || { imageUrl: null, caption: null };
   const currentImage =
