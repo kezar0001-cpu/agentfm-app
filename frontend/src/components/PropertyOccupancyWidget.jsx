@@ -49,19 +49,29 @@ const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = 
 
       const vacancyRate = total > 0
         ? ((vacant / total) * 100).toFixed(1)
-        : 0;
+        : '0.0';
 
-      // Handle potential null/undefined occupancyRate from backend
+      // Bug Fix: Handle potential null/undefined/string occupancyRate from backend
+      // The backend might return occupancyRate as a number, string, or undefined
+      // Convert all cases to a consistent number type before calling .toFixed()
       const occupancyRateValue = occupancyStats.occupancyRate ??
         (total > 0 ? ((occupied / total) * 100) : 0);
+
+      // Bug Fix: Safely convert to number and format to 1 decimal place
+      // This prevents "toFixed is not a function" errors when occupancyRate is already a string
+      const occupancyRateNumber = typeof occupancyRateValue === 'number'
+        ? occupancyRateValue
+        : typeof occupancyRateValue === 'string'
+        ? parseFloat(occupancyRateValue)
+        : 0;
 
       return {
         total,
         occupied,
         vacant,
         maintenance,
-        occupancyRate: typeof occupancyRateValue === 'number'
-          ? occupancyRateValue.toFixed(1)
+        occupancyRate: Number.isFinite(occupancyRateNumber)
+          ? occupancyRateNumber.toFixed(1)
           : '0.0',
         vacancyRate,
       };

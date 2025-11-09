@@ -54,28 +54,25 @@ const PropertyNotesSection = ({ propertyId, canEdit = false }) => {
     data: notesData,
     isLoading,
     isError,
-    refetch,
   } = usePropertyNotes(propertyId);
 
+  // Bug Fix: Removed manual refetch() calls - mutations now auto-invalidate via invalidateKeys
   // Mutations
   const { mutateAsync: addNote, isPending: isAdding } = useAddPropertyNote(
     propertyId,
     () => {
       showNotification('Note added successfully', 'success');
-      refetch();
     }
   );
 
   const { mutateAsync: updateNote, isPending: isUpdating } =
     useUpdatePropertyNote(propertyId, () => {
       showNotification('Note updated successfully', 'success');
-      refetch();
     });
 
   const { mutateAsync: deleteNote, isPending: isDeleting } =
     useDeletePropertyNote(propertyId, () => {
       showNotification('Note deleted successfully', 'success');
-      refetch();
     });
 
   // Local state

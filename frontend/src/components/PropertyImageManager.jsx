@@ -41,31 +41,28 @@ import { uploadPropertyImages } from '../utils/uploadPropertyImages.js';
 
 const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) => {
   const { showSuccess, showError } = useNotification();
-  const { data: imagesData, isLoading, refetch } = usePropertyImages(propertyId);
+  const { data: imagesData, isLoading } = usePropertyImages(propertyId);
+  // Bug Fix: Removed manual refetch() calls - mutations now auto-invalidate via invalidateKeys
   const addImageMutation = useAddPropertyImage(propertyId, () => {
     showSuccess('Image added successfully');
-    refetch();
     if (typeof onImagesUpdated === 'function') {
       onImagesUpdated();
     }
   });
   const updateImageMutation = useUpdatePropertyImage(propertyId, () => {
     showSuccess('Image updated successfully');
-    refetch();
     if (typeof onImagesUpdated === 'function') {
       onImagesUpdated();
     }
   });
   const deleteImageMutation = useDeletePropertyImage(propertyId, () => {
     showSuccess('Image deleted successfully');
-    refetch();
     if (typeof onImagesUpdated === 'function') {
       onImagesUpdated();
     }
   });
   const reorderImagesMutation = useReorderPropertyImages(propertyId, () => {
     showSuccess('Images reordered successfully');
-    refetch();
     if (typeof onImagesUpdated === 'function') {
       onImagesUpdated();
     }
@@ -181,29 +178,56 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
     setIsUploadingFiles(true);
     setBulkUploadError('');
 
+    // Bug Fix: Track successes and failures for better error reporting
+    let successCount = 0;
+    let failureCount = 0;
+    let firstError = null;
+
     try {
       const uploaded = await uploadPropertyImages(files);
-      for (let index = 0; index < uploaded.length; index += 1) {
-        const file = uploaded[index];
-        try {
+
+      // Bug Fix: Use Promise.allSettled to attempt all uploads even if some fail
+      // This provides better UX than stopping at first failure
+      const uploadResults = await Promise.allSettled(
+        uploaded.map(async (file, index) => {
           const payload = {
             imageUrl: file.url,
             caption: null,
           };
 
+          // Only set first image as primary if no images exist yet
           if (images.length === 0 && index === 0) {
             payload.isPrimary = true;
           }
 
-          await addImageMutation.mutateAsync({
+          return addImageMutation.mutateAsync({
             data: payload,
           });
-        } catch (error) {
-          setBulkUploadError(
-            error?.response?.data?.message || error?.message || 'Failed to add uploaded image'
-          );
-          break;
+        })
+      );
+
+      // Bug Fix: Count successes and failures for comprehensive error message
+      uploadResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successCount++;
+        } else {
+          failureCount++;
+          if (!firstError) {
+            firstError = result.reason;
+          }
         }
+      });
+
+      // Bug Fix: Provide detailed feedback about partial failures
+      if (failureCount > 0 && successCount > 0) {
+        setBulkUploadError(
+          `${successCount} of ${files.length} images uploaded successfully. ` +
+          `${failureCount} failed: ${firstError?.response?.data?.message || firstError?.message || 'Unknown error'}`
+        );
+      } else if (failureCount > 0) {
+        setBulkUploadError(
+          `Failed to upload images: ${firstError?.response?.data?.message || firstError?.message || 'Unknown error'}`
+        );
       }
     } catch (error) {
       setBulkUploadError(error?.response?.data?.message || error?.message || 'Failed to upload images');
