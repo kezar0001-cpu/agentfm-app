@@ -700,28 +700,48 @@ const invalidatePropertyCaches = async (userIdentifiers, helpers = {}) => {
 // Bug Fix: Deep merge amenities to prevent data loss during partial updates
 // When updating amenities, merge new values with existing ones instead of replacing
 // Bug Fix: Keep false values to allow users to explicitly disable/uncheck amenities
+// Bug Fix: Add safeguards against DoS attacks via deeply nested objects
 const deepMergeAmenities = (existing, updates) => {
   if (!existing && !updates) return null;
   if (!existing) return updates;
   if (!updates) return existing;
 
+  // Bug Fix: Validate updates structure to prevent DoS attacks
+  // Only allow expected categories at depth 1, and primitive values at depth 2
+  const allowedCategories = ['utilities', 'features', 'security', 'accessibility', 'parking', 'pets'];
+
+  // Check if updates object has unexpected structure
+  if (typeof updates !== 'object' || Array.isArray(updates)) {
+    console.warn('Invalid amenities update structure, rejecting merge');
+    return existing;
+  }
+
   // Deep merge each amenities category
   const merged = { ...existing };
 
-  const categories = ['utilities', 'features', 'security', 'accessibility', 'parking', 'pets'];
-
-  for (const category of categories) {
+  for (const category of allowedCategories) {
     if (updates[category] !== undefined) {
       // Bug Fix: If updates[category] is explicitly null, remove the entire category
       if (updates[category] === null) {
         merged[category] = null;
-      } else if (typeof updates[category] === 'object') {
+      } else if (typeof updates[category] === 'object' && !Array.isArray(updates[category])) {
+        // Bug Fix: Validate that category only contains primitive values (no deep nesting)
+        const categoryValues = updates[category];
+        const hasInvalidNesting = Object.values(categoryValues).some(
+          value => value !== null && typeof value === 'object'
+        );
+
+        if (hasInvalidNesting) {
+          console.warn(`Invalid nesting detected in amenities.${category}, skipping category`);
+          continue;
+        }
+
         // Merge individual fields, keeping false values (they explicitly disable features)
-        // Previous implementation incorrectly removed false values
         merged[category] = {
           ...(existing[category] || {}),
-          ...updates[category],
+          ...categoryValues,
         };
+
         // If category is now empty, set to null
         if (Object.keys(merged[category]).length === 0) {
           merged[category] = null;
@@ -1080,13 +1100,13 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
       where.status = status;
     }
 
-    // Bug Fix: Properly destructure all return values including hasMoreItems
+    // Bug Fix: Streamlined pagination - always use limit+1 pattern, count only when needed
     const { items: properties, total, hasMoreItems } = await withPropertyImagesSupport(async (includeImages) => {
       const select = buildPropertyListSelect(includeImages);
 
-      // Bug Fix: Optimize count query - only count when offset is 0 to reduce load
-      // For paginated requests, we can estimate or skip the total
-      const shouldCount = offset === 0;
+      // Bug Fix: Only count total when explicitly requested via query param
+      // This reduces database load for most list requests
+      const shouldCount = req.query.includeTotal === 'true' || offset === 0;
 
       const [items, count] = await Promise.all([
         prisma.property.findMany({
@@ -1099,7 +1119,7 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
         shouldCount ? prisma.property.count({ where }) : Promise.resolve(null),
       ]);
 
-      // If we fetched limit + 1 items, there are more pages
+      // Bug Fix: More efficient hasMore detection using limit+1 pattern
       const hasMoreItems = items.length > limit;
       const finalItems = hasMoreItems ? items.slice(0, limit) : items;
 
@@ -1108,8 +1128,8 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
 
     // Calculate page number and hasMore
     const page = Math.floor(offset / limit) + 1;
-    // Bug Fix: Use properly destructured hasMoreItems for more efficient hasMore calculation
-    const hasMore = total !== null ? offset + limit < total : hasMoreItems;
+    // Bug Fix: Prefer hasMoreItems flag over total-based calculation for efficiency
+    const hasMore = hasMoreItems;
 
     // Return paginated response
     res.json({
@@ -1326,10 +1346,11 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     }
 
     const { property: updatedProperty, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
-      // Bug Fix: Add serializable transaction isolation to prevent race conditions
+      // Bug Fix: Use Serializable isolation to prevent race conditions
+      // Note: Serializable isolation detects concurrent modifications and rolls back conflicting transactions
+      // This is more robust than explicit row locking and works across all database operations
       const result = await prisma.$transaction(async (tx) => {
-        // Bug Fix: Acquire exclusive lock on property row first to prevent concurrent image updates
-        // This prevents race conditions where two requests try to update images simultaneously
+        // Verify property exists before updating (transaction will rollback if concurrent modification detected)
         await tx.property.findUnique({
           where: { id: property.id },
           select: { id: true }, // Minimal select for performance
@@ -1341,47 +1362,67 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         });
 
         if (includeImages && imageUpdates !== undefined) {
-          // Bug Fix: Lock property images for update to prevent concurrent modifications
+          // Bug Fix: Use efficient update strategy instead of delete-recreate
+          // This prevents data loss and reduces database load
           const existingImages = await tx.propertyImage.findMany({
             where: { propertyId: property.id },
-            select: { imageUrl: true, caption: true },
+            select: { id: true, imageUrl: true, caption: true, displayOrder: true },
             orderBy: [
               { displayOrder: 'asc' },
               { createdAt: 'asc' },
             ],
           });
 
-          const existingCaptionsByUrl = existingImages.reduce((map, image) => {
-            if (!map.has(image.imageUrl)) {
-              map.set(image.imageUrl, []);
-            }
-            map.get(image.imageUrl).push(image.caption ?? null);
-            return map;
-          }, new Map());
+          // Create maps for efficient lookup
+          const existingByUrl = new Map();
+          const existingById = new Map();
+          existingImages.forEach(img => {
+            existingByUrl.set(img.imageUrl, img);
+            existingById.set(img.id, img);
+          });
 
-          // Delete and recreate in single transaction to maintain consistency
-          await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
+          const updatedUrls = new Set(imageUpdates.map(img => img.imageUrl));
 
-          if (imageUpdates.length) {
-            const records = imageUpdates.map((image, index) => {
-              const previousCaptions = existingCaptionsByUrl.get(image.imageUrl) || [];
-              const fallbackCaption = previousCaptions.length ? previousCaptions.shift() : null;
-              const captionToUse = image.captionProvided
-                ? image.caption ?? null
-                : fallbackCaption ?? image.caption ?? null;
+          // Step 1: Delete images that are no longer in the update list
+          const imagesToDelete = existingImages
+            .filter(img => !updatedUrls.has(img.imageUrl))
+            .map(img => img.id);
 
-              return {
-                propertyId: property.id,
-                imageUrl: image.imageUrl,
-                caption: captionToUse,
-                isPrimary: image.isPrimary,
-                displayOrder: index,
-                uploadedById: req.user.id,
-              };
+          if (imagesToDelete.length > 0) {
+            await tx.propertyImage.deleteMany({
+              where: { id: { in: imagesToDelete } },
             });
+          }
 
-            if (records.length) {
-              await tx.propertyImage.createMany({ data: records });
+          // Step 2: Update or create images
+          for (let index = 0; index < imageUpdates.length; index++) {
+            const imageUpdate = imageUpdates[index];
+            const existing = existingByUrl.get(imageUpdate.imageUrl);
+
+            const imageData = {
+              imageUrl: imageUpdate.imageUrl,
+              caption: imageUpdate.captionProvided
+                ? (imageUpdate.caption ?? null)
+                : (existing?.caption ?? imageUpdate.caption ?? null),
+              isPrimary: imageUpdate.isPrimary,
+              displayOrder: index,
+              uploadedById: req.user.id,
+            };
+
+            if (existing) {
+              // Update existing image
+              await tx.propertyImage.update({
+                where: { id: existing.id },
+                data: imageData,
+              });
+            } else {
+              // Create new image
+              await tx.propertyImage.create({
+                data: {
+                  ...imageData,
+                  propertyId: property.id,
+                },
+              });
             }
           }
         }
@@ -1455,15 +1496,26 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    // Bug Fix: Comprehensive validation before deletion - check units, jobs, and inspections
+    // Bug Fix: Comprehensive validation before deletion - check units, jobs, inspections, and active tenants
     const unitCount = property._count?.units || 0;
     const jobCount = property._count?.jobs || 0;
     const inspectionCount = property._count?.inspections || 0;
+
+    // Bug Fix: Check for active tenants across all units in the property
+    const activeTenantCount = await prisma.unitTenant.count({
+      where: {
+        unit: {
+          propertyId: req.params.id,
+        },
+        isActive: true,
+      },
+    });
 
     const issues = [];
     if (unitCount > 0) issues.push(`${unitCount} unit(s)`);
     if (jobCount > 0) issues.push(`${jobCount} active job(s)`);
     if (inspectionCount > 0) issues.push(`${inspectionCount} inspection(s)`);
+    if (activeTenantCount > 0) issues.push(`${activeTenantCount} active tenant(s)`);
 
     if (issues.length > 0) {
       return sendError(
@@ -1471,7 +1523,7 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         409,
         `Cannot delete property with ${issues.join(', ')}. Please remove all related data before deleting the property.`,
         ErrorCodes.VAL_VALIDATION_ERROR,
-        { unitCount, jobCount, inspectionCount }
+        { unitCount, jobCount, inspectionCount, activeTenantCount }
       );
     }
 
@@ -1884,9 +1936,10 @@ router.get('/:id/activity', async (req, res) => {
     // Bug Fix: Handle NaN from parseInt properly
     const parsedActivityLimit = parseInt(req.query.limit);
     const limit = Math.min(Number.isNaN(parsedActivityLimit) ? 20 : parsedActivityLimit, 50);
-    // Bug Fix: Include user role in cache key to prevent cross-role cache pollution
-    // Different roles may have different access permissions to activity data
-    const cacheKey = `property:${req.params.id}:activity:${limit}:role:${req.user.role}`;
+    // Bug Fix: Include user ID in cache key to prevent cache collision between users
+    // Even users with the same role may have different access permissions
+    // This prevents potential data leaks if access permissions change
+    const cacheKey = `property:${req.params.id}:activity:${limit}:user:${req.user.id}`;
 
     const cached = await redisGet(cacheKey);
     if (cached) {
