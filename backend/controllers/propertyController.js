@@ -2,7 +2,11 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // ============================================
-// PROPERTY CONTROLLER
+// PROPERTY CONTROLLER (LEGACY - DEPRECATED)
+// ============================================
+// NOTE: This controller is legacy code and is NO LONGER USED in production.
+// The active implementation is in backend/src/routes/properties.js
+// This file is kept for backward compatibility with older tests only.
 // ============================================
 
 /**
@@ -73,53 +77,6 @@ exports.getProperties = async (req, res) => {
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
-  }
-};
-
-/**
- * Create a new property.
- */
-exports.createProperty = async (req, res) => {
-  try {
-    const { name, address, city, state, zipCode, propertyType } = req.body;
-
-    const property = await prisma.property.create({
-      data: {
-        name,
-        address,
-        city,
-        state,
-        zipCode,
-        propertyType,
-        managerId: req.user.id, // Assign the current user as the manager
-      },
-    });
-
-    res.status(201).json(property);
-  } catch (error) {
-    console.error('Error creating property:', error);
-    res.status(500).json({ error: 'Failed to create property' });
-  }
-};
-
-/**
- * Get a single property by its ID.
- */
-exports.getPropertyById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const property = await prisma.property.findUnique({
-      where: { id },
-    });
-
-    if (!property) {
-      return res.status(404).json({ error: 'Property not found' });
-    }
-
-    res.json(property);
-  } catch (error) {
-    console.error('Error fetching property:', error);
-    res.status(500).json({ error: 'Failed to fetch property' });
   }
 };
 
