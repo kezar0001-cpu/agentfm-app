@@ -16,6 +16,9 @@ const {
   maybeHandleImageUpload,
   isMultipartRequest,
   determineNewImagePrimaryFlag,
+  extractImageUrlFromInput,
+  normaliseSubmittedPropertyImages,
+  applyLegacyAliases,
 } = propertiesRouter._test;
 
 test('property images router is exposed and configured with merge params', () => {
@@ -63,11 +66,26 @@ test('propertyImageCreateSchema accepts hosted or uploaded image sources', () =>
   assert.equal(failure.success, false);
 });
 
+test('propertyImageCreateSchema normalises altText alias', () => {
+  const parsed = propertyImageCreateSchema.parse({
+    imageUrl: 'https://example.com/front.jpg',
+    altText: 'Front elevation',
+  });
+
+  assert.equal(parsed.caption, 'Front elevation');
+  assert.equal(parsed.isPrimary, undefined);
+});
+
 test('propertyImageUpdateSchema rejects empty payload', () => {
   const failure = propertyImageUpdateSchema.safeParse({});
   assert.equal(failure.success, false);
   const success = propertyImageUpdateSchema.safeParse({ caption: 'Updated caption' });
   assert.equal(success.success, true);
+});
+
+test('propertyImageUpdateSchema maps altText to caption field', () => {
+  const parsed = propertyImageUpdateSchema.parse({ altText: 'Balcony view' });
+  assert.equal(parsed.caption, 'Balcony view');
 });
 
 test('propertyImageReorderSchema enforces non-empty ordered ids array', () => {
@@ -82,6 +100,52 @@ test('determineNewImagePrimaryFlag promotes first upload even when explicitly fa
     determineNewImagePrimaryFlag(false, { hasExistingImages: false, hasExistingPrimary: false }),
     true
   );
+});
+
+test('extractImageUrlFromInput resolves mixed payloads', () => {
+  assert.equal(extractImageUrlFromInput(' https://example.com/test.jpg '), 'https://example.com/test.jpg');
+  assert.equal(
+    extractImageUrlFromInput({ imageUrl: ' /uploads/image.png ' }),
+    '/uploads/image.png'
+  );
+  assert.equal(
+    extractImageUrlFromInput({ url: 'https://example.com/gallery.jpg' }),
+    'https://example.com/gallery.jpg'
+  );
+  assert.equal(extractImageUrlFromInput({}), null);
+});
+
+test('normaliseSubmittedPropertyImages keeps captions and primary selection', () => {
+  const result = normaliseSubmittedPropertyImages([
+    'https://example.com/first.jpg',
+    { imageUrl: 'https://example.com/second.jpg', altText: 'Second', isPrimary: true },
+    { imageUrl: 'invalid-url' },
+  ]);
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].imageUrl, 'https://example.com/first.jpg');
+  assert.equal(result[0].isPrimary, false);
+  assert.equal(result[0].captionProvided, false);
+  assert.equal(result[1].imageUrl, 'https://example.com/second.jpg');
+  assert.equal(result[1].isPrimary, true);
+  assert.equal(result[1].caption, 'Second');
+  assert.equal(result[1].captionProvided, true);
+});
+
+test('applyLegacyAliases derives cover image from structured imageMetadata when provided', () => {
+  const input = {
+    images: ['https://example.com/legacy.jpg'],
+    imageMetadata: [
+      { imageUrl: 'https://example.com/structured.jpg', caption: 'Front', isPrimary: true },
+      { url: '/uploads/lobby.png', caption: 'Lobby' },
+    ],
+  };
+
+  const result = applyLegacyAliases(input);
+
+  assert.equal(result.imageUrl, 'https://example.com/structured.jpg');
+  assert.deepEqual(result.images, input.images);
+  assert.strictEqual(result.imageMetadata, input.imageMetadata);
 });
 
 test('determineNewImagePrimaryFlag keeps existing primary unless explicitly overridden', () => {
