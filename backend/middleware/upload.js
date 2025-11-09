@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 
 // Create uploads directory if it doesn't exist
 const uploadDir = path.join(__dirname, '../uploads/properties');
@@ -14,7 +15,8 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Bug Fix: Use UUID instead of Date.now() + random to prevent filename collisions
+    const uniqueSuffix = randomUUID();
     cb(null, 'property-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
@@ -35,7 +37,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit per file
+    fileSize: 10 * 1024 * 1024 // 10MB limit per file (unified with other upload endpoints)
   },
   fileFilter: fileFilter
 });
