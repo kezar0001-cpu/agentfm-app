@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -121,18 +121,22 @@ export default function PropertiesPage() {
   // Flatten all pages into a single array
   const properties = data?.pages?.flatMap(page => page.items) || [];
 
-  // Filter properties
-  const filteredProperties = properties.filter((property) => {
-  const matchesSearch =
-    (property.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
-    (property.address || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
-    (property.city || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+  // Filter properties (memoized for performance)
+  const filteredProperties = useMemo(() => {
+    const searchLower = (searchTerm || '').toLowerCase();
 
-  const matchesStatus =
-    filterStatus === 'all' || (property.status || '') === filterStatus;
+    return properties.filter((property) => {
+      const matchesSearch =
+        (property.name || '').toLowerCase().includes(searchLower) ||
+        (property.address || '').toLowerCase().includes(searchLower) ||
+        (property.city || '').toLowerCase().includes(searchLower);
 
-  return matchesSearch && matchesStatus;
-});
+      const matchesStatus =
+        filterStatus === 'all' || (property.status || '') === filterStatus;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [properties, searchTerm, filterStatus]);
 
   const handleMenuOpen = (event, property) => {
     event.stopPropagation();
