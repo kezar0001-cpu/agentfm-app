@@ -40,8 +40,10 @@ const PropertyPhotoUploader = ({
     const cleaned = Array.isArray(nextImages)
       ? nextImages.filter((image) => image && image.url)
       : [];
+    // Bug Fix: Check if cleaned array has items before accessing cleaned[0]
+    // Previous code could cause runtime error if cleaned array was empty
     const nextCover = cleaned.length
-      ? (cleaned.find((image) => image.url === coverImageUrl)?.url || cleaned[0].url)
+      ? (cleaned.find((image) => image.url === coverImageUrl)?.url || cleaned[0]?.url || '')
       : '';
     onChange(cleaned, nextCover);
   };

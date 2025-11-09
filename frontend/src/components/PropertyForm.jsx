@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm, Controller, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -159,14 +159,31 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   }, [property, open, reset]);
 
   // Bug Fix: Clean up photo state when dialog closes to prevent stale data
+  // Bug Fix: Use ref to track cleanup and prevent race condition with quick open/close cycles
+  const cleanupTimerRef = useRef(null);
   useEffect(() => {
     if (!open) {
-      // Use a timeout to prevent flash during close animation
-      const timer = setTimeout(() => {
+      // Clear any pending cleanup from previous close
+      if (cleanupTimerRef.current) {
+        clearTimeout(cleanupTimerRef.current);
+      }
+      // Schedule cleanup after animation completes
+      cleanupTimerRef.current = setTimeout(() => {
         setPhotoSelections([]);
         setCoverImage('');
+        cleanupTimerRef.current = null;
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        if (cleanupTimerRef.current) {
+          clearTimeout(cleanupTimerRef.current);
+          cleanupTimerRef.current = null;
+        }
+      };
+    }
+    // Dialog is now open - cancel any pending cleanup
+    if (cleanupTimerRef.current) {
+      clearTimeout(cleanupTimerRef.current);
+      cleanupTimerRef.current = null;
     }
   }, [open]);
 

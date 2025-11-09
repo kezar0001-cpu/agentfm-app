@@ -288,8 +288,13 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       }
     }
 
-    if (basicInfo.totalUnits && Number.isNaN(parseInt(basicInfo.totalUnits, 10))) {
-      errors.totalUnits = 'Must be a valid number';
+    if (basicInfo.totalUnits) {
+      const totalUnitsNum = parseInt(basicInfo.totalUnits, 10);
+      if (Number.isNaN(totalUnitsNum)) {
+        errors.totalUnits = 'Must be a valid number';
+      } else if (totalUnitsNum < 0) {
+        errors.totalUnits = 'Total units cannot be negative';
+      }
     }
 
     if (basicInfo.totalArea && Number.isNaN(parseFloat(basicInfo.totalArea))) {
@@ -664,9 +669,8 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
             </Stack>
 
             <Stack direction="row" spacing={1} alignItems="center">
-              <Chip label="Progress saved" color="success" size="small" variant="outlined" />
               <Typography variant="caption" color="text.secondary">
-                Units can be edited later from the property detail page.
+                Note: Units will be saved when you complete the onboarding wizard.
               </Typography>
             </Stack>
           </Stack>
@@ -934,8 +938,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       default:
         return renderCompletion();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStep, formState, basicInfoErrors, ownerInviteResults]);
+  // Bug Fix: Include all dependencies to prevent stale closures
+  // The previous incomplete dependency array caused stale state in render functions
+  }, [activeStep, formState, basicInfoErrors, ownerInviteResults, createdProperty, uploadedImages]);
 
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="md" fullWidth>
