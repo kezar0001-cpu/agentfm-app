@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -40,6 +40,9 @@ import {
   CalendarToday as CalendarIcon,
   Work as WorkIcon,
   Assignment as InspectionIcon,
+  ArrowBackIos,
+  ArrowForwardIos,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
@@ -79,6 +82,8 @@ export default function UnitDetailPage() {
   const [currentTab, setCurrentTab] = useState(0);
   const [moveInWizardOpen, setMoveInWizardOpen] = useState(false);
   const [moveOutWizardOpen, setMoveOutWizardOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Fetch unit details
   const unitQuery = useQuery({
@@ -118,6 +123,15 @@ export default function UnitDetailPage() {
     enabled: currentTab === 2,
   });
 
+  // Fetch unit images
+  const unitImagesQuery = useQuery({
+    queryKey: ['units', id, 'images'],
+    queryFn: async () => {
+      const response = await apiClient.get(`/units/${id}/images`);
+      return response.data?.images || [];
+    },
+  });
+
   // Remove tenant mutation
   const removeTenantMutation = useMutation({
     mutationFn: async (tenantId) => {
@@ -141,6 +155,48 @@ export default function UnitDetailPage() {
   const activeTenant = tenants.find((t) => t.isActive);
   const jobs = jobsQuery.data || [];
   const inspections = inspectionsQuery.data || [];
+  const unitImages = unitImagesQuery.data || [];
+  const unitCarouselImages = unitImages.length
+    ? unitImages
+    : unit?.imageUrl
+      ? [{ imageUrl: unit.imageUrl, caption: null, isPrimary: true }]
+      : [];
+
+  // Lightbox handlers
+  const handleOpenLightbox = (index) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const handleCloseLightbox = () => {
+    setLightboxOpen(false);
+  };
+
+  const handleLightboxPrev = () => {
+    setLightboxIndex((prev) => (prev - 1 + unitCarouselImages.length) % unitCarouselImages.length);
+  };
+
+  const handleLightboxNext = () => {
+    setLightboxIndex((prev) => (prev + 1) % unitCarouselImages.length);
+  };
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return undefined;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleCloseLightbox();
+      } else if (e.key === 'ArrowLeft') {
+        handleLightboxPrev();
+      } else if (e.key === 'ArrowRight') {
+        handleLightboxNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, unitCarouselImages.length]);
 
   const propertyPath = unit?.propertyId
     ? `/properties/${unit.propertyId}`
@@ -458,6 +514,244 @@ export default function UnitDetailPage() {
                 </Card>
               </Grid>
 
+              {/* Unit Image Gallery - Modern Split Layout */}
+              <Grid item xs={12}>
+                {unitCarouselImages.length > 0 ? (
+                  <Box>
+                    {/* Desktop: Split layout (large left + 2x2 grid right) */}
+                    {/* Mobile: Stacked layout */}
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+                        gap: 1,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Main Large Image */}
+                      <Paper
+                        sx={{
+                          position: 'relative',
+                          paddingTop: { xs: '56.25%', md: '66.67%' }, // 16:9 mobile, 3:2 desktop
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          borderRadius: { xs: 3, md: 0 },
+                          transition: 'transform 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.01)',
+                            '& img': {
+                              filter: 'brightness(1.05)',
+                            },
+                          },
+                        }}
+                        onClick={() => handleOpenLightbox(0)}
+                        elevation={0}
+                      >
+                        <Box
+                          component="img"
+                          src={typeof unitCarouselImages[0] === 'string' ? unitCarouselImages[0] : unitCarouselImages[0].imageUrl}
+                          alt={typeof unitCarouselImages[0] === 'object' && unitCarouselImages[0].caption ? unitCarouselImages[0].caption : `Unit ${unit.unitNumber} main image`}
+                          sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transition: 'filter 0.3s ease',
+                          }}
+                        />
+                        <Chip
+                          label="Primary"
+                          size="small"
+                          color="primary"
+                          sx={{
+                            position: 'absolute',
+                            top: 12,
+                            left: 12,
+                            zIndex: 2,
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Paper>
+
+                      {/* 2x2 Grid of Thumbnails (desktop only) */}
+                      {unitCarouselImages.length > 1 && (
+                        <Box
+                          sx={{
+                            display: { xs: 'none', md: 'grid' },
+                            gridTemplateColumns: '1fr 1fr',
+                            gridTemplateRows: '1fr 1fr',
+                            gap: 1,
+                          }}
+                        >
+                          {unitCarouselImages.slice(1, 5).map((image, idx) => {
+                            const imageUrl = typeof image === 'string' ? image : image.imageUrl;
+                            const caption = typeof image === 'object' ? image.caption : null;
+                            const actualIndex = idx + 1;
+
+                            return (
+                              <Paper
+                                key={image.id || actualIndex}
+                                sx={{
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  cursor: 'pointer',
+                                  borderRadius: 0,
+                                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                  '&:hover': {
+                                    transform: 'scale(1.05)',
+                                    boxShadow: 4,
+                                    zIndex: 1,
+                                    '& img': {
+                                      filter: 'brightness(1.1)',
+                                    },
+                                  },
+                                }}
+                                onClick={() => handleOpenLightbox(actualIndex)}
+                                elevation={0}
+                              >
+                                <Box
+                                  component="img"
+                                  src={imageUrl}
+                                  alt={caption || `Unit ${unit.unitNumber} image ${actualIndex + 1}`}
+                                  sx={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    transition: 'filter 0.2s ease',
+                                  }}
+                                />
+                              </Paper>
+                            );
+                          })}
+
+                          {/* "+N more" tile - shown in last position if there are more than 5 images */}
+                          {unitCarouselImages.length > 5 && (
+                            <Paper
+                              sx={{
+                                position: 'relative',
+                                overflow: 'hidden',
+                                cursor: 'pointer',
+                                borderRadius: 0,
+                                bgcolor: 'rgba(0,0,0,0.75)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.2s ease',
+                                '&:hover': {
+                                  bgcolor: 'rgba(0,0,0,0.85)',
+                                },
+                                ...(unitCarouselImages.length > 5 && unitCarouselImages[4] && {
+                                  backgroundImage: `url(${typeof unitCarouselImages[4] === 'string' ? unitCarouselImages[4] : unitCarouselImages[4].imageUrl})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                  '&::before': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.6)',
+                                    zIndex: 1,
+                                  },
+                                }),
+                              }}
+                              onClick={() => handleOpenLightbox(4)}
+                              elevation={0}
+                            >
+                              <Typography
+                                variant="h5"
+                                sx={{
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  zIndex: 2,
+                                  position: 'relative',
+                                }}
+                              >
+                                +{unitCarouselImages.length - 4}
+                              </Typography>
+                            </Paper>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+
+                    {/* Mobile: Horizontal scroll gallery for additional images */}
+                    {unitCarouselImages.length > 1 && (
+                      <Box
+                        sx={{
+                          display: { xs: 'flex', md: 'none' },
+                          gap: 1,
+                          overflowX: 'auto',
+                          mt: 1,
+                          pb: 1,
+                          '&::-webkit-scrollbar': {
+                            height: 6,
+                          },
+                          '&::-webkit-scrollbar-thumb': {
+                            backgroundColor: 'rgba(0,0,0,0.2)',
+                            borderRadius: 3,
+                          },
+                        }}
+                      >
+                        {unitCarouselImages.slice(1).map((image, idx) => {
+                          const imageUrl = typeof image === 'string' ? image : image.imageUrl;
+                          const caption = typeof image === 'object' ? image.caption : null;
+                          const actualIndex = idx + 1;
+
+                          return (
+                            <Paper
+                              key={image.id || actualIndex}
+                              sx={{
+                                position: 'relative',
+                                minWidth: 100,
+                                height: 80,
+                                overflow: 'hidden',
+                                cursor: 'pointer',
+                                borderRadius: 2,
+                                '&:hover': {
+                                  boxShadow: 3,
+                                },
+                              }}
+                              onClick={() => handleOpenLightbox(actualIndex)}
+                            >
+                              <Box
+                                component="img"
+                                src={imageUrl}
+                                alt={caption || `Unit ${unit.unitNumber} image ${actualIndex + 1}`}
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            </Paper>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Box>
+                ) : (
+                  <Paper
+                    sx={{
+                      height: { xs: 220, sm: 280, md: 350 },
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'grey.100',
+                      borderRadius: 3,
+                      color: 'grey.400',
+                    }}
+                  >
+                    <HomeIcon sx={{ fontSize: { xs: 72, md: 100 } }} />
+                  </Paper>
+                )}
+              </Grid>
+
               {/* Jobs and Inspections Tabs */}
               <Grid item xs={12}>
                 <Paper>
@@ -697,6 +991,166 @@ export default function UnitDetailPage() {
               <DialogTitle>Move Out Wizard</DialogTitle>
               <DialogContent>
                 <MoveOutWizard unitId={id} onComplete={() => setMoveOutWizardOpen(false)} />
+              </DialogContent>
+            </Dialog>
+
+            {/* Image Lightbox Dialog */}
+            <Dialog
+              open={lightboxOpen}
+              onClose={handleCloseLightbox}
+              maxWidth={false}
+              PaperProps={{
+                sx: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                  boxShadow: 'none',
+                  margin: 0,
+                  maxWidth: '100vw',
+                  maxHeight: '100vh',
+                  borderRadius: 0,
+                },
+              }}
+              sx={{
+                '& .MuiBackdrop-root': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                },
+              }}
+            >
+              <DialogContent
+                sx={{
+                  position: 'relative',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '100vh',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Close Button */}
+                <IconButton
+                  onClick={handleCloseLightbox}
+                  sx={{
+                    position: 'absolute',
+                    top: 16,
+                    right: 16,
+                    color: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    zIndex: 3,
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                    },
+                  }}
+                >
+                  <CloseIcon />
+                </IconButton>
+
+                {/* Previous Arrow */}
+                {unitCarouselImages.length > 1 && (
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLightboxPrev();
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      left: 16,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'white',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      zIndex: 3,
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                      },
+                    }}
+                  >
+                    <ArrowBackIos sx={{ ml: 0.5 }} />
+                  </IconButton>
+                )}
+
+                {/* Next Arrow */}
+                {unitCarouselImages.length > 1 && (
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLightboxNext();
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      right: 16,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'white',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      zIndex: 3,
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                      },
+                    }}
+                  >
+                    <ArrowForwardIos />
+                  </IconButton>
+                )}
+
+                {/* Image */}
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: { xs: 2, md: 4 },
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={typeof unitCarouselImages[lightboxIndex] === 'string' ? unitCarouselImages[lightboxIndex] : unitCarouselImages[lightboxIndex]?.imageUrl}
+                    alt={typeof unitCarouselImages[lightboxIndex] === 'object' && unitCarouselImages[lightboxIndex]?.caption ? unitCarouselImages[lightboxIndex].caption : `Unit ${unit?.unitNumber} image ${lightboxIndex + 1}`}
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: '90vh',
+                      objectFit: 'contain',
+                      transition: 'opacity 0.3s ease',
+                    }}
+                  />
+                </Box>
+
+                {/* Image Counter and Caption */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                    padding: 3,
+                    zIndex: 2,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'white',
+                      textAlign: 'center',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {lightboxIndex + 1} / {unitCarouselImages.length}
+                  </Typography>
+                  {typeof unitCarouselImages[lightboxIndex] === 'object' && unitCarouselImages[lightboxIndex]?.caption && (
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        color: 'white',
+                        textAlign: 'center',
+                        mt: 1,
+                      }}
+                    >
+                      {unitCarouselImages[lightboxIndex].caption}
+                    </Typography>
+                  )}
+                </Box>
               </DialogContent>
             </Dialog>
           </>
