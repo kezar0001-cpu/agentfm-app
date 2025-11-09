@@ -107,7 +107,7 @@ export default function PropertiesPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.properties.list(debouncedSearchTerm, filterStatus),
+    queryKey: queryKeys.properties.list({ search: debouncedSearchTerm, status: filterStatus }),
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams({
         limit: PROPERTIES_PAGE_SIZE.toString(),
@@ -673,11 +673,11 @@ export default function PropertiesPage() {
                           }}
                         >
                           <PropertyOccupancyWidget
-                          occupancyStats={property.occupancyStats}
-                          totalUnits={property.totalUnits}
-                          compact={true}
-                        />
-                      </Box>
+                            occupancyStats={property.occupancyStats}
+                            totalUnits={property.totalUnits}
+                            compact={true}
+                          />
+                        </Box>
                       </Card>
                     );
                   })}
