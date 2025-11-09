@@ -50,6 +50,12 @@ const PropertyPhotoUploader = ({
     const files = Array.from(event?.target?.files || []);
     if (!files.length) return;
 
+    // Bug Fix: Prevent concurrent uploads by checking if already uploading
+    if (isUploading) {
+      console.warn('Upload already in progress, ignoring new upload request');
+      return;
+    }
+
     setIsUploading(true);
     setError('');
 

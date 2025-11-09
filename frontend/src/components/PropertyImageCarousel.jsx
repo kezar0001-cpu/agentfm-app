@@ -80,8 +80,10 @@ const PropertyImageCarousel = ({
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
+  // Bug Fix: Reset currentIndex and autoplay when images change
   useEffect(() => {
     setCurrentIndex(0);
+    setAutoplayEnabled(true);
   }, [items]);
 
   // Memoize handleStep to prevent recreating the function on every render
