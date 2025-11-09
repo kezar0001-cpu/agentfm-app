@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -98,6 +98,7 @@ export default function PropertiesPage() {
 
   // Fetch properties with infinite query (Bug Fix #1: Server-side search and filter)
   const PROPERTIES_PAGE_SIZE = 50;
+  const PROPERTIES_MAX_PAGES = 20; // Limit to 1000 properties in memory (Bug Fix: Prevent memory accumulation)
   const {
     data,
     isLoading,
@@ -131,6 +132,8 @@ export default function PropertiesPage() {
       return lastPage.hasMore ? totalFetched : undefined;
     },
     initialPageParam: 0,
+    maxPages: PROPERTIES_MAX_PAGES, // Bug Fix: Limit cached pages to prevent unbounded memory growth
+    gcTime: 5 * 60 * 1000, // Bug Fix: Garbage collect unused queries after 5 minutes
   });
 
   // Delete mutation
@@ -144,9 +147,27 @@ export default function PropertiesPage() {
     },
   });
 
-  // Flatten all pages into a single array
+  // Flatten all pages into a single array and memoize to prevent unnecessary re-renders
   // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
-  const properties = data?.pages?.flatMap(page => page.items) || [];
+  // Bug Fix: Memoize properties list with pre-processed images to avoid re-processing on every render
+  const properties = useMemo(() => {
+    const flattenedProperties = data?.pages?.flatMap(page => page.items) || [];
+
+    // Pre-process images for each property to avoid recalculating on every render
+    return flattenedProperties.map(property => ({
+      ...property,
+      processedImages: (() => {
+        if (!property) return [];
+        if (Array.isArray(property.images) && property.images.length > 0) {
+          return property.images;
+        }
+        if (property.imageUrl) {
+          return [property.imageUrl];
+        }
+        return [];
+      })(),
+    }));
+  }, [data?.pages]);
 
   const handleMenuOpen = (event, property) => {
     event.stopPropagation();
@@ -211,17 +232,6 @@ export default function PropertiesPage() {
       UNDER_MAINTENANCE: 'warning',
     };
     return colors[status] || 'default';
-  };
-
-  const getPropertyImages = (property) => {
-    if (!property) return [];
-    if (Array.isArray(property.images) && property.images.length > 0) {
-      return property.images;
-    }
-    if (property.imageUrl) {
-      return [property.imageUrl];
-    }
-    return [];
   };
 
   return (
@@ -401,7 +411,8 @@ export default function PropertiesPage() {
               {viewMode === 'grid' && (
                 <Grid container spacing={3}>
                   {properties.map((property) => {
-                    const propertyImages = getPropertyImages(property);
+                    // Bug Fix: Use pre-processed images to avoid recalculating on every render
+                    const propertyImages = property.processedImages;
                     const hasMultipleImages = propertyImages.length > 1;
 
                     return (
@@ -533,7 +544,8 @@ export default function PropertiesPage() {
               {viewMode === 'list' && (
                 <Stack spacing={2}>
                   {properties.map((property) => {
-                    const propertyImages = getPropertyImages(property);
+                    // Bug Fix: Use pre-processed images to avoid recalculating on every render
+                    const propertyImages = property.processedImages;
                     const hasMultipleImages = propertyImages.length > 1;
 
                     return (
@@ -838,6 +850,12 @@ export default function PropertiesPage() {
           {selectedProperty?.totalUnits > 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               This property has {selectedProperty.totalUnits} unit(s). Make sure to remove all units and tenants before deleting.
+            </Alert>
+          )}
+          {/* Bug Fix: Show delete error inside dialog for better user feedback */}
+          {deleteMutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }} onClose={() => deleteMutation.reset()}>
+              {deleteMutation.error?.response?.data?.message || deleteMutation.error?.message || 'Failed to delete property. Please try again.'}
             </Alert>
           )}
         </DialogContent>
