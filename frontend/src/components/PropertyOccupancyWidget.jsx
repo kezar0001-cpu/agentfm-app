@@ -32,16 +32,27 @@ const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = 
   const calculateStats = () => {
     // If pre-calculated stats are provided, use them
     if (occupancyStats) {
-      const vacancyRate = occupancyStats.total > 0
-        ? ((occupancyStats.vacant / occupancyStats.total) * 100).toFixed(1)
+      const total = occupancyStats.total ?? 0;
+      const occupied = occupancyStats.occupied ?? 0;
+      const vacant = occupancyStats.vacant ?? 0;
+      const maintenance = occupancyStats.maintenance ?? 0;
+
+      const vacancyRate = total > 0
+        ? ((vacant / total) * 100).toFixed(1)
         : 0;
 
+      // Handle potential null/undefined occupancyRate from backend
+      const occupancyRateValue = occupancyStats.occupancyRate ??
+        (total > 0 ? ((occupied / total) * 100) : 0);
+
       return {
-        total: occupancyStats.total,
-        occupied: occupancyStats.occupied,
-        vacant: occupancyStats.vacant,
-        maintenance: occupancyStats.maintenance,
-        occupancyRate: occupancyStats.occupancyRate.toFixed(1),
+        total,
+        occupied,
+        vacant,
+        maintenance,
+        occupancyRate: typeof occupancyRateValue === 'number'
+          ? occupancyRateValue.toFixed(1)
+          : '0.0',
         vacancyRate,
       };
     }

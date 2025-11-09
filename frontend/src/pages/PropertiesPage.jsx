@@ -87,6 +87,7 @@ export default function PropertiesPage() {
   }, [location.state?.openCreateDialog, location.pathname, navigate]);
 
   // Fetch properties with infinite query
+  const PROPERTIES_PAGE_SIZE = 50;
   const {
     data,
     isLoading,
@@ -98,11 +99,11 @@ export default function PropertiesPage() {
   } = useInfiniteQuery({
     queryKey: queryKeys.properties.all(),
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await apiClient.get(`/properties?limit=50&offset=${pageParam}`);
+      const response = await apiClient.get(`/properties?limit=${PROPERTIES_PAGE_SIZE}&offset=${pageParam}`);
       return response.data;
     },
     getNextPageParam: (lastPage, allPages) => {
-      return lastPage.hasMore ? allPages.length * 50 : undefined;
+      return lastPage.hasMore ? allPages.length * PROPERTIES_PAGE_SIZE : undefined;
     },
     initialPageParam: 0,
   });
