@@ -445,6 +445,88 @@ const propertyImageInputObjectSchema = z.object({
 
 const propertyImageInputSchema = z.union([z.string(), propertyImageInputObjectSchema]);
 
+// Bug Fix: Add proper validation for amenities structure to prevent data corruption
+const amenitiesSchema = z
+  .object({
+    utilities: z
+      .object({
+        water: z.boolean().optional(),
+        gas: z.boolean().optional(),
+        electricity: z.boolean().optional(),
+        internet: z.boolean().optional(),
+        trash: z.boolean().optional(),
+        sewer: z.boolean().optional(),
+        cable: z.boolean().optional(),
+      })
+      .optional()
+      .nullable(),
+    features: z
+      .object({
+        pool: z.boolean().optional(),
+        gym: z.boolean().optional(),
+        laundry: z.boolean().optional(),
+        elevator: z.boolean().optional(),
+        doorman: z.boolean().optional(),
+        storage: z.boolean().optional(),
+        balcony: z.boolean().optional(),
+        patio: z.boolean().optional(),
+        yard: z.boolean().optional(),
+        fireplace: z.boolean().optional(),
+        airConditioning: z.boolean().optional(),
+        heating: z.boolean().optional(),
+        dishwasher: z.boolean().optional(),
+        microwave: z.boolean().optional(),
+        refrigerator: z.boolean().optional(),
+        washerDryer: z.boolean().optional(),
+      })
+      .optional()
+      .nullable(),
+    security: z
+      .object({
+        gated: z.boolean().optional(),
+        cameras: z.boolean().optional(),
+        alarm: z.boolean().optional(),
+        accessControl: z.boolean().optional(),
+        securityGuard: z.boolean().optional(),
+        intercom: z.boolean().optional(),
+      })
+      .optional()
+      .nullable(),
+    accessibility: z
+      .object({
+        wheelchairAccessible: z.boolean().optional(),
+        elevator: z.boolean().optional(),
+        ramps: z.boolean().optional(),
+        wideHallways: z.boolean().optional(),
+        accessibleBathroom: z.boolean().optional(),
+        accessibleParking: z.boolean().optional(),
+      })
+      .optional()
+      .nullable(),
+    parking: z
+      .object({
+        available: z.boolean().optional(),
+        type: z.enum(['NONE', 'STREET', 'DRIVEWAY', 'GARAGE', 'COVERED', 'UNCOVERED']).optional().nullable(),
+        spaces: z.number().int().min(0).optional().nullable(),
+        covered: z.boolean().optional(),
+      })
+      .optional()
+      .nullable(),
+    pets: z
+      .object({
+        allowed: z.boolean().optional(),
+        catsAllowed: z.boolean().optional(),
+        dogsAllowed: z.boolean().optional(),
+        deposit: z.number().min(0).optional().nullable(),
+        weightLimit: z.number().int().min(0).optional().nullable(),
+        restrictions: z.string().optional().nullable(),
+      })
+      .optional()
+      .nullable(),
+  })
+  .optional()
+  .nullable();
+
 const basePropertySchema = z.object({
     name: requiredString('Property name is required'),
     address: requiredString('Address is required'),
@@ -469,6 +551,7 @@ const basePropertySchema = z.object({
     description: optionalString(),
     imageUrl: optionalImageLocation(),
     managerId: optionalString(),
+    amenities: amenitiesSchema, // Bug Fix: Add validated amenities field
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
@@ -895,7 +978,8 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
       where.status = status;
     }
 
-    const { items: properties, total } = await withPropertyImagesSupport(async (includeImages) => {
+    // Bug Fix: Properly destructure all return values including hasMoreItems
+    const { items: properties, total, hasMoreItems } = await withPropertyImagesSupport(async (includeImages) => {
       const select = buildPropertyListSelect(includeImages);
 
       // Bug Fix: Optimize count query - only count when offset is 0 to reduce load
@@ -922,8 +1006,8 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
 
     // Calculate page number and hasMore
     const page = Math.floor(offset / limit) + 1;
-    // Bug Fix: Use hasMoreItems for more efficient hasMore calculation
-    const hasMore = total !== null ? offset + limit < total : properties.hasMoreItems;
+    // Bug Fix: Use properly destructured hasMoreItems for more efficient hasMore calculation
+    const hasMore = total !== null ? offset + limit < total : hasMoreItems;
 
     // Return paginated response
     res.json({
@@ -1268,13 +1352,25 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       );
     }
 
-    await prisma.property.delete({ where: { id: property.id } });
+    // Bug Fix: Wrap deletion and cache invalidation in try-catch for better error handling
+    try {
+      await prisma.property.delete({ where: { id: property.id } });
 
-    // Invalidate property and dashboard caches for all affected users
-    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
-    await invalidatePropertyCaches(cacheUserIds);
+      // Invalidate property and dashboard caches for all affected users
+      // Don't fail the request if cache invalidation fails - log it instead
+      const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+      try {
+        await invalidatePropertyCaches(cacheUserIds);
+      } catch (cacheError) {
+        console.error('Cache invalidation failed after property deletion:', cacheError);
+        // Don't throw - deletion was successful, cache will expire naturally
+      }
 
-    res.json({ success: true, message: 'Property deleted successfully' });
+      res.json({ success: true, message: 'Property deleted successfully' });
+    } catch (deleteError) {
+      // If deletion fails, property still exists - this is an error state
+      throw deleteError;
+    }
   } catch (error) {
     console.error('Delete property error:', {
       message: error?.message,

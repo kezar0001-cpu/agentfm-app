@@ -267,12 +267,19 @@ export default function PropertyDetailPage() {
     setLightboxOpen(false);
   };
 
+  // Bug Fix: Add safety checks to prevent edge cases when images array changes
   const handleLightboxPrev = () => {
-    setLightboxIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
+    setLightboxIndex((prev) => {
+      if (carouselImages.length === 0) return 0;
+      return (prev - 1 + carouselImages.length) % carouselImages.length;
+    });
   };
 
   const handleLightboxNext = () => {
-    setLightboxIndex((prev) => (prev + 1) % carouselImages.length);
+    setLightboxIndex((prev) => {
+      if (carouselImages.length === 0) return 0;
+      return (prev + 1) % carouselImages.length;
+    });
   };
 
   // Keyboard navigation for lightbox
@@ -292,6 +299,15 @@ export default function PropertyDetailPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lightboxOpen, carouselImages.length]);
+
+  // Bug Fix: Close lightbox if current index becomes invalid when images change
+  useEffect(() => {
+    if (lightboxOpen && carouselImages.length > 0 && lightboxIndex >= carouselImages.length) {
+      setLightboxIndex(Math.max(0, carouselImages.length - 1));
+    } else if (lightboxOpen && carouselImages.length === 0) {
+      handleCloseLightbox();
+    }
+  }, [lightboxOpen, lightboxIndex, carouselImages.length]);
 
   const parseNumericValue = (value) => {
     if (value === null || value === undefined || value === '') {
