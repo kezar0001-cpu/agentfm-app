@@ -1016,10 +1016,12 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
     }
 
     // Parse pagination parameters
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
-    // Bug Fix: Add upper limit to offset to prevent excessive database load
+    // Bug Fix: Properly handle NaN from parseInt to prevent database query failures
     const MAX_OFFSET = 10000; // Reasonable limit to prevent abuse
-    const offset = Math.min(Math.max(parseInt(req.query.offset) || 0, 0), MAX_OFFSET);
+    const parsedLimit = parseInt(req.query.limit);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 50 : parsedLimit, 1), 100);
+    const parsedOffset = parseInt(req.query.offset);
+    const offset = Math.min(Math.max(Number.isNaN(parsedOffset) ? 0 : parsedOffset, 0), MAX_OFFSET);
 
     // Parse search and filter parameters (Bug Fix #1: Server-side search)
     // Bug Fix: Validate search string length to prevent performance issues
@@ -1151,7 +1153,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       }, {
         isolationLevel: 'Serializable',
         maxWait: 5000,
-        timeout: 10000,
+        timeout: 30000, // Bug Fix: Increase timeout to handle large image uploads (50+ images)
       });
 
       if (!includeImages) {
@@ -1188,7 +1190,8 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
 });
 
 // GET /:id - Get property by ID (with access check)
-router.get('/:id', async (req, res) => {
+// Bug Fix: Add caching to reduce database load on frequently accessed property details
+router.get('/:id', cacheMiddleware({ ttl: 60 }), async (req, res) => {
   try {
     const property = await withPropertyImagesSupport((includeImages) =>
       prisma.property.findUnique({
@@ -1343,7 +1346,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       }, {
         isolationLevel: 'Serializable', // Prevent race conditions in concurrent updates
         maxWait: 5000, // Maximum time to wait for transaction to start
-        timeout: 10000, // Maximum time for transaction to complete
+        timeout: 30000, // Bug Fix: Increase timeout for operations with many images
       });
 
       if (!includeImages) {
@@ -1593,7 +1596,7 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
     }, {
       isolationLevel: 'Serializable',
       maxWait: 5000,
-      timeout: 10000,
+      timeout: 30000, // Bug Fix: Increase timeout for image operations
     });
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
@@ -1663,7 +1666,7 @@ propertyImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (
     }, {
       isolationLevel: 'Serializable',
       maxWait: 5000,
-      timeout: 10000,
+      timeout: 30000, // Bug Fix: Increase timeout for image operations
     });
 
     if (!updated) {
@@ -1733,7 +1736,7 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
     }, {
       isolationLevel: 'Serializable',
       maxWait: 5000,
-      timeout: 10000,
+      timeout: 30000, // Bug Fix: Increase timeout for image operations
     });
 
     if (!deleted) {
@@ -1800,7 +1803,7 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
     }, {
       isolationLevel: 'Serializable',
       maxWait: 5000,
-      timeout: 10000,
+      timeout: 30000, // Bug Fix: Increase timeout for image reorder operations
     });
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
@@ -1834,7 +1837,9 @@ router.get('/:id/activity', async (req, res) => {
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    // Bug Fix: Handle NaN from parseInt properly
+    const parsedActivityLimit = parseInt(req.query.limit);
+    const limit = Math.min(Number.isNaN(parsedActivityLimit) ? 20 : parsedActivityLimit, 50);
     const cacheKey = `property:${req.params.id}:activity:${limit}`;
 
     const cached = await redisGet(cacheKey);
