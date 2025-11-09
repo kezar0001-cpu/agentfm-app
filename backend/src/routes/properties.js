@@ -100,6 +100,11 @@ const propertyListSelect = {
   createdAt: true,
   updatedAt: true,
   propertyImages: propertyImagesListSelection,
+  units: {
+    select: {
+      status: true,
+    },
+  },
   _count: {
     select: {
       units: true,
@@ -752,10 +757,32 @@ const syncPropertyCoverImage = async (tx, propertyId) => {
   return nextImageUrl;
 };
 
+const calculateOccupancyStats = (property) => {
+  if (!property || !Array.isArray(property.units)) {
+    return null;
+  }
+
+  const occupiedCount = property.units.filter(u => u.status === 'OCCUPIED').length;
+  const vacantCount = property.units.filter(u => u.status === 'VACANT').length;
+  const maintenanceCount = property.units.filter(u => u.status === 'MAINTENANCE').length;
+  const totalUnits = property.units.length || property.totalUnits || 0;
+  const occupancyRate = totalUnits > 0 ? ((occupiedCount / totalUnits) * 100) : 0;
+
+  return {
+    occupied: occupiedCount,
+    vacant: vacantCount,
+    maintenance: maintenanceCount,
+    total: totalUnits,
+    occupancyRate: parseFloat(occupancyRate.toFixed(1)),
+  };
+};
+
 const toPublicProperty = (property) => {
   if (!property) return property;
 
-  const { propertyImages, ...rest } = property;
+  const { propertyImages, units, ...rest } = property;
+
+  const occupancyStats = calculateOccupancyStats(property);
 
   return {
     ...rest,
@@ -763,6 +790,7 @@ const toPublicProperty = (property) => {
     type: property.type ?? property.propertyType ?? null,
     coverImage: property.coverImage ?? property.imageUrl ?? null,
     images: normalizePropertyImages(property),
+    ...(occupancyStats && { occupancyStats }),
   };
 };
 
@@ -1484,16 +1512,20 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
       return sendError(res, 400, 'Ordered image ids do not match existing images', ErrorCodes.VAL_VALIDATION_ERROR);
     }
 
-    await prisma.$transaction(
-      providedIds.map((id, index) =>
-        prisma.propertyImage.update({
-          where: { id },
-          data: { displayOrder: index },
-        })
-      )
-    );
+    await prisma.$transaction(async (tx) => {
+      // Update display order for all images
+      await Promise.all(
+        providedIds.map((id, index) =>
+          tx.propertyImage.update({
+            where: { id },
+            data: { displayOrder: index },
+          })
+        )
+      );
 
-    await syncPropertyCoverImage(prisma, propertyId);
+      // Sync cover image within the same transaction
+      await syncPropertyCoverImage(tx, propertyId);
+    });
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
     await invalidatePropertyCaches(cacheUserIds);
