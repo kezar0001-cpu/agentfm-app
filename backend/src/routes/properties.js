@@ -1198,12 +1198,29 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         owners: {
           select: { ownerId: true },
         },
+        _count: {
+          select: {
+            units: true,
+          },
+        },
       },
     });
     const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
     if (!access.allowed) {
       const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
       return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    // Bug Fix: Prevent deletion of properties with units to maintain data integrity
+    const unitCount = property._count?.units || 0;
+    if (unitCount > 0) {
+      return sendError(
+        res,
+        409,
+        `Cannot delete property with ${unitCount} unit(s). Please remove all units before deleting the property.`,
+        ErrorCodes.VAL_VALIDATION_ERROR,
+        { unitCount }
+      );
     }
 
     await prisma.property.delete({ where: { id: property.id } });
