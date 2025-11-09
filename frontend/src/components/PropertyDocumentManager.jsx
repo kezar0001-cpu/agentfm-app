@@ -68,14 +68,13 @@ const getAccessLevelColor = (level) => {
 
 const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
   const { showSuccess, showError } = useNotification();
-  const { data: documentsData, isLoading, refetch } = usePropertyDocuments(propertyId);
+  const { data: documentsData, isLoading } = usePropertyDocuments(propertyId);
+  // Bug Fix: Removed manual refetch() calls - mutations now auto-invalidate via invalidateKeys
   const addDocumentMutation = useAddPropertyDocument(propertyId, () => {
     showSuccess('Document added successfully');
-    refetch();
   });
   const deleteDocumentMutation = useDeletePropertyDocument(propertyId, () => {
     showSuccess('Document deleted successfully');
-    refetch();
   });
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -104,14 +103,36 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
       return;
     }
 
+    // Bug Fix: Add URL validation to prevent invalid URLs
+    try {
+      new URL(formData.fileUrl.trim());
+    } catch (error) {
+      setUploadError('Please enter a valid URL');
+      return;
+    }
+
+    // Bug Fix: Validate file size is a non-negative number
+    const fileSizeNumber = parseInt(formData.fileSize, 10);
+    if (isNaN(fileSizeNumber) || fileSizeNumber < 0) {
+      setUploadError('File size must be a non-negative number');
+      return;
+    }
+
+    // Bug Fix: Validate MIME type format (basic validation)
+    const mimeTypeValue = formData.mimeType.trim();
+    if (mimeTypeValue && !/^[\w\-]+\/[\w\-+.]+$/.test(mimeTypeValue)) {
+      setUploadError('Please enter a valid MIME type (e.g., application/pdf, image/jpeg)');
+      return;
+    }
+
     try {
       setUploadError('');
       await addDocumentMutation.mutateAsync({
         data: {
           fileName: formData.fileName.trim(),
           fileUrl: formData.fileUrl.trim(),
-          fileSize: formData.fileSize || 0,
-          mimeType: formData.mimeType || 'application/octet-stream',
+          fileSize: fileSizeNumber,
+          mimeType: mimeTypeValue || 'application/octet-stream',
           category: formData.category,
           description: formData.description.trim() || null,
           accessLevel: formData.accessLevel,
