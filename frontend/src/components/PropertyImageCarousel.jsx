@@ -119,6 +119,24 @@ const PropertyImageCarousel = ({
     setFullscreenOpen(false);
   };
 
+  // Keyboard navigation for fullscreen mode
+  useEffect(() => {
+    if (!fullscreenOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        handleCloseFullscreen();
+      } else if (event.key === 'ArrowLeft') {
+        handleStep(-1);
+      } else if (event.key === 'ArrowRight') {
+        handleStep(1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullscreenOpen, items.length]);
+
   const currentItem = items[currentIndex] || { imageUrl: null, caption: null };
   const currentImage =
     items.length > 0

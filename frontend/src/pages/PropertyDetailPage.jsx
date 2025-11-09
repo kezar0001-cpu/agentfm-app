@@ -605,18 +605,119 @@ export default function PropertyDetailPage() {
               </Stack>
             </Stack>
 
-            {/* Property Image */}
+            {/* Property Image Gallery */}
             {carouselImages.length > 0 ? (
-              <PropertyImageCarousel
-                images={carouselImages}
-                fallbackText={property.name}
-                height={{ xs: 220, sm: 320, md: 420 }}
-                borderRadius={3}
-                showDots={hasMultipleCarouselImages}
-                showArrows={hasMultipleCarouselImages}
-                showCounter={hasMultipleCarouselImages}
-                showFullscreenButton
-              />
+              <Box>
+                {/* Main Carousel */}
+                <PropertyImageCarousel
+                  images={carouselImages}
+                  fallbackText={property.name}
+                  height={{ xs: 220, sm: 320, md: 420 }}
+                  borderRadius={3}
+                  showDots={hasMultipleCarouselImages}
+                  showArrows={hasMultipleCarouselImages}
+                  showCounter={hasMultipleCarouselImages}
+                  showFullscreenButton
+                  showCaption={true}
+                />
+
+                {/* Gallery Grid (if multiple images) */}
+                {hasMultipleCarouselImages && (
+                  <Grid container spacing={1} sx={{ mt: 2 }}>
+                    {propertyImages.slice(0, 6).map((image, index) => {
+                      const imageUrl = typeof image === 'string' ? image : image.imageUrl;
+                      const caption = typeof image === 'object' ? image.caption : null;
+
+                      return (
+                        <Grid item xs={4} sm={3} md={2} key={image.id || index}>
+                          <Paper
+                            sx={{
+                              position: 'relative',
+                              paddingTop: '75%', // 4:3 aspect ratio
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                              borderRadius: 2,
+                              '&:hover': {
+                                boxShadow: 3,
+                                '& .overlay': {
+                                  opacity: 1,
+                                },
+                              },
+                            }}
+                            onClick={() => {
+                              // This will be handled by the carousel's fullscreen button
+                              // For now, users can click the fullscreen button on the main carousel
+                            }}
+                          >
+                            <Box
+                              component="img"
+                              src={typeof image === 'string' ? image : image.imageUrl}
+                              alt={caption || `Property image ${index + 1}`}
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                            {index === 0 && (
+                              <Chip
+                                label="Primary"
+                                size="small"
+                                color="primary"
+                                sx={{
+                                  position: 'absolute',
+                                  top: 4,
+                                  left: 4,
+                                  zIndex: 2,
+                                  fontSize: '0.65rem',
+                                }}
+                              />
+                            )}
+                          </Paper>
+                        </Grid>
+                      );
+                    })}
+                    {propertyImages.length > 6 && (
+                      <Grid item xs={4} sm={3} md={2}>
+                        <Paper
+                          sx={{
+                            position: 'relative',
+                            paddingTop: '75%',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            borderRadius: 2,
+                            bgcolor: 'rgba(0,0,0,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            '&:hover': {
+                              bgcolor: 'rgba(0,0,0,0.8)',
+                            },
+                          }}
+                          onClick={() => setCurrentTab(3)} // Navigate to Images tab
+                        >
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              color: 'white',
+                              fontWeight: 600,
+                            }}
+                          >
+                            +{propertyImages.length - 6}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    )}
+                  </Grid>
+                )}
+              </Box>
             ) : (
               <Paper
                 sx={{
