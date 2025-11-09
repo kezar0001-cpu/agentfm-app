@@ -12,6 +12,53 @@ const router = express.Router();
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// Bug Fix #6: Add rate limiting for uploads to prevent abuse
+const uploadRateLimits = new Map();
+const UPLOAD_RATE_LIMIT = 30; // Max 30 uploads per window
+const UPLOAD_RATE_WINDOW = 60 * 1000; // 1 minute window
+
+const checkUploadRateLimit = (userId) => {
+  const now = Date.now();
+  const userLimits = uploadRateLimits.get(userId) || { count: 0, windowStart: now };
+
+  if (now - userLimits.windowStart > UPLOAD_RATE_WINDOW) {
+    userLimits.count = 0;
+    userLimits.windowStart = now;
+  }
+
+  userLimits.count++;
+  uploadRateLimits.set(userId, userLimits);
+
+  // Clean up old entries to prevent memory leak
+  if (uploadRateLimits.size > 10000) {
+    const threshold = now - UPLOAD_RATE_WINDOW;
+    for (const [key, value] of uploadRateLimits.entries()) {
+      if (value.windowStart < threshold) {
+        uploadRateLimits.delete(key);
+      }
+    }
+  }
+
+  return userLimits.count <= UPLOAD_RATE_LIMIT;
+};
+
+const rateLimitUpload = (req, res, next) => {
+  if (!req.user?.id) {
+    return next();
+  }
+
+  if (!checkUploadRateLimit(req.user.id)) {
+    return sendError(
+      res,
+      429,
+      `Too many uploads. Maximum ${UPLOAD_RATE_LIMIT} uploads per minute.`,
+      ErrorCodes.RATE_LIMIT_EXCEEDED
+    );
+  }
+
+  next();
+};
+
 // Configure disk storage with safe, unique filenames
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -51,7 +98,7 @@ const upload = multer({
  * Returns: { url: "/uploads/<filename>" }
  * Requires authentication
  */
-router.post('/single', requireAuth, upload.single('file'), (req, res) => {
+router.post('/single', requireAuth, rateLimitUpload, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return sendError(res, 400, 'No file uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);
@@ -80,7 +127,7 @@ router.post('/single', requireAuth, upload.single('file'), (req, res) => {
  * Returns: { urls: ["/uploads/<filename1>", "/uploads/<filename2>"] }
  * Requires authentication
  */
-router.post('/multiple', requireAuth, upload.array('files', 50), (req, res) => {
+router.post('/multiple', requireAuth, rateLimitUpload, upload.array('files', 50), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return sendError(res, 400, 'No files uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);

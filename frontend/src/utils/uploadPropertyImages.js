@@ -48,6 +48,10 @@ export async function uploadPropertyImages(files) {
     if (error.response?.status === 415) {
       throw new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
     }
+    // Bug Fix #11: Handle rate limiting errors gracefully
+    if (error.response?.status === 429) {
+      throw new Error('Too many uploads. Please wait a minute before uploading more images.');
+    }
     if (error.response?.status === 400) {
       const serverMsg = error.response?.data?.message || '';
       if (serverMsg.toLowerCase().includes('limit')) {

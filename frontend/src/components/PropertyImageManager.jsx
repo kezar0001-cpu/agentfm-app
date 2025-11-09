@@ -175,6 +175,14 @@ const PropertyImageManager = ({ propertyId, canEdit = false, onImagesUpdated }) 
     const files = Array.from(event?.target?.files || []);
     if (!files.length) return;
 
+    // Bug Fix #14: Limit maximum number of files to prevent browser/server overload
+    const MAX_FILES_PER_UPLOAD = 50;
+    if (files.length > MAX_FILES_PER_UPLOAD) {
+      setBulkUploadError(`Too many files selected. Maximum ${MAX_FILES_PER_UPLOAD} files per upload.`);
+      if (event?.target) event.target.value = '';
+      return;
+    }
+
     // Bug Fix: Client-side validation before upload to save bandwidth
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
