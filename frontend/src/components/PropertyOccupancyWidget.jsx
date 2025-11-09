@@ -22,13 +22,31 @@ import {
 
 /**
  * PropertyOccupancyWidget - Displays property occupancy statistics
- * @param {Array} units - Array of units for the property
+ * @param {Array} units - Array of units for the property (optional, for backward compatibility)
  * @param {number} totalUnits - Total number of units (from property.totalUnits)
+ * @param {Object} occupancyStats - Pre-calculated occupancy statistics from backend
  * @param {boolean} compact - Whether to display in compact mode
  */
-const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, compact = false }) => {
+const PropertyOccupancyWidget = ({ units = [], totalUnits = 0, occupancyStats = null, compact = false }) => {
   // Calculate occupancy statistics
   const calculateStats = () => {
+    // If pre-calculated stats are provided, use them
+    if (occupancyStats) {
+      const vacancyRate = occupancyStats.total > 0
+        ? ((occupancyStats.vacant / occupancyStats.total) * 100).toFixed(1)
+        : 0;
+
+      return {
+        total: occupancyStats.total,
+        occupied: occupancyStats.occupied,
+        vacant: occupancyStats.vacant,
+        maintenance: occupancyStats.maintenance,
+        occupancyRate: occupancyStats.occupancyRate.toFixed(1),
+        vacancyRate,
+      };
+    }
+
+    // Fallback to calculating from units array (for backward compatibility)
     const occupied = units.filter((u) => u.status === 'OCCUPIED').length;
     const vacant = units.filter((u) => u.status === 'VACANT').length;
     const maintenance = units.filter((u) => u.status === 'MAINTENANCE').length;

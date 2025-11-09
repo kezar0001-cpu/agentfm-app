@@ -91,4 +91,65 @@ describe('PropertiesPage counts display', () => {
       expect(screen.getByText('0 active jobs • 0 inspections')).toBeInTheDocument();
     });
   });
+
+  it('renders occupancy stats when provided in property response', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: {
+        items: [
+          {
+            id: 'property-2',
+            name: 'Sunset Apartments',
+            address: '456 Beach Road',
+            city: 'Miami',
+            state: 'FL',
+            zipCode: '33139',
+            country: 'United States',
+            propertyType: 'Residential',
+            status: 'ACTIVE',
+            totalUnits: 10,
+            totalArea: 5000,
+            yearBuilt: 2020,
+            managerId: 'manager-1',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-02T00:00:00.000Z',
+            _count: {
+              units: 10,
+              jobs: 3,
+              inspections: 2,
+            },
+            occupancyStats: {
+              occupied: 7,
+              vacant: 2,
+              maintenance: 1,
+              total: 10,
+              occupancyRate: 70.0,
+            },
+          },
+        ],
+        total: 1,
+        page: 1,
+        hasMore: false,
+      },
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PropertiesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Sunset Apartments')).toBeInTheDocument();
+      expect(screen.getByText('3 active jobs • 2 inspections')).toBeInTheDocument();
+    });
+  });
 });

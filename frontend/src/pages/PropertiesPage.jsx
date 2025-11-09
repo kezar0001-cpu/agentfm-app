@@ -658,7 +658,7 @@ export default function PropertiesPage() {
                           }}
                         >
                           <PropertyOccupancyWidget
-                          units={property.units || []}
+                          occupancyStats={property.occupancyStats}
                           totalUnits={property.totalUnits}
                           compact={true}
                         />

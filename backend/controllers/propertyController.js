@@ -38,11 +38,38 @@ exports.getProperties = async (req, res) => {
         _count: {
           select: { units: true, jobs: true, inspections: true },
         },
+        units: {
+          select: {
+            status: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(properties);
+    // Add occupancy statistics to each property
+    const propertiesWithOccupancy = properties.map(property => {
+      const occupiedCount = property.units.filter(u => u.status === 'OCCUPIED').length;
+      const vacantCount = property.units.filter(u => u.status === 'VACANT').length;
+      const maintenanceCount = property.units.filter(u => u.status === 'MAINTENANCE').length;
+      const totalUnits = property.units.length || property.totalUnits || 0;
+      const occupancyRate = totalUnits > 0 ? ((occupiedCount / totalUnits) * 100).toFixed(1) : 0;
+
+      return {
+        ...property,
+        occupancyStats: {
+          occupied: occupiedCount,
+          vacant: vacantCount,
+          maintenance: maintenanceCount,
+          total: totalUnits,
+          occupancyRate: parseFloat(occupancyRate),
+        },
+        // Remove the units array from response to keep payload lean
+        units: undefined,
+      };
+    });
+
+    res.json(propertiesWithOccupancy);
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
