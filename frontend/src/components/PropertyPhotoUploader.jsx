@@ -61,23 +61,70 @@ const PropertyPhotoUploader = ({
     // Bug Fix: Client-side validation before upload to save bandwidth
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    // Bug Fix #10: Add maximum dimension validation to prevent huge images
+    const MAX_DIMENSION = 8000; // 8000px max width/height
 
-    const invalidFiles = files.filter(file => {
-      if (file.size > MAX_FILE_SIZE) return true;
-      if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) return true;
-      return false;
-    });
+    const invalidFiles = [];
+    const dimensionCheckPromises = [];
+
+    // First pass: check file size and type
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({ file, reason: 'size' });
+        continue;
+      }
+      if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) {
+        invalidFiles.push({ file, reason: 'type' });
+        continue;
+      }
+
+      // Bug Fix #10: Check image dimensions before uploading
+      const dimensionCheck = new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
+            resolve({ file, reason: 'dimension', width: img.width, height: img.height });
+          } else {
+            resolve(null);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve({ file, reason: 'corrupt' });
+        };
+
+        img.src = url;
+      });
+
+      dimensionCheckPromises.push(dimensionCheck);
+    }
+
+    // Wait for all dimension checks to complete
+    const dimensionResults = await Promise.all(dimensionCheckPromises);
+    invalidFiles.push(...dimensionResults.filter(Boolean));
 
     if (invalidFiles.length > 0) {
-      const oversized = invalidFiles.filter(f => f.size > MAX_FILE_SIZE);
-      const wrongType = invalidFiles.filter(f => !ALLOWED_TYPES.includes(f.type.toLowerCase()));
+      const oversized = invalidFiles.filter(f => f.reason === 'size');
+      const wrongType = invalidFiles.filter(f => f.reason === 'type');
+      const tooBig = invalidFiles.filter(f => f.reason === 'dimension');
+      const corrupt = invalidFiles.filter(f => f.reason === 'corrupt');
 
       let errorMsg = '';
       if (oversized.length > 0) {
         errorMsg += `${oversized.length} file(s) exceed 10MB limit. `;
       }
       if (wrongType.length > 0) {
-        errorMsg += `${wrongType.length} file(s) are not valid images (JPEG, PNG, GIF, WebP only).`;
+        errorMsg += `${wrongType.length} file(s) are not valid images (JPEG, PNG, GIF, WebP only). `;
+      }
+      if (tooBig.length > 0) {
+        errorMsg += `${tooBig.length} file(s) exceed maximum dimensions (${MAX_DIMENSION}px). `;
+      }
+      if (corrupt.length > 0) {
+        errorMsg += `${corrupt.length} file(s) are corrupted or unreadable. `;
       }
 
       setError(errorMsg.trim());

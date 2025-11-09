@@ -104,10 +104,17 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   const [coverImage, setCoverImage] = useState('');
 
   // Create/Update mutation
+  // Bug Fix #8: Invalidate property detail cache to ensure fresh data on detail page
   const mutation = useApiMutation({
     url: isEdit ? `/properties/${property?.id}` : '/properties',
     method: isEdit ? 'patch' : 'post',
-    invalidateKeys: [queryKeys.properties.all()],
+    invalidateKeys: isEdit
+      ? [
+          queryKeys.properties.all(),
+          queryKeys.properties.detail(property?.id),
+          ['propertyImages', property?.id],
+        ]
+      : [queryKeys.properties.all()],
   });
 
   // Initialize form with property data if editing
@@ -205,8 +212,19 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   }, [imageUrlValue]);
 
   const handleImagesChange = (nextImages = [], nextCover = '') => {
-    setPhotoSelections(nextImages);
-    const resolvedCover = nextCover || nextImages[0]?.url || '';
+    // Bug Fix #9: Remove duplicate images by URL to prevent database bloat
+    const uniqueImages = [];
+    const seenUrls = new Set();
+
+    for (const image of nextImages) {
+      if (image && image.url && !seenUrls.has(image.url)) {
+        seenUrls.add(image.url);
+        uniqueImages.push(image);
+      }
+    }
+
+    setPhotoSelections(uniqueImages);
+    const resolvedCover = nextCover || uniqueImages[0]?.url || '';
     setCoverImage(resolvedCover);
     setValue('imageUrl', resolvedCover || '', { shouldDirty: true, shouldValidate: true });
   };

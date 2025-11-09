@@ -69,6 +69,7 @@ import { CircularProgress } from '@mui/material';
 import { queryKeys } from '../utils/queryKeys.js';
 import ensureArray from '../utils/ensureArray';
 import { getCurrentUser } from '../lib/auth';
+import { resolvePropertyImageUrl } from '../utils/propertyImages.js';
 
 const UNITS_PAGE_SIZE = 50;
 
@@ -392,6 +393,24 @@ export default function PropertyDetailPage() {
     return formatted === 'N/A' ? 'N/A' : `${formatted} sq ft`;
   };
 
+  // Bug Fix #1: Helper function to safely get and resolve image URL
+  // Handles both string URLs and image objects, resolves relative paths
+  const getImageUrl = useCallback((image, index = 0) => {
+    if (!image) return '';
+
+    const rawUrl = typeof image === 'string' ? image : image.imageUrl;
+    if (!rawUrl) return '';
+
+    return resolvePropertyImageUrl(rawUrl, propertyName);
+  }, [propertyName]);
+
+  // Bug Fix #2: Helper function to safely get image caption
+  const getImageCaption = useCallback((image, index = 0) => {
+    if (!image) return `Property image ${index + 1}`;
+    if (typeof image === 'string') return `Property image ${index + 1}`;
+    return image.caption || image.altText || `Property image ${index + 1}`;
+  }, []);
+
   const utilitiesIncluded = getAmenityLabels('utilities');
   const featureHighlights = getAmenityLabels('features');
   const securityHighlights = getAmenityLabels('security');
@@ -686,8 +705,13 @@ export default function PropertyDetailPage() {
                   >
                     <Box
                       component="img"
-                      src={typeof carouselImages[0] === 'string' ? carouselImages[0] : carouselImages[0].imageUrl}
-                      alt={typeof carouselImages[0] === 'object' && carouselImages[0].caption ? carouselImages[0].caption : 'Property main image'}
+                      src={getImageUrl(carouselImages[0], 0)}
+                      alt={getImageCaption(carouselImages[0], 0)}
+                      onError={(e) => {
+                        // Bug Fix #3: Fallback for broken images
+                        e.target.style.display = 'none';
+                        console.warn('Failed to load property image:', carouselImages[0]);
+                      }}
                       sx={{
                         position: 'absolute',
                         top: 0,
@@ -723,16 +747,13 @@ export default function PropertyDetailPage() {
                         gap: 1,
                       }}
                     >
-                      {/* Bug Fix: Consistent grid layout - always show 3 thumbnails + "+N more" if needed */}
-                      {/* For 2-4 images: show all as thumbnails. For 5+ images: show 3 thumbnails + "+N more" */}
-                      {carouselImages.slice(1, Math.min(carouselImages.length, carouselImages.length >= 5 ? 4 : carouselImages.length)).map((image, idx) => {
-                        const imageUrl = typeof image === 'string' ? image : image.imageUrl;
-                        const caption = typeof image === 'object' ? image.caption : null;
+                      {/* Bug Fix #4: Simplified grid logic - show up to 3 thumbnails */}
+                      {carouselImages.slice(1, Math.min(carouselImages.length, 5)).map((image, idx) => {
                         const actualIndex = idx + 1;
 
                         return (
                           <Paper
-                            key={image.id || actualIndex}
+                            key={image?.id || actualIndex}
                             sx={{
                               position: 'relative',
                               overflow: 'hidden',
@@ -753,8 +774,11 @@ export default function PropertyDetailPage() {
                           >
                             <Box
                               component="img"
-                              src={imageUrl}
-                              alt={caption || `Property image ${actualIndex + 1}`}
+                              src={getImageUrl(image, actualIndex)}
+                              alt={getImageCaption(image, actualIndex)}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
                               sx={{
                                 width: '100%',
                                 height: '100%',
@@ -782,9 +806,9 @@ export default function PropertyDetailPage() {
                             '&:hover': {
                               bgcolor: 'rgba(0,0,0,0.85)',
                             },
-                            // Show the 4th image (index 4) as background with dark overlay
+                            // Bug Fix #5: Use resolved URL for background image
                             ...(carouselImages[4] && {
-                              backgroundImage: `url(${typeof carouselImages[4] === 'string' ? carouselImages[4] : carouselImages[4].imageUrl})`,
+                              backgroundImage: `url(${getImageUrl(carouselImages[4], 4)})`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
                               '&::before': {
@@ -811,7 +835,7 @@ export default function PropertyDetailPage() {
                               position: 'relative',
                             }}
                           >
-                            +{carouselImages.length - 4}
+                            +{carouselImages.length - 5}
                           </Typography>
                         </Paper>
                       )}
@@ -838,13 +862,11 @@ export default function PropertyDetailPage() {
                     }}
                   >
                     {carouselImages.slice(1).map((image, idx) => {
-                      const imageUrl = typeof image === 'string' ? image : image.imageUrl;
-                      const caption = typeof image === 'object' ? image.caption : null;
                       const actualIndex = idx + 1;
 
                       return (
                         <Paper
-                          key={image.id || actualIndex}
+                          key={image?.id || actualIndex}
                           sx={{
                             position: 'relative',
                             minWidth: 100,
@@ -860,8 +882,11 @@ export default function PropertyDetailPage() {
                         >
                           <Box
                             component="img"
-                            src={imageUrl}
-                            alt={caption || `Property image ${actualIndex + 1}`}
+                            src={getImageUrl(image, actualIndex)}
+                            alt={getImageCaption(image, actualIndex)}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
                             sx={{
                               width: '100%',
                               height: '100%',
@@ -1917,17 +1942,26 @@ export default function PropertyDetailPage() {
               padding: { xs: 2, md: 4 },
             }}
           >
-            <Box
-              component="img"
-              src={typeof carouselImages[lightboxIndex] === 'string' ? carouselImages[lightboxIndex] : carouselImages[lightboxIndex]?.imageUrl}
-              alt={typeof carouselImages[lightboxIndex] === 'object' && carouselImages[lightboxIndex]?.caption ? carouselImages[lightboxIndex].caption : `Property image ${lightboxIndex + 1}`}
-              sx={{
-                maxWidth: '100%',
-                maxHeight: '90vh',
-                objectFit: 'contain',
-                transition: 'opacity 0.3s ease',
-              }}
-            />
+            {/* Bug Fix #6: Null-safe lightbox image with proper URL resolution */}
+            {carouselImages[lightboxIndex] ? (
+              <Box
+                component="img"
+                src={getImageUrl(carouselImages[lightboxIndex], lightboxIndex)}
+                alt={getImageCaption(carouselImages[lightboxIndex], lightboxIndex)}
+                onError={(e) => {
+                  console.error('Failed to load lightbox image:', carouselImages[lightboxIndex]);
+                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3EImage unavailable%3C/text%3E%3C/svg%3E';
+                }}
+                sx={{
+                  maxWidth: '100%',
+                  maxHeight: '90vh',
+                  objectFit: 'contain',
+                  transition: 'opacity 0.3s ease',
+                }}
+              />
+            ) : (
+              <Typography color="white">Image not available</Typography>
+            )}
           </Box>
 
           {/* Image Counter and Caption */}
@@ -1952,7 +1986,8 @@ export default function PropertyDetailPage() {
             >
               {lightboxIndex + 1} / {carouselImages.length}
             </Typography>
-            {typeof carouselImages[lightboxIndex] === 'object' && carouselImages[lightboxIndex]?.caption && (
+            {/* Bug Fix #7: Show caption if available */}
+            {carouselImages[lightboxIndex] && typeof carouselImages[lightboxIndex] === 'object' && (carouselImages[lightboxIndex]?.caption || carouselImages[lightboxIndex]?.altText) && (
               <Typography
                 variant="body1"
                 sx={{
@@ -1961,7 +1996,7 @@ export default function PropertyDetailPage() {
                   mt: 1,
                 }}
               >
-                {carouselImages[lightboxIndex].caption}
+                {carouselImages[lightboxIndex].caption || carouselImages[lightboxIndex].altText}
               </Typography>
             )}
           </Box>
