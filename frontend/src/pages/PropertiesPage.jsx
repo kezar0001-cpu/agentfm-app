@@ -305,7 +305,13 @@ export default function PropertiesPage() {
     setEditMode(false);
   };
 
+  // Bug Fix: Prevent double-fetch race condition by checking if already fetching
   const handleLoadMore = async () => {
+    // Prevent double-fetch if already loading
+    if (isFetchingNextPage) {
+      return;
+    }
+
     try {
       setPaginationError(null);
       await fetchNextPage();
