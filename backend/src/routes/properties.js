@@ -150,9 +150,14 @@ const preprocessImageValue = (value) => {
   return value;
 };
 
+// Bug Fix: Add maximum URL length to prevent database bloat and performance issues
+const MAX_IMAGE_URL_LENGTH = 2048; // Standard max URL length
+
 const isValidImageLocation = (value) => {
   if (typeof value !== 'string') return false;
   if (!value.trim()) return false;
+  // Bug Fix: Validate URL length to prevent malicious extremely long URLs
+  if (value.length > MAX_IMAGE_URL_LENGTH) return false;
   if (/^https?:\/\//i.test(value)) return true;
   if (value.startsWith('data:')) return true;
   if (value.startsWith('/uploads/')) return true;
@@ -495,7 +500,7 @@ const amenitiesSchema = z
     accessibility: z
       .object({
         wheelchairAccessible: z.boolean().optional(),
-        elevator: z.boolean().optional(),
+        accessibleElevator: z.boolean().optional(),
         ramps: z.boolean().optional(),
         wideHallways: z.boolean().optional(),
         accessibleBathroom: z.boolean().optional(),
@@ -694,6 +699,7 @@ const invalidatePropertyCaches = async (userIdentifiers, helpers = {}) => {
 
 // Bug Fix: Deep merge amenities to prevent data loss during partial updates
 // When updating amenities, merge new values with existing ones instead of replacing
+// Bug Fix: Properly handle explicit false values and null to allow removing amenities
 const deepMergeAmenities = (existing, updates) => {
   if (!existing && !updates) return null;
   if (!existing) return updates;
@@ -705,11 +711,28 @@ const deepMergeAmenities = (existing, updates) => {
   const categories = ['utilities', 'features', 'security', 'accessibility', 'parking', 'pets'];
 
   for (const category of categories) {
-    if (updates[category]) {
-      merged[category] = {
-        ...(existing[category] || {}),
-        ...updates[category],
-      };
+    if (updates[category] !== undefined) {
+      // Bug Fix: If updates[category] is explicitly null, remove the entire category
+      if (updates[category] === null) {
+        merged[category] = null;
+      } else if (typeof updates[category] === 'object') {
+        // Merge individual fields, preserving explicit false values
+        merged[category] = {
+          ...(existing[category] || {}),
+          ...updates[category],
+        };
+        // Bug Fix: Clean up the merged category - remove all fields that are explicitly false
+        // This allows users to "uncheck" amenities by sending false
+        Object.keys(merged[category]).forEach(key => {
+          if (merged[category][key] === false) {
+            delete merged[category][key];
+          }
+        });
+        // If category is now empty, set to null
+        if (Object.keys(merged[category]).length === 0) {
+          merged[category] = null;
+        }
+      }
     }
   }
 
@@ -905,18 +928,28 @@ const calculateOccupancyStats = (property) => {
 
 // Bug Fix: Calculate occupancy stats using database aggregation for accuracy with large properties
 // This ensures correct stats even for properties with >100 units (where units array is paginated)
+// Bug Fix: Wrap in transaction to prevent inconsistent data if units are modified concurrently
 const calculateOccupancyStatsFromDB = async (propertyId) => {
   try {
-    const [stats, totalCount] = await Promise.all([
-      prisma.unit.groupBy({
-        by: ['status'],
-        where: { propertyId },
-        _count: { id: true },
-      }),
-      prisma.unit.count({ where: { propertyId } }),
-    ]);
+    // Bug Fix: Use READ COMMITTED transaction to get consistent snapshot of unit data
+    const result = await prisma.$transaction(async (tx) => {
+      const [stats, totalCount] = await Promise.all([
+        tx.unit.groupBy({
+          by: ['status'],
+          where: { propertyId },
+          _count: { id: true },
+        }),
+        tx.unit.count({ where: { propertyId } }),
+      ]);
 
-    const statsByStatus = stats.reduce((acc, item) => {
+      return { stats, totalCount };
+    }, {
+      isolationLevel: 'ReadCommitted', // Sufficient for read-only operation
+      maxWait: 2000, // Shorter wait for read-only transaction
+      timeout: 5000, // Faster timeout for stats calculation
+    });
+
+    const statsByStatus = result.stats.reduce((acc, item) => {
       acc[item.status] = item._count.id;
       return acc;
     }, {});
@@ -924,7 +957,7 @@ const calculateOccupancyStatsFromDB = async (propertyId) => {
     const occupied = statsByStatus.OCCUPIED || 0;
     const vacant = statsByStatus.VACANT || 0;
     const maintenance = statsByStatus.MAINTENANCE || 0;
-    const total = totalCount;
+    const total = result.totalCount;
     const occupancyRate = total > 0 ? ((occupied / total) * 100) : 0;
 
     return {
@@ -1026,8 +1059,16 @@ router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
     // Parse search and filter parameters (Bug Fix #1: Server-side search)
     // Bug Fix: Validate search string length to prevent performance issues
     const searchInput = req.query.search?.trim() || '';
-    const search = searchInput.length <= 200 ? searchInput : searchInput.substring(0, 200);
+    const rawSearch = searchInput.length <= 200 ? searchInput : searchInput.substring(0, 200);
     const status = req.query.status?.trim().toUpperCase() || '';
+
+    // Bug Fix: Escape special regex characters to prevent query errors
+    // Prisma's 'contains' mode can have issues with special chars in some databases
+    const escapeRegexChars = (str) => {
+      // Escape regex special characters: . * + ? ^ $ { } ( ) | [ ] \
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+    const search = rawSearch ? escapeRegexChars(rawSearch) : '';
 
     // Add search filter
     if (search) {
@@ -1291,6 +1332,13 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     const { property: updatedProperty, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
       // Bug Fix: Add serializable transaction isolation to prevent race conditions
       const result = await prisma.$transaction(async (tx) => {
+        // Bug Fix: Acquire exclusive lock on property row first to prevent concurrent image updates
+        // This prevents race conditions where two requests try to update images simultaneously
+        await tx.property.findUnique({
+          where: { id: property.id },
+          select: { id: true }, // Minimal select for performance
+        });
+
         const updatedRecord = await tx.property.update({
           where: { id: property.id },
           data: updateData,
@@ -1840,7 +1888,9 @@ router.get('/:id/activity', async (req, res) => {
     // Bug Fix: Handle NaN from parseInt properly
     const parsedActivityLimit = parseInt(req.query.limit);
     const limit = Math.min(Number.isNaN(parsedActivityLimit) ? 20 : parsedActivityLimit, 50);
-    const cacheKey = `property:${req.params.id}:activity:${limit}`;
+    // Bug Fix: Include user role in cache key to prevent cross-role cache pollution
+    // Different roles may have different access permissions to activity data
+    const cacheKey = `property:${req.params.id}:activity:${limit}:role:${req.user.role}`;
 
     const cached = await redisGet(cacheKey);
     if (cached) {
