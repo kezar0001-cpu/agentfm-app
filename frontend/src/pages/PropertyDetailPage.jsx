@@ -44,6 +44,9 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   PersonAdd as PersonAddIcon,
+  ArrowBackIos,
+  ArrowForwardIos,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
@@ -54,8 +57,6 @@ import { formatDateTime } from '../utils/date';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PropertyForm from '../components/PropertyForm';
 import UnitForm from '../components/UnitForm';
-import PropertyImageManager from '../components/PropertyImageManager';
-import PropertyImageCarousel from '../components/PropertyImageCarousel';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import PropertyNotesSection from '../components/PropertyNotesSection';
 import InviteOwnerDialog from '../components/InviteOwnerDialog.jsx';
@@ -140,6 +141,8 @@ export default function PropertyDetailPage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [unitMenuAnchor, setUnitMenuAnchor] = useState(null);
   const [deleteUnitDialogOpen, setDeleteUnitDialogOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const unitDialogOpenRef = useRef(unitDialogOpen);
   const deleteUnitDialogOpenRef = useRef(deleteUnitDialogOpen);
   const [ownerInviteDialogOpen, setOwnerInviteDialogOpen] = useState(false);
@@ -253,6 +256,42 @@ export default function PropertyDetailPage() {
     : null;
 
   const amenities = property?.amenities ?? {};
+
+  // Lightbox handlers
+  const handleOpenLightbox = (index) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const handleCloseLightbox = () => {
+    setLightboxOpen(false);
+  };
+
+  const handleLightboxPrev = () => {
+    setLightboxIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
+  };
+
+  const handleLightboxNext = () => {
+    setLightboxIndex((prev) => (prev + 1) % carouselImages.length);
+  };
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return undefined;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleCloseLightbox();
+      } else if (e.key === 'ArrowLeft') {
+        handleLightboxPrev();
+      } else if (e.key === 'ArrowRight') {
+        handleLightboxNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, carouselImages.length]);
 
   const parseNumericValue = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -605,117 +644,225 @@ export default function PropertyDetailPage() {
               </Stack>
             </Stack>
 
-            {/* Property Image Gallery */}
+            {/* Property Image Gallery - Modern Split Layout */}
             {carouselImages.length > 0 ? (
               <Box>
-                {/* Main Carousel */}
-                <PropertyImageCarousel
-                  images={carouselImages}
-                  fallbackText={property.name}
-                  height={{ xs: 220, sm: 320, md: 420 }}
-                  borderRadius={3}
-                  showDots={hasMultipleCarouselImages}
-                  showArrows={hasMultipleCarouselImages}
-                  showCounter={hasMultipleCarouselImages}
-                  showFullscreenButton
-                  showCaption={true}
-                />
+                {/* Desktop: Split layout (large left + 2x2 grid right) */}
+                {/* Mobile: Stacked layout */}
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+                    gap: 1,
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Main Large Image */}
+                  <Paper
+                    sx={{
+                      position: 'relative',
+                      paddingTop: { xs: '56.25%', md: '66.67%' }, // 16:9 mobile, 3:2 desktop
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      borderRadius: { xs: 3, md: 0 },
+                      transition: 'transform 0.3s ease',
+                      '&:hover': {
+                        transform: 'scale(1.01)',
+                        '& img': {
+                          filter: 'brightness(1.05)',
+                        },
+                      },
+                    }}
+                    onClick={() => handleOpenLightbox(0)}
+                    elevation={0}
+                  >
+                    <Box
+                      component="img"
+                      src={typeof carouselImages[0] === 'string' ? carouselImages[0] : carouselImages[0].imageUrl}
+                      alt={typeof carouselImages[0] === 'object' && carouselImages[0].caption ? carouselImages[0].caption : 'Property main image'}
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        transition: 'filter 0.3s ease',
+                      }}
+                    />
+                    <Chip
+                      label="Primary"
+                      size="small"
+                      color="primary"
+                      sx={{
+                        position: 'absolute',
+                        top: 12,
+                        left: 12,
+                        zIndex: 2,
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                      }}
+                    />
+                  </Paper>
 
-                {/* Gallery Grid (if multiple images) */}
-                {hasMultipleCarouselImages && (
-                  <Grid container spacing={1} sx={{ mt: 2 }}>
-                    {propertyImages.slice(0, 6).map((image, index) => {
-                      const imageUrl = typeof image === 'string' ? image : image.imageUrl;
-                      const caption = typeof image === 'object' ? image.caption : null;
+                  {/* 2x2 Grid of Thumbnails (desktop only) */}
+                  {carouselImages.length > 1 && (
+                    <Box
+                      sx={{
+                        display: { xs: 'none', md: 'grid' },
+                        gridTemplateColumns: '1fr 1fr',
+                        gridTemplateRows: '1fr 1fr',
+                        gap: 1,
+                      }}
+                    >
+                      {carouselImages.slice(1, 5).map((image, idx) => {
+                        const imageUrl = typeof image === 'string' ? image : image.imageUrl;
+                        const caption = typeof image === 'object' ? image.caption : null;
+                        const actualIndex = idx + 1;
 
-                      return (
-                        <Grid item xs={4} sm={3} md={2} key={image.id || index}>
+                        return (
                           <Paper
+                            key={image.id || actualIndex}
                             sx={{
                               position: 'relative',
-                              paddingTop: '75%', // 4:3 aspect ratio
                               overflow: 'hidden',
                               cursor: 'pointer',
-                              borderRadius: 2,
+                              borderRadius: 0,
+                              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                               '&:hover': {
-                                boxShadow: 3,
-                                '& .overlay': {
-                                  opacity: 1,
+                                transform: 'scale(1.05)',
+                                boxShadow: 4,
+                                zIndex: 1,
+                                '& img': {
+                                  filter: 'brightness(1.1)',
                                 },
                               },
                             }}
-                            onClick={() => {
-                              // This will be handled by the carousel's fullscreen button
-                              // For now, users can click the fullscreen button on the main carousel
-                            }}
+                            onClick={() => handleOpenLightbox(actualIndex)}
+                            elevation={0}
                           >
                             <Box
                               component="img"
-                              src={typeof image === 'string' ? image : image.imageUrl}
-                              alt={caption || `Property image ${index + 1}`}
+                              src={imageUrl}
+                              alt={caption || `Property image ${actualIndex + 1}`}
                               sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
                                 width: '100%',
                                 height: '100%',
                                 objectFit: 'cover',
+                                transition: 'filter 0.2s ease',
                               }}
                             />
-                            {index === 0 && (
-                              <Chip
-                                label="Primary"
-                                size="small"
-                                color="primary"
-                                sx={{
-                                  position: 'absolute',
-                                  top: 4,
-                                  left: 4,
-                                  zIndex: 2,
-                                  fontSize: '0.65rem',
-                                }}
-                              />
-                            )}
                           </Paper>
-                        </Grid>
-                      );
-                    })}
-                    {propertyImages.length > 6 && (
-                      <Grid item xs={4} sm={3} md={2}>
+                        );
+                      })}
+
+                      {/* "+N more" tile - shown in last position if there are more than 5 images */}
+                      {carouselImages.length > 5 && (
                         <Paper
                           sx={{
                             position: 'relative',
-                            paddingTop: '75%',
                             overflow: 'hidden',
                             cursor: 'pointer',
-                            borderRadius: 2,
-                            bgcolor: 'rgba(0,0,0,0.7)',
+                            borderRadius: 0,
+                            bgcolor: 'rgba(0,0,0,0.75)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            transition: 'background-color 0.2s ease',
                             '&:hover': {
-                              bgcolor: 'rgba(0,0,0,0.8)',
+                              bgcolor: 'rgba(0,0,0,0.85)',
                             },
+                            // If we have exactly 5 images, show the 5th image with overlay
+                            ...(carouselImages.length > 5 && carouselImages[4] && {
+                              backgroundImage: `url(${typeof carouselImages[4] === 'string' ? carouselImages[4] : carouselImages[4].imageUrl})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backgroundColor: 'rgba(0,0,0,0.6)',
+                                zIndex: 1,
+                              },
+                            }),
                           }}
-                          onClick={() => setCurrentTab(3)} // Navigate to Images tab
+                          onClick={() => handleOpenLightbox(4)}
+                          elevation={0}
                         >
                           <Typography
-                            variant="h6"
+                            variant="h5"
                             sx={{
-                              position: 'absolute',
-                              top: '50%',
-                              left: '50%',
-                              transform: 'translate(-50%, -50%)',
                               color: 'white',
-                              fontWeight: 600,
+                              fontWeight: 700,
+                              zIndex: 2,
+                              position: 'relative',
                             }}
                           >
-                            +{propertyImages.length - 6}
+                            +{carouselImages.length - 4}
                           </Typography>
                         </Paper>
-                      </Grid>
-                    )}
-                  </Grid>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Mobile: Horizontal scroll gallery for additional images */}
+                {carouselImages.length > 1 && (
+                  <Box
+                    sx={{
+                      display: { xs: 'flex', md: 'none' },
+                      gap: 1,
+                      overflowX: 'auto',
+                      mt: 1,
+                      pb: 1,
+                      '&::-webkit-scrollbar': {
+                        height: 6,
+                      },
+                      '&::-webkit-scrollbar-thumb': {
+                        backgroundColor: 'rgba(0,0,0,0.2)',
+                        borderRadius: 3,
+                      },
+                    }}
+                  >
+                    {carouselImages.slice(1).map((image, idx) => {
+                      const imageUrl = typeof image === 'string' ? image : image.imageUrl;
+                      const caption = typeof image === 'object' ? image.caption : null;
+                      const actualIndex = idx + 1;
+
+                      return (
+                        <Paper
+                          key={image.id || actualIndex}
+                          sx={{
+                            position: 'relative',
+                            minWidth: 100,
+                            height: 80,
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            borderRadius: 2,
+                            '&:hover': {
+                              boxShadow: 3,
+                            },
+                          }}
+                          onClick={() => handleOpenLightbox(actualIndex)}
+                        >
+                          <Box
+                            component="img"
+                            src={imageUrl}
+                            alt={caption || `Property image ${actualIndex + 1}`}
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        </Paper>
+                      );
+                    })}
+                  </Box>
                 )}
               </Box>
             ) : (
@@ -801,7 +948,6 @@ export default function PropertyDetailPage() {
                 <Tab label="Overview" />
                 <Tab label={`Units (${units.length})`} />
                 <Tab label="Owners" />
-                <Tab label="Images" />
                 <Tab label="Documents" />
                 <Tab label="Notes" />
                 <Tab label="Activity" />
@@ -1463,23 +1609,8 @@ export default function PropertyDetailPage() {
               </Paper>
             )}
 
-            {/* Images Tab */}
-            {currentTab === 3 && (
-              <Paper sx={{ p: { xs: 2, md: 3 } }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                  Property Images
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
-                <PropertyImageManager
-                  propertyId={id}
-                  canEdit={canEdit}
-                  onImagesUpdated={propertyQuery.refetch}
-                />
-              </Paper>
-            )}
-
             {/* Documents Tab */}
-            {currentTab === 4 && (
+            {currentTab === 3 && (
               <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Property Documents
@@ -1490,7 +1621,7 @@ export default function PropertyDetailPage() {
             )}
 
             {/* Notes Tab */}
-            {currentTab === 5 && (
+            {currentTab === 4 && (
               <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Property Notes
@@ -1501,7 +1632,7 @@ export default function PropertyDetailPage() {
             )}
 
             {/* Activity Tab */}
-            {currentTab === 6 && (
+            {currentTab === 5 && (
               <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                   Recent Activity
@@ -1667,6 +1798,166 @@ export default function PropertyDetailPage() {
           }
         }}
       />
+
+      {/* Image Lightbox Dialog */}
+      <Dialog
+        open={lightboxOpen}
+        onClose={handleCloseLightbox}
+        maxWidth={false}
+        PaperProps={{
+          sx: {
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+            boxShadow: 'none',
+            margin: 0,
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            borderRadius: 0,
+          },
+        }}
+        sx={{
+          '& .MuiBackdrop-root': {
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+          },
+        }}
+      >
+        <DialogContent
+          sx={{
+            position: 'relative',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Close Button */}
+          <IconButton
+            onClick={handleCloseLightbox}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              color: 'white',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              zIndex: 3,
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)',
+              },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+
+          {/* Previous Arrow */}
+          {carouselImages.length > 1 && (
+            <IconButton
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLightboxPrev();
+              }}
+              sx={{
+                position: 'absolute',
+                left: 16,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'white',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                zIndex: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                },
+              }}
+            >
+              <ArrowBackIos sx={{ ml: 0.5 }} />
+            </IconButton>
+          )}
+
+          {/* Next Arrow */}
+          {carouselImages.length > 1 && (
+            <IconButton
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLightboxNext();
+              }}
+              sx={{
+                position: 'absolute',
+                right: 16,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'white',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                zIndex: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                },
+              }}
+            >
+              <ArrowForwardIos />
+            </IconButton>
+          )}
+
+          {/* Image */}
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: { xs: 2, md: 4 },
+            }}
+          >
+            <Box
+              component="img"
+              src={typeof carouselImages[lightboxIndex] === 'string' ? carouselImages[lightboxIndex] : carouselImages[lightboxIndex]?.imageUrl}
+              alt={typeof carouselImages[lightboxIndex] === 'object' && carouselImages[lightboxIndex]?.caption ? carouselImages[lightboxIndex].caption : `Property image ${lightboxIndex + 1}`}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                transition: 'opacity 0.3s ease',
+              }}
+            />
+          </Box>
+
+          {/* Image Counter and Caption */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+              padding: 3,
+              zIndex: 2,
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'white',
+                textAlign: 'center',
+                fontWeight: 500,
+              }}
+            >
+              {lightboxIndex + 1} / {carouselImages.length}
+            </Typography>
+            {typeof carouselImages[lightboxIndex] === 'object' && carouselImages[lightboxIndex]?.caption && (
+              <Typography
+                variant="body1"
+                sx={{
+                  color: 'white',
+                  textAlign: 'center',
+                  mt: 1,
+                }}
+              >
+                {carouselImages[lightboxIndex].caption}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
