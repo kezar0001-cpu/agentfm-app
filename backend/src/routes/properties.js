@@ -604,6 +604,10 @@ const applyLegacyAliases = (input = {}) => {
   if (!data.propertyType && data.type) {
     data.propertyType = data.type;
   }
+  if (Array.isArray(data.imageMetadata)) {
+    data.images = data.imageMetadata;
+    delete data.imageMetadata;
+  }
   if (!data.imageUrl && (data.coverImage || data.images?.length)) {
     const candidates = [data.coverImage, ...(Array.isArray(data.images) ? data.images : [])];
     const firstUrl = candidates
