@@ -884,6 +884,8 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     // Property managers can only create properties for themselves
     const managerId = req.user.id;
 
+    const rawImages = legacyImages;
+
     const initialImages = normaliseSubmittedPropertyImages(rawImages);
 
     const primaryImageCandidate = initialImages.find((image) => image.isPrimary) || initialImages[0] || null;
@@ -913,7 +915,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
             isPrimary: image.isPrimary,
             displayOrder: index,
             uploadedById: req.user.id,
-          });
+          }));
 
           if (records.length) {
             await tx.propertyImage.createMany({ data: records });
@@ -1015,6 +1017,8 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     // Property manager can only update their own properties (already checked by ensurePropertyAccess)
     const managerId = property.managerId;
+
+    const rawImages = legacyImages;
 
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
