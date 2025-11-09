@@ -197,12 +197,47 @@ export default function PropertiesPage() {
   });
 
   // Delete mutation
+  // Bug Fix: Add optimistic updates for better UX - property disappears immediately
   const deleteMutation = useMutation({
     mutationFn: async (propertyId) => {
       const response = await apiClient.delete(`/properties/${propertyId}`);
       return response.data;
     },
+    // Bug Fix: Optimistically remove property from cache before server responds
+    onMutate: async (propertyId) => {
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: queryKeys.properties.all() });
+
+      // Snapshot the previous value for rollback on error
+      const previousData = queryClient.getQueriesData({ queryKey: queryKeys.properties.all() });
+
+      // Optimistically update the cache by removing the property
+      queryClient.setQueriesData({ queryKey: queryKeys.properties.all() }, (old) => {
+        if (!old?.pages) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map(page => ({
+            ...page,
+            items: page.items?.filter(property => property.id !== propertyId) || [],
+            total: Math.max(0, (page.total || 0) - 1),
+          })),
+        };
+      });
+
+      return { previousData };
+    },
+    // Bug Fix: Rollback optimistic update on error
+    onError: (_err, _propertyId, context) => {
+      // Restore previous data if mutation fails
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
     onSuccess: () => {
+      // Still invalidate to ensure we have fresh data from server
       queryClient.invalidateQueries({ queryKey: queryKeys.properties.all() });
     },
   });

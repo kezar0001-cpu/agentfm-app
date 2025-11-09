@@ -119,7 +119,7 @@ const AMENITY_LABELS = {
   ],
   accessibility: [
     { key: 'wheelchairAccessible', label: 'Wheelchair Accessible' },
-    { key: 'elevator', label: 'Elevator Access' },
+    { key: 'accessibleElevator', label: 'Accessible Elevator' },
     { key: 'ramps', label: 'Ramps' },
     { key: 'wideHallways', label: 'Wide Hallways' },
     { key: 'accessibleBathroom', label: 'Accessible Bathroom' },
