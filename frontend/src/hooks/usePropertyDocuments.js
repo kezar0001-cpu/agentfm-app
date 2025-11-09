@@ -1,6 +1,7 @@
 // frontend/src/hooks/usePropertyDocuments.js
 import useApiQuery from './useApiQuery.js';
 import useApiMutation from './useApiMutation.js';
+import { queryKeys } from '../utils/queryKeys.js';
 
 /**
  * Hook to fetch property documents
@@ -31,6 +32,8 @@ export function usePropertyDocument(propertyId, documentId, enabled = true) {
 
 /**
  * Hook to add a property document
+ * Bug Fix: Added invalidateKeys to automatically refresh data after mutation
+ * This prevents stale cache data and eliminates need for manual refetch()
  * @param {string} propertyId - Property ID
  * @param {function} onSuccess - Success callback
  */
@@ -38,12 +41,17 @@ export function useAddPropertyDocument(propertyId, onSuccess) {
   return useApiMutation({
     url: `/properties/${propertyId}/documents`,
     method: 'post',
+    invalidateKeys: [
+      ['propertyDocuments', propertyId],
+      queryKeys.properties.detail(propertyId),
+    ],
     onSuccess,
   });
 }
 
 /**
  * Hook to delete a property document
+ * Bug Fix: Added invalidateKeys to automatically refresh data after mutation
  * @param {string} propertyId - Property ID
  * @param {function} onSuccess - Success callback
  */
@@ -51,6 +59,10 @@ export function useDeletePropertyDocument(propertyId, onSuccess) {
   return useApiMutation({
     url: `/properties/${propertyId}/documents`,
     method: 'delete',
+    invalidateKeys: [
+      ['propertyDocuments', propertyId],
+      queryKeys.properties.detail(propertyId),
+    ],
     onSuccess,
   });
 }
