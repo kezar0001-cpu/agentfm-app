@@ -60,6 +60,22 @@ import { normaliseArray } from '../utils/error';
 import { formatPropertyAddressLine } from '../utils/formatPropertyLocation';
 import { queryKeys } from '../utils/queryKeys.js';
 
+// Helper function to get status color - defined outside component to avoid recreation on every render
+const getStatusColor = (status) => {
+  const colors = {
+    ACTIVE: 'success',
+    INACTIVE: 'default',
+    UNDER_MAINTENANCE: 'warning',
+  };
+  return colors[status] || 'default';
+};
+
+// Helper function to format status text - replaces all underscores with spaces
+const formatStatusText = (status) => {
+  if (!status) return '';
+  return status.replaceAll('_', ' ');
+};
+
 export default function PropertiesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -89,6 +105,7 @@ export default function PropertiesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [paginationError, setPaginationError] = useState(null);
 
   // Debounce search term to avoid excessive API calls
   useEffect(() => {
@@ -134,6 +151,7 @@ export default function PropertiesPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch,
   } = useInfiniteQuery({
     queryKey: queryKeys.properties.list({ search: debouncedSearchTerm, status: filterStatus }),
     queryFn: async ({ pageParam = 0 }) => {
@@ -209,6 +227,7 @@ export default function PropertiesPage() {
       const hasMultipleImages = processedImages.length > 1;
       const totalUnits = getTotalUnits(property);
       const statusColor = getStatusColor(property.status || '');
+      const formattedStatus = formatStatusText(property.status || '');
       const formattedAddress = formatPropertyAddressLine(property);
 
       return {
@@ -218,6 +237,7 @@ export default function PropertiesPage() {
         hasMultipleImages,
         totalUnits,
         statusColor,
+        formattedStatus,
         formattedAddress,
       };
     });
@@ -285,13 +305,13 @@ export default function PropertiesPage() {
     setEditMode(false);
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      ACTIVE: 'success',
-      INACTIVE: 'default',
-      UNDER_MAINTENANCE: 'warning',
-    };
-    return colors[status] || 'default';
+  const handleLoadMore = async () => {
+    try {
+      setPaginationError(null);
+      await fetchNextPage();
+    } catch (err) {
+      setPaginationError(err.message || 'Failed to load more properties');
+    }
   };
 
   return (
@@ -439,10 +459,15 @@ export default function PropertiesPage() {
           </Grid>
         </Paper>
 
-        {/* Error Alert */}
+        {/* Error Alerts */}
         {deleteMutation.isError && (
           <Alert severity="error" onClose={() => deleteMutation.reset()}>
             {deleteMutation.error?.message || 'Failed to delete property'}
+          </Alert>
+        )}
+        {paginationError && (
+          <Alert severity="error" onClose={() => setPaginationError(null)}>
+            {paginationError}
           </Alert>
         )}
 
@@ -549,7 +574,7 @@ export default function PropertiesPage() {
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                             <Chip
                               size="small"
-                              label={property.status?.replace('_', ' ') || ''}
+                              label={property.formattedStatus}
                               color={property.statusColor}
                             />
                             <Chip
@@ -698,7 +723,7 @@ export default function PropertiesPage() {
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                           <Chip
                             size="small"
-                            label={property.status?.replace('_', ' ') || ''}
+                            label={property.formattedStatus}
                             color={property.statusColor}
                           />
                           <Chip
@@ -808,7 +833,7 @@ export default function PropertiesPage() {
                             <TableCell>
                               <Chip
                                 size="small"
-                                label={property.status?.replace('_', ' ') || 'Unknown'}
+                                label={property.formattedStatus || 'Unknown'}
                                 color={property.statusColor}
                                 sx={{ textTransform: 'capitalize' }}
                               />
@@ -835,7 +860,7 @@ export default function PropertiesPage() {
                   <Button
                     variant="outlined"
                     size="large"
-                    onClick={() => fetchNextPage()}
+                    onClick={handleLoadMore}
                     disabled={isFetchingNextPage}
                     startIcon={isFetchingNextPage ? <CircularProgress size={20} /> : null}
                   >
@@ -894,7 +919,7 @@ export default function PropertiesPage() {
             Are you sure you want to delete <strong>{selectedProperty?.name}</strong>?
             This action cannot be undone.
           </Typography>
-          {selectedProperty?.totalUnits > 0 && (
+          {selectedProperty && Number(selectedProperty.totalUnits) > 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               This property has {selectedProperty.totalUnits} unit(s). Make sure to remove all units and tenants before deleting.
             </Alert>
