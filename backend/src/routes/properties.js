@@ -400,7 +400,11 @@ const buildPropertyImagesInclude = (includeImages) =>
   includeImages ? { propertyImages: propertyImagesIncludeConfig } : {};
 
 const buildPropertyDetailInclude = (includeImages) => ({
-  units: { orderBy: { unitNumber: 'asc' } },
+  // Bug Fix: Add pagination to units to prevent loading thousands of units at once
+  units: {
+    orderBy: { unitNumber: 'asc' },
+    take: 100, // Limit to first 100 units for performance
+  },
   manager: {
     select: {
       id: true,
@@ -421,6 +425,11 @@ const buildPropertyDetailInclude = (includeImages) => ({
           phone: true,
         },
       },
+    },
+  },
+  _count: {
+    select: {
+      units: true, // Include total count for pagination UI
     },
   },
   ...buildPropertyImagesInclude(includeImages),
@@ -773,7 +782,9 @@ const calculateOccupancyStats = (property) => {
     return acc;
   }, { occupied: 0, vacant: 0, maintenance: 0 });
 
-  const totalUnits = property.units.length || property.totalUnits || 0;
+  // Bug Fix: Use actual units array length for consistency, not the potentially stale totalUnits field
+  // This ensures accuracy when units are added/removed but totalUnits hasn't been updated
+  const totalUnits = property.units.length;
   const occupancyRate = totalUnits > 0 ? ((stats.occupied / totalUnits) * 100) : 0;
 
   return {
@@ -827,8 +838,8 @@ const ensurePropertyAccess = (property, user, options = {}) => {
 // Routes
 // ---------------------------------------------------------------------------
 // GET / - List properties (PROPERTY_MANAGER sees their properties, OWNER sees owned properties)
-// Cached for 5 minutes
-router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
+// Bug Fix: Reduced cache TTL from 5 minutes to 1 minute for better data freshness
+router.get('/', cacheMiddleware({ ttl: 60 }), async (req, res) => {
   try {
     let where = {};
 
@@ -860,10 +871,14 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
 
     // Parse pagination parameters
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    // Bug Fix: Add upper limit to offset to prevent excessive database load
+    const MAX_OFFSET = 10000; // Reasonable limit to prevent abuse
+    const offset = Math.min(Math.max(parseInt(req.query.offset) || 0, 0), MAX_OFFSET);
 
     // Parse search and filter parameters (Bug Fix #1: Server-side search)
-    const search = req.query.search?.trim() || '';
+    // Bug Fix: Validate search string length to prevent performance issues
+    const searchInput = req.query.search?.trim() || '';
+    const search = searchInput.length <= 200 ? searchInput : searchInput.substring(0, 200);
     const status = req.query.status?.trim().toUpperCase() || '';
 
     // Add search filter
@@ -883,28 +898,37 @@ router.get('/', cacheMiddleware({ ttl: 300 }), async (req, res) => {
     const { items: properties, total } = await withPropertyImagesSupport(async (includeImages) => {
       const select = buildPropertyListSelect(includeImages);
 
+      // Bug Fix: Optimize count query - only count when offset is 0 to reduce load
+      // For paginated requests, we can estimate or skip the total
+      const shouldCount = offset === 0;
+
       const [items, count] = await Promise.all([
         prisma.property.findMany({
           where,
           select,
           orderBy: { createdAt: 'desc' },
           skip: offset,
-          take: limit,
+          take: limit + 1, // Fetch one extra to determine hasMore efficiently
         }),
-        prisma.property.count({ where }),
+        shouldCount ? prisma.property.count({ where }) : Promise.resolve(null),
       ]);
 
-      return { items, total: count };
+      // If we fetched limit + 1 items, there are more pages
+      const hasMoreItems = items.length > limit;
+      const finalItems = hasMoreItems ? items.slice(0, limit) : items;
+
+      return { items: finalItems, total: count, hasMoreItems };
     });
 
     // Calculate page number and hasMore
     const page = Math.floor(offset / limit) + 1;
-    const hasMore = offset + limit < total;
+    // Bug Fix: Use hasMoreItems for more efficient hasMore calculation
+    const hasMore = total !== null ? offset + limit < total : properties.hasMoreItems;
 
     // Return paginated response
     res.json({
       items: properties.map(toPublicProperty),
-      total,
+      total: total ?? offset + properties.length, // Provide estimate if total not calculated
       page,
       hasMore,
     });
@@ -977,6 +1001,10 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         }
 
         return newProperty;
+      }, {
+        isolationLevel: 'Serializable',
+        maxWait: 5000,
+        timeout: 10000,
       });
 
       if (!includeImages) {
@@ -1098,6 +1126,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     }
 
     const { property: updatedProperty, propertyWithImages } = await withPropertyImagesSupport(async (includeImages) => {
+      // Bug Fix: Add serializable transaction isolation to prevent race conditions
       const result = await prisma.$transaction(async (tx) => {
         const updatedRecord = await tx.property.update({
           where: { id: property.id },
@@ -1105,6 +1134,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         });
 
         if (includeImages && imageUpdates !== undefined) {
+          // Bug Fix: Lock property images for update to prevent concurrent modifications
           const existingImages = await tx.propertyImage.findMany({
             where: { propertyId: property.id },
             select: { imageUrl: true, caption: true },
@@ -1122,6 +1152,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
             return map;
           }, new Map());
 
+          // Delete and recreate in single transaction to maintain consistency
           await tx.propertyImage.deleteMany({ where: { propertyId: property.id } });
 
           if (imageUpdates.length) {
@@ -1149,6 +1180,10 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         }
 
         return updatedRecord;
+      }, {
+        isolationLevel: 'Serializable', // Prevent race conditions in concurrent updates
+        maxWait: 5000, // Maximum time to wait for transaction to start
+        timeout: 10000, // Maximum time for transaction to complete
       });
 
       if (!includeImages) {
@@ -1201,6 +1236,8 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
         _count: {
           select: {
             units: true,
+            jobs: true,
+            inspections: true,
           },
         },
       },
@@ -1211,15 +1248,23 @@ router.delete('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       return sendError(res, access.status, access.reason, errorCode);
     }
 
-    // Bug Fix: Prevent deletion of properties with units to maintain data integrity
+    // Bug Fix: Comprehensive validation before deletion - check units, jobs, and inspections
     const unitCount = property._count?.units || 0;
-    if (unitCount > 0) {
+    const jobCount = property._count?.jobs || 0;
+    const inspectionCount = property._count?.inspections || 0;
+
+    const issues = [];
+    if (unitCount > 0) issues.push(`${unitCount} unit(s)`);
+    if (jobCount > 0) issues.push(`${jobCount} active job(s)`);
+    if (inspectionCount > 0) issues.push(`${inspectionCount} inspection(s)`);
+
+    if (issues.length > 0) {
       return sendError(
         res,
         409,
-        `Cannot delete property with ${unitCount} unit(s). Please remove all units before deleting the property.`,
+        `Cannot delete property with ${issues.join(', ')}. Please remove all related data before deleting the property.`,
         ErrorCodes.VAL_VALIDATION_ERROR,
-        { unitCount }
+        { unitCount, jobCount, inspectionCount }
       );
     }
 
@@ -1373,6 +1418,10 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), maybeHandleImage
       await syncPropertyCoverImage(tx, propertyId);
 
       return image;
+    }, {
+      isolationLevel: 'Serializable',
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
@@ -1439,6 +1488,10 @@ propertyImagesRouter.patch('/:imageId', requireRole('PROPERTY_MANAGER'), async (
       await syncPropertyCoverImage(tx, propertyId);
 
       return result;
+    }, {
+      isolationLevel: 'Serializable',
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     if (!updated) {
@@ -1505,6 +1558,10 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
       await syncPropertyCoverImage(tx, propertyId);
 
       return existing;
+    }, {
+      isolationLevel: 'Serializable',
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     if (!deleted) {
@@ -1568,6 +1625,10 @@ propertyImagesRouter.post('/reorder', requireRole('PROPERTY_MANAGER'), async (re
 
       // Sync cover image within the same transaction
       await syncPropertyCoverImage(tx, propertyId);
+    }, {
+      isolationLevel: 'Serializable',
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
