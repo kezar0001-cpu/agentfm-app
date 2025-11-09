@@ -90,6 +90,8 @@ export default function PropertiesPage() {
   const filterStatus = searchParams.get('status') || 'all';
 
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  // Bug Fix: Track local search input to avoid URL pollution on every keystroke
+  const [localSearchInput, setLocalSearchInput] = useState(searchTerm);
 
   // Bug Fix #3: Persist view mode preference in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -108,14 +110,24 @@ export default function PropertiesPage() {
   const [editMode, setEditMode] = useState(false);
   const [paginationError, setPaginationError] = useState(null);
 
-  // Debounce search term to avoid excessive API calls
+  // Sync local search input with URL search param (for back/forward navigation)
+  useEffect(() => {
+    setLocalSearchInput(searchTerm);
+  }, [searchTerm]);
+
+  // Bug Fix: Debounce both search term AND URL updates to prevent URL pollution
+  // This prevents creating excessive browser history entries on every keystroke
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
+      setDebouncedSearchTerm(localSearchInput);
+      // Only update URL if value has actually changed
+      if (localSearchInput !== searchTerm) {
+        updateSearchParam('search', localSearchInput);
+      }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [localSearchInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bug Fix: Clear pagination errors when search or filter changes
   // This prevents stale error messages from persisting after user changes query
@@ -265,6 +277,13 @@ export default function PropertiesPage() {
   // Bug Fix: Use ref to maintain stable property object references across renders
   // This prevents unnecessary re-renders when new pages load - only new properties are created
   const propertyCacheRef = useRef(new Map());
+
+  // Bug Fix: Clear property cache on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      propertyCacheRef.current.clear();
+    };
+  }, []);
 
   // Flatten all pages into a single array and memoize to prevent unnecessary re-renders
   // Note: Filtering now happens server-side via API parameters (Bug Fix #1)
@@ -485,8 +504,8 @@ export default function PropertiesPage() {
                 id="properties-search-term"
                 name="searchTerm"
                 placeholder="Search properties by name, address, or city..."
-                value={searchTerm}
-                onChange={(e) => updateSearchParam('search', e.target.value)}
+                value={localSearchInput}
+                onChange={(e) => setLocalSearchInput(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -494,11 +513,11 @@ export default function PropertiesPage() {
                     </InputAdornment>
                   ),
                   // Bug Fix: Add clear button for better UX
-                  endAdornment: searchTerm && (
+                  endAdornment: localSearchInput && (
                     <InputAdornment position="end">
                       <IconButton
                         aria-label="clear search"
-                        onClick={() => updateSearchParam('search', '')}
+                        onClick={() => setLocalSearchInput('')}
                         edge="end"
                         size="small"
                       >
@@ -859,22 +878,26 @@ export default function PropertiesPage() {
                       </Box>
 
                       {/* Occupancy Widget (List View Only) */}
-                      <Box
-                        sx={{
-                          display: { xs: 'none', lg: 'flex' },
-                          alignItems: 'center',
-                          p: 2,
-                          borderLeft: '1px solid',
-                          borderColor: 'divider',
-                          minWidth: 200,
-                        }}
-                      >
-                        <PropertyOccupancyWidget
-                          occupancyStats={property.occupancyStats}
-                          totalUnits={property.totalUnits}
-                          compact={true}
-                        />
-                      </Box>
+                      {/* Bug Fix: Only show occupancy widget if occupancyStats is available */}
+                      {/* occupancyStats is only calculated in detail view, not list view */}
+                      {property.occupancyStats && (
+                        <Box
+                          sx={{
+                            display: { xs: 'none', lg: 'flex' },
+                            alignItems: 'center',
+                            p: 2,
+                            borderLeft: '1px solid',
+                            borderColor: 'divider',
+                            minWidth: 200,
+                          }}
+                        >
+                          <PropertyOccupancyWidget
+                            occupancyStats={property.occupancyStats}
+                            totalUnits={property.totalUnits}
+                            compact={true}
+                          />
+                        </Box>
+                      )}
                     </Card>
                   ))}
                 </Stack>
