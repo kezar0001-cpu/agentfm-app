@@ -1396,6 +1396,53 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
   }
 });
 
+// DIAGNOSTIC ENDPOINT - Must come BEFORE /:id route
+// GET /:id/debug-images - Debug endpoint to see raw image data
+router.get('/:id/debug-images', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: {
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ]
+        }
+      }
+    });
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    const publicProp = toPublicProperty(property);
+
+    const diagnosticInfo = {
+      propertyId: property.id,
+      propertyName: property.name,
+      database: {
+        imageUrl: property.imageUrl,
+        propertyImagesCount: property.propertyImages?.length || 0,
+        propertyImages: property.propertyImages || [],
+      },
+      normalized: {
+        imagesCount: normalizePropertyImages(property).length,
+        images: normalizePropertyImages(property),
+      },
+      publicResponse: {
+        imageUrl: publicProp.imageUrl,
+        imagesCount: publicProp.images?.length || 0,
+        images: publicProp.images || [],
+      },
+    };
+
+    res.json(diagnosticInfo);
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // GET /:id - Get property by ID (with access check)
 // Bug Fix: Add caching to reduce database load on frequently accessed property details
 router.get('/:id', cacheMiddleware({ ttl: 60 }), async (req, res) => {
@@ -2278,53 +2325,6 @@ router.get('/:id/activity', async (req, res) => {
   } catch (error) {
     console.error('Get property activity error:', error);
     return sendError(res, 500, 'Failed to fetch property activity', ErrorCodes.ERR_INTERNAL_SERVER);
-  }
-});
-
-// DIAGNOSTIC ENDPOINT - Remove after debugging
-// GET /:id/debug-images - Debug endpoint to see raw image data
-router.get('/:id/debug-images', async (req, res) => {
-  try {
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-      include: {
-        propertyImages: {
-          orderBy: [
-            { displayOrder: 'asc' },
-            { createdAt: 'asc' },
-          ]
-        }
-      }
-    });
-
-    if (!property) {
-      return res.status(404).json({ error: 'Property not found' });
-    }
-
-    const publicProp = toPublicProperty(property);
-
-    const diagnosticInfo = {
-      propertyId: property.id,
-      propertyName: property.name,
-      database: {
-        imageUrl: property.imageUrl,
-        propertyImagesCount: property.propertyImages?.length || 0,
-        propertyImages: property.propertyImages || [],
-      },
-      normalized: {
-        imagesCount: normalizePropertyImages(property).length,
-        images: normalizePropertyImages(property),
-      },
-      publicResponse: {
-        imageUrl: publicProp.imageUrl,
-        imagesCount: publicProp.images?.length || 0,
-        images: publicProp.images || [],
-      },
-    };
-
-    res.json(diagnosticInfo);
-  } catch (error) {
-    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
