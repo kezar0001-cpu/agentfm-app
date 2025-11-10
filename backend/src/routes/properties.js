@@ -180,6 +180,53 @@ const propertyListSelect = {
 // All property routes require authentication
 router.use(requireAuth);
 
+// DIAGNOSTIC ENDPOINT - Must come BEFORE any /:id routes to avoid conflicts
+// GET /image-diagnostic/:id - Debug endpoint to see raw image data
+router.get('/image-diagnostic/:id', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: {
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ]
+        }
+      }
+    });
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    const publicProp = toPublicProperty(property);
+
+    const diagnosticInfo = {
+      propertyId: property.id,
+      propertyName: property.name,
+      database: {
+        imageUrl: property.imageUrl,
+        propertyImagesCount: property.propertyImages?.length || 0,
+        propertyImages: property.propertyImages || [],
+      },
+      normalized: {
+        imagesCount: normalizePropertyImages(property).length,
+        images: normalizePropertyImages(property),
+      },
+      publicResponse: {
+        imageUrl: publicProp.imageUrl,
+        imagesCount: publicProp.images?.length || 0,
+        images: publicProp.images || [],
+      },
+    };
+
+    res.json(diagnosticInfo);
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // Nested units routes
 router.use('/:propertyId/units', unitsRouter);
 
@@ -1393,53 +1440,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       meta: error?.meta,
     });
     return sendError(res, 500, 'Failed to create property', ErrorCodes.ERR_INTERNAL_SERVER);
-  }
-});
-
-// DIAGNOSTIC ENDPOINT - Separate path to avoid conflict with /:id
-// GET /debug/images/:id - Debug endpoint to see raw image data
-router.get('/debug/images/:id', async (req, res) => {
-  try {
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-      include: {
-        propertyImages: {
-          orderBy: [
-            { displayOrder: 'asc' },
-            { createdAt: 'asc' },
-          ]
-        }
-      }
-    });
-
-    if (!property) {
-      return res.status(404).json({ error: 'Property not found' });
-    }
-
-    const publicProp = toPublicProperty(property);
-
-    const diagnosticInfo = {
-      propertyId: property.id,
-      propertyName: property.name,
-      database: {
-        imageUrl: property.imageUrl,
-        propertyImagesCount: property.propertyImages?.length || 0,
-        propertyImages: property.propertyImages || [],
-      },
-      normalized: {
-        imagesCount: normalizePropertyImages(property).length,
-        images: normalizePropertyImages(property),
-      },
-      publicResponse: {
-        imageUrl: publicProp.imageUrl,
-        imagesCount: publicProp.images?.length || 0,
-        images: publicProp.images || [],
-      },
-    };
-
-    res.json(diagnosticInfo);
-  } catch (error) {
-    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
