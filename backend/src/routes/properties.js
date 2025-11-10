@@ -643,7 +643,28 @@ const basePropertySchema = z.object({
     description: optionalString(),
     imageUrl: optionalImageLocation(),
     managerId: optionalString(),
-    amenities: amenitiesSchema, // Bug Fix: Add validated amenities field
+
+    // Enhanced property details
+    lotSize: optionalFloat(),
+    buildingSize: optionalFloat(),
+    numberOfFloors: optionalInt({ min: 1, minMessage: 'Number of floors must be at least 1' }),
+    constructionType: optionalString(),
+    heatingSystem: optionalString(),
+    coolingSystem: optionalString(),
+    amenities: amenitiesSchema,
+
+    // Financial information
+    purchasePrice: optionalFloat(),
+    purchaseDate: z.union([z.string(), z.date()]).optional().nullable().transform((val) => {
+      if (!val) return null;
+      if (val instanceof Date) return val;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    currentMarketValue: optionalFloat(),
+    annualPropertyTax: optionalFloat(),
+    annualInsurance: optionalFloat(),
+    monthlyHOA: optionalFloat(),
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
@@ -1409,7 +1430,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
-    // Bug Fix: Deep merge amenities to preserve existing data during partial updates
+    // Deep merge amenities to preserve existing data during partial updates
     const mergedAmenities = amenitiesUpdate !== undefined
       ? deepMergeAmenities(property.amenities, amenitiesUpdate)
       : undefined;
