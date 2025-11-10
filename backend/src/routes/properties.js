@@ -1481,14 +1481,20 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     // Debug logging for response
     if (process.env.NODE_ENV !== 'test') {
       console.log('\n[Step 5] Final response:');
+      console.log(`  - Property ID: ${responsePayload?.id}`);
+      console.log(`  - Property Name: ${responsePayload?.name}`);
       console.log(`  - Images in response: ${responsePayload?.images?.length || 0}`);
+      console.log(`  - Cover image URL: ${responsePayload?.imageUrl ? responsePayload.imageUrl.substring(0, 80) + '...' : 'none'}`);
       if (responsePayload?.images && responsePayload.images.length > 0) {
         console.log(`  - Response images:`, responsePayload.images.map((img, i) => ({
           index: i,
           id: img.id,
           url: img.imageUrl.substring(0, 80) + '...',
           isPrimary: img.isPrimary,
+          displayOrder: img.displayOrder,
         })));
+      } else {
+        console.log('  - ⚠️  WARNING: No images in response! This might indicate a problem.');
       }
       console.log('========== End Image Processing Debug ==========\n');
     }
@@ -1532,9 +1538,18 @@ router.get('/:id', cacheMiddleware({ ttl: 60 }), async (req, res) => {
 
     // Enhanced logging for debugging image display issues
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`[PropertyDetail] GET /${req.params.id}:`);
+      console.log(`\n[PropertyDetail] GET /${req.params.id}:`);
+      console.log(`  - Property Name: ${property.name}`);
       console.log(`  - PropertyImage records in DB: ${property.propertyImages?.length || 0}`);
-      console.log(`  - property.imageUrl: ${property.imageUrl ? 'set' : 'not set'}`);
+      console.log(`  - property.imageUrl: ${property.imageUrl || 'not set'}`);
+      if (property.propertyImages && property.propertyImages.length > 0) {
+        console.log(`  - DB image sample:`, property.propertyImages.slice(0, 2).map((img, i) => ({
+          index: i,
+          id: img.id,
+          url: img.imageUrl ? img.imageUrl.substring(0, 80) + '...' : 'no-url',
+          isPrimary: img.isPrimary,
+        })));
+      }
     }
 
     const responsePayload = toPublicProperty(propertyWithStats);
@@ -1543,10 +1558,16 @@ router.get('/:id', cacheMiddleware({ ttl: 60 }), async (req, res) => {
     if (process.env.NODE_ENV !== 'test') {
       console.log(`  - Images in response: ${responsePayload.images?.length || 0}`);
       if (responsePayload.images && responsePayload.images.length > 0) {
-        console.log(`  - Sample image URLs:`, responsePayload.images.slice(0, 3).map(img =>
-          img.imageUrl ? img.imageUrl.substring(0, 60) + '...' : 'no-url'
-        ));
+        console.log(`  - Response image samples:`, responsePayload.images.slice(0, 2).map((img, i) => ({
+          index: i,
+          id: img.id,
+          url: img.imageUrl ? img.imageUrl.substring(0, 80) + '...' : 'no-url',
+          isPrimary: img.isPrimary,
+        })));
+      } else {
+        console.log('  - ⚠️  WARNING: No images in response!');
       }
+      console.log('');
     }
 
     res.json({ success: true, property: responsePayload });
