@@ -378,6 +378,18 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         }
       }
 
+      // Debug logging to verify images are being sent
+      console.log('[PropertyWizard] Creating property with payload:', {
+        name: payload.name,
+        imageUrl: payload.imageUrl,
+        imagesCount: payload.images?.length || 0,
+        images: payload.images?.map((img, i) => ({
+          index: i,
+          url: img.imageUrl?.substring(0, 60) + '...',
+          isPrimary: img.isPrimary,
+        })) || [],
+      });
+
       const response = await createPropertyMutation.mutateAsync({ data: payload });
       const savedProperty = response?.data?.property || response?.data || null;
 
@@ -597,15 +609,6 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         propertyName={basicInfo.name}
         onChange={handleUploadedImagesChange}
         allowAltText
-      />
-
-      <TextField
-        fullWidth
-        id="onboarding-property-image-url"
-        label="Cover image URL (optional)"
-        value={basicInfo.imageUrl}
-        onChange={handleBasicInfoChange('imageUrl')}
-        helperText="Uploaded images appear above. Paste an external URL if you need to link from elsewhere."
       />
     </Stack>
   );
