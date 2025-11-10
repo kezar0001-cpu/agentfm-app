@@ -1418,7 +1418,26 @@ router.get('/:id', cacheMiddleware({ ttl: 60 }), async (req, res) => {
     const occupancyStats = await calculateOccupancyStatsFromDB(property.id);
     const propertyWithStats = occupancyStats ? { ...property, occupancyStats } : property;
 
-    res.json({ success: true, property: toPublicProperty(propertyWithStats) });
+    // Enhanced logging for debugging image display issues
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`[PropertyDetail] GET /${req.params.id}:`);
+      console.log(`  - PropertyImage records in DB: ${property.propertyImages?.length || 0}`);
+      console.log(`  - property.imageUrl: ${property.imageUrl ? 'set' : 'not set'}`);
+    }
+
+    const responsePayload = toPublicProperty(propertyWithStats);
+
+    // Enhanced logging for response
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`  - Images in response: ${responsePayload.images?.length || 0}`);
+      if (responsePayload.images && responsePayload.images.length > 0) {
+        console.log(`  - Sample image URLs:`, responsePayload.images.slice(0, 3).map(img =>
+          img.imageUrl ? img.imageUrl.substring(0, 60) + '...' : 'no-url'
+        ));
+      }
+    }
+
+    res.json({ success: true, property: responsePayload });
   } catch (error) {
     console.error('Get property error:', {
       message: error?.message,
@@ -2259,6 +2278,53 @@ router.get('/:id/activity', async (req, res) => {
   } catch (error) {
     console.error('Get property activity error:', error);
     return sendError(res, 500, 'Failed to fetch property activity', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DIAGNOSTIC ENDPOINT - Remove after debugging
+// GET /:id/debug-images - Debug endpoint to see raw image data
+router.get('/:id/debug-images', async (req, res) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: {
+        propertyImages: {
+          orderBy: [
+            { displayOrder: 'asc' },
+            { createdAt: 'asc' },
+          ]
+        }
+      }
+    });
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    const publicProp = toPublicProperty(property);
+
+    const diagnosticInfo = {
+      propertyId: property.id,
+      propertyName: property.name,
+      database: {
+        imageUrl: property.imageUrl,
+        propertyImagesCount: property.propertyImages?.length || 0,
+        propertyImages: property.propertyImages || [],
+      },
+      normalized: {
+        imagesCount: normalizePropertyImages(property).length,
+        images: normalizePropertyImages(property),
+      },
+      publicResponse: {
+        imageUrl: publicProp.imageUrl,
+        imagesCount: publicProp.images?.length || 0,
+        images: publicProp.images || [],
+      },
+    };
+
+    res.json(diagnosticInfo);
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
