@@ -212,6 +212,11 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   }, [imageUrlValue]);
 
   const handleImagesChange = (nextImages = [], nextCover = '') => {
+    console.log('[PropertyForm] handleImagesChange called:', {
+      imageCount: nextImages.length,
+      nextCover: nextCover ? nextCover.substring(0, 50) + '...' : 'none',
+    });
+
     // Bug Fix #9: Remove duplicate images by URL to prevent database bloat
     const uniqueImages = [];
     const seenUrls = new Set();
@@ -223,18 +228,37 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       }
     }
 
+    console.log('[PropertyForm] After deduplication:', {
+      uniqueCount: uniqueImages.length,
+      removed: nextImages.length - uniqueImages.length,
+    });
+
     setPhotoSelections(uniqueImages);
     const resolvedCover = nextCover || uniqueImages[0]?.url || '';
     setCoverImage(resolvedCover);
     setValue('imageUrl', resolvedCover || '', { shouldDirty: true, shouldValidate: true });
+
+    console.log('[PropertyForm] State updated:', {
+      photoSelections: uniqueImages.length,
+      coverImage: resolvedCover ? resolvedCover.substring(0, 50) + '...' : 'none',
+    });
   };
 
   const onSubmit = async (data) => {
     try {
+      console.log('[PropertyForm] onSubmit - photoSelections:', {
+        count: photoSelections.length,
+        samples: photoSelections.slice(0, 3).map(img => ({
+          url: img.url ? img.url.substring(0, 60) + '...' : 'no-url',
+          altText: img.altText || 'none',
+        })),
+      });
+
       const coverFromForm = typeof data.imageUrl === 'string' ? data.imageUrl.trim() : '';
       const imagePayload = photoSelections
         .map((image, index) => {
           if (!image || !image.url) {
+            console.warn('[PropertyForm] Skipping invalid image at index', index, image);
             return null;
           }
 
@@ -247,6 +271,12 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           };
         })
         .filter(Boolean);
+
+      console.log('[PropertyForm] Submitting with images:', {
+        imagePayloadCount: imagePayload.length,
+        coverFromForm: coverFromForm ? coverFromForm.substring(0, 60) + '...' : 'none',
+        primaryImageIndex: imagePayload.findIndex(img => img.isPrimary),
+      });
 
       await mutation.mutateAsync({
         data: {

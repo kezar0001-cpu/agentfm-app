@@ -29,6 +29,7 @@ const PropertyPhotoUploader = ({
 }) => {
   const fileInputId = useId();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState('');
 
   const safeImages = Array.isArray(images) && images.length > 0 ? images : [];
@@ -141,26 +142,39 @@ const PropertyPhotoUploader = ({
     }
 
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
     setError('');
 
     try {
+      console.log(`[Upload] Starting upload of ${files.length} files...`);
       const uploaded = await uploadPropertyImages(files);
+      setUploadProgress({ current: uploaded.length, total: files.length });
+      console.log(`[Upload] Successfully uploaded ${uploaded.length} files to Cloudinary`);
+      console.log('[Upload] Uploaded URLs:', uploaded.map(u => u.url.substring(0, 100) + '...'));
+
+      // Bug Fix: Use functional update to ensure we have latest state
       updateImages((prev = []) => {
         const existing = Array.isArray(prev) ? prev : [];
-        return [
-          ...existing,
-          ...uploaded.map((item) => ({
-            ...INITIAL_IMAGE,
-            url: item.url,
-            name: item.name,
-          })),
-        ];
+        const newImages = uploaded.map((item) => ({
+          ...INITIAL_IMAGE,
+          url: item.url,
+          name: item.name,
+        }));
+
+        const combined = [...existing, ...newImages];
+        console.log(`[Upload] Total images after upload: ${combined.length} (${existing.length} existing + ${newImages.length} new)`);
+
+        return combined;
       });
     } catch (uploadError) {
+      console.error('[Upload] Upload failed:', uploadError);
       const message = uploadError?.response?.data?.message || uploadError?.message || 'Failed to upload images';
       setError(message);
     } finally {
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress({ current: 0, total: 0 });
+      }, 500); // Brief delay to show completion state
       // Bug Fix: Clear file input and release file references to prevent memory leaks
       if (event?.target) {
         event.target.value = '';
@@ -204,7 +218,9 @@ const PropertyPhotoUploader = ({
           startIcon={<CloudUploadIcon />}
           disabled={disabled || isUploading}
         >
-          {isUploading ? 'Uploading…' : 'Upload photos'}
+          {isUploading
+            ? `Uploading ${uploadProgress.current}/${uploadProgress.total}…`
+            : 'Upload photos'}
           <input
             id={fileInputId}
             type="file"
@@ -216,7 +232,9 @@ const PropertyPhotoUploader = ({
           />
         </Button>
         <Typography variant="body2" color="text.secondary">
-          {description}
+          {isUploading
+            ? `Processing ${uploadProgress.total} file${uploadProgress.total !== 1 ? 's' : ''}...`
+            : description}
         </Typography>
       </Stack>
 
