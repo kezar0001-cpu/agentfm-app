@@ -1396,9 +1396,9 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
   }
 });
 
-// DIAGNOSTIC ENDPOINT - Must come BEFORE /:id route
-// GET /:id/debug-images - Debug endpoint to see raw image data
-router.get('/:id/debug-images', async (req, res) => {
+// DIAGNOSTIC ENDPOINT - Separate path to avoid conflict with /:id
+// GET /debug/images/:id - Debug endpoint to see raw image data
+router.get('/debug/images/:id', async (req, res) => {
   try {
     const property = await prisma.property.findUnique({
       where: { id: req.params.id },
