@@ -336,22 +336,11 @@ const normaliseSubmittedPropertyImages = (input) => {
     return [];
   }
 
-  const rejectedImages = [];
   const collected = input
-    .map((item, index) => {
+    .map((item) => {
       if (typeof item === 'string') {
         const trimmed = item.trim();
-        if (!trimmed) {
-          rejectedImages.push({ index, reason: 'empty string', item: '(empty)' });
-          return null;
-        }
-        if (!isValidImageLocation(trimmed)) {
-          rejectedImages.push({
-            index,
-            reason: 'invalid URL format',
-            url: trimmed.substring(0, 100),
-            urlLength: trimmed.length,
-          });
+        if (!trimmed || !isValidImageLocation(trimmed)) {
           return null;
         }
         return {
@@ -363,30 +352,11 @@ const normaliseSubmittedPropertyImages = (input) => {
       }
 
       if (!item || typeof item !== 'object') {
-        rejectedImages.push({ index, reason: 'not an object', type: typeof item });
         return null;
       }
 
       const imageUrl = extractImageUrlFromInput(item);
-      if (!imageUrl) {
-        rejectedImages.push({
-          index,
-          reason: 'no imageUrl found',
-          hasImageUrl: !!item.imageUrl,
-          hasUrl: !!item.url,
-        });
-        return null;
-      }
-
-      if (!isValidImageLocation(imageUrl)) {
-        rejectedImages.push({
-          index,
-          reason: 'failed isValidImageLocation check',
-          url: imageUrl.substring(0, 100),
-          urlLength: imageUrl.length,
-          startsWithHttp: imageUrl.toLowerCase().startsWith('http'),
-          startsWithUploads: imageUrl.startsWith('/uploads/'),
-        });
+      if (!imageUrl || !isValidImageLocation(imageUrl)) {
         return null;
       }
 
@@ -403,14 +373,6 @@ const normaliseSubmittedPropertyImages = (input) => {
       };
     })
     .filter(Boolean);
-
-  // Log rejected images if any
-  if (rejectedImages.length > 0 && process.env.NODE_ENV !== 'test') {
-    console.warn('\n⚠️  [Normalization] Some images were rejected during validation:');
-    rejectedImages.forEach((rejected) => {
-      console.warn(`  - Image ${rejected.index}: ${rejected.reason}`, rejected);
-    });
-  }
 
   if (!collected.length) {
     return [];
@@ -1316,45 +1278,26 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
 
     const rawImages = legacyImages;
 
-    // Debug logging to trace image processing
+    // Enhanced logging for debugging image upload issues
     if (process.env.NODE_ENV !== 'test') {
-      console.log('\n========== [PropertyCreate] Image Processing Debug ==========');
-      console.log('[Step 1] Raw images received from request:');
-      console.log(`  - Type: ${rawImages ? (Array.isArray(rawImages) ? 'array' : typeof rawImages) : 'undefined/null'}`);
-      console.log(`  - Count: ${rawImages ? (Array.isArray(rawImages) ? rawImages.length : 1) : 0}`);
-      if (rawImages && Array.isArray(rawImages) && rawImages.length > 0) {
-        console.log(`  - First image sample:`, {
-          hasImageUrl: !!rawImages[0]?.imageUrl,
-          imageUrl: rawImages[0]?.imageUrl?.substring(0, 100),
-          hasCaption: !!rawImages[0]?.caption,
-          isPrimary: rawImages[0]?.isPrimary,
-        });
-        console.log(`  - All image URLs:`, rawImages.map((img, i) => ({
-          index: i,
-          url: img?.imageUrl?.substring(0, 80) + '...',
-          urlLength: img?.imageUrl?.length,
-          isPrimary: img?.isPrimary,
-        })));
+      console.log('[PropertyCreate] Image debugging:');
+      console.log('  - Raw images received:', rawImages ? `${rawImages.length} images` : 'none');
+      if (rawImages && rawImages.length > 0) {
+        console.log('  - First image sample:', JSON.stringify(rawImages[0]).substring(0, 200));
       }
     }
 
     const initialImages = normaliseSubmittedPropertyImages(rawImages);
 
-    // Debug logging after normalization
+    // Enhanced logging after normalization
     if (process.env.NODE_ENV !== 'test') {
-      console.log('\n[Step 2] After normalization:');
-      console.log(`  - Normalized count: ${initialImages.length}`);
+      console.log('  - Normalized images:', `${initialImages.length} images`);
       if (initialImages.length > 0) {
-        console.log(`  - Normalized images:`, initialImages.map((img, i) => ({
+        console.log('  - Images to be saved:', initialImages.map((img, i) => ({
           index: i,
           url: img.imageUrl.substring(0, 80) + '...',
-          urlValid: img.imageUrl && img.imageUrl.length > 0,
           isPrimary: img.isPrimary,
         })));
-      } else if (rawImages && Array.isArray(rawImages) && rawImages.length > 0) {
-        console.log('  - ⚠️ WARNING: Raw images were provided but normalization returned 0 images!');
-        console.log('  - This means images are being filtered out during validation.');
-        console.log('  - Check isValidImageLocation validation logic.');
       }
     }
 
@@ -1388,37 +1331,23 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
           }));
 
           if (records.length) {
-            // Debug logging before save
-            if (process.env.NODE_ENV !== 'test') {
-              console.log('\n[Step 3] Saving images to database:');
-              console.log(`  - Records to save: ${records.length}`);
-              console.log(`  - Record details:`, records.map((r, i) => ({
-                index: i,
-                url: r.imageUrl.substring(0, 80) + '...',
-                isPrimary: r.isPrimary,
-                displayOrder: r.displayOrder,
-              })));
-            }
-
             // Bug Fix #11: Use createMany for efficient batch insert
             await tx.propertyImage.createMany({ data: records });
 
-            // Debug logging after save
+            // Enhanced logging after save
             if (process.env.NODE_ENV !== 'test') {
-              console.log(`  - ✅ Successfully saved ${records.length} PropertyImage records to database`);
+              console.log(`  - ✅ Saved ${records.length} PropertyImage records to database`);
             }
 
             // Bug Fix #12: Ensure property.imageUrl is synced after creating images
             // This guarantees the cover image is always set correctly
             await syncPropertyCoverImage(tx, newProperty.id);
           }
-        } else {
+        } else if (!includeImages) {
+          console.warn('  - ⚠️  PropertyImage table not available, falling back to single imageUrl');
+        } else if (!initialImages.length) {
           if (process.env.NODE_ENV !== 'test') {
-            if (!includeImages) {
-              console.log('\n[Step 3] PropertyImage table not available, skipping image save');
-            } else if (!initialImages.length) {
-              console.log('\n[Step 3] No images to save (initialImages.length === 0)');
-            }
+            console.log('  - No images to save (empty array)');
           }
         }
 
@@ -1438,18 +1367,9 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         include: buildPropertyImagesInclude(true),
       });
 
-      // Debug logging for retrieved property
+      // Enhanced logging for final result
       if (process.env.NODE_ENV !== 'test') {
-        console.log('\n[Step 4] Retrieved property from database:');
-        console.log(`  - PropertyImage records in DB: ${withImages?.propertyImages?.length || 0}`);
-        if (withImages?.propertyImages && withImages.propertyImages.length > 0) {
-          console.log(`  - Images:`, withImages.propertyImages.map((img, i) => ({
-            index: i,
-            id: img.id,
-            url: img.imageUrl.substring(0, 80) + '...',
-            isPrimary: img.isPrimary,
-          })));
-        }
+        console.log(`  - Property created with ${withImages?.propertyImages?.length || 0} images in response`);
       }
 
       return { property: createdProperty, propertyWithImages: withImages };
@@ -1460,21 +1380,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     await invalidatePropertyCaches(cacheUserIds);
 
     const responsePayload = propertyWithImages ? toPublicProperty(propertyWithImages) : toPublicProperty(property);
-
-    // Debug logging for response
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('\n[Step 5] Final response:');
-      console.log(`  - Images in response: ${responsePayload?.images?.length || 0}`);
-      if (responsePayload?.images && responsePayload.images.length > 0) {
-        console.log(`  - Response images:`, responsePayload.images.map((img, i) => ({
-          index: i,
-          id: img.id,
-          url: img.imageUrl.substring(0, 80) + '...',
-          isPrimary: img.isPrimary,
-        })));
-      }
-      console.log('========== End Image Processing Debug ==========\n');
-    }
 
     res.status(201).json({ success: true, property: responsePayload });
   } catch (error) {
