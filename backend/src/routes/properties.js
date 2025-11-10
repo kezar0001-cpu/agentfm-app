@@ -1242,6 +1242,7 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
+    // Also remove enhanced fields that don't exist in the database schema yet
     const {
       managerId: managerIdInput,
       postcode,
@@ -1249,6 +1250,20 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       coverImage,
       imageMetadata,
       images: legacyImages,
+      // Enhanced fields not yet in database schema - destructure to exclude from create
+      lotSize,
+      buildingSize,
+      numberOfFloors,
+      constructionType,
+      heatingSystem,
+      coolingSystem,
+      amenities,
+      purchasePrice,
+      purchaseDate,
+      currentMarketValue,
+      annualPropertyTax,
+      annualInsurance,
+      monthlyHOA,
       ...data
     } = parsed;
 
@@ -1391,6 +1406,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
+    // Also remove enhanced fields that don't exist in the database schema yet
     const {
       managerId: managerIdInput,
       postcode,
@@ -1398,6 +1414,20 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       coverImage,
       imageMetadata,
       images: legacyImages,
+      // Enhanced fields not yet in database schema - destructure to exclude from update
+      lotSize,
+      buildingSize,
+      numberOfFloors,
+      constructionType,
+      heatingSystem,
+      coolingSystem,
+      amenities,
+      purchasePrice,
+      purchaseDate,
+      currentMarketValue,
+      annualPropertyTax,
+      annualInsurance,
+      monthlyHOA,
       ...data
     } = parsed;
 
