@@ -383,11 +383,22 @@ const normaliseSubmittedPropertyImages = (input) => {
     return [];
   }
 
+  const rejectedImages = [];
   const collected = input
-    .map((item) => {
+    .map((item, index) => {
       if (typeof item === 'string') {
         const trimmed = item.trim();
-        if (!trimmed || !isValidImageLocation(trimmed)) {
+        if (!trimmed) {
+          rejectedImages.push({ index, reason: 'empty string', item: '(empty)' });
+          return null;
+        }
+        if (!isValidImageLocation(trimmed)) {
+          rejectedImages.push({
+            index,
+            reason: 'invalid URL format',
+            url: trimmed.substring(0, 100),
+            urlLength: trimmed.length,
+          });
           return null;
         }
         return {
@@ -399,11 +410,30 @@ const normaliseSubmittedPropertyImages = (input) => {
       }
 
       if (!item || typeof item !== 'object') {
+        rejectedImages.push({ index, reason: 'not an object', type: typeof item });
         return null;
       }
 
       const imageUrl = extractImageUrlFromInput(item);
-      if (!imageUrl || !isValidImageLocation(imageUrl)) {
+      if (!imageUrl) {
+        rejectedImages.push({
+          index,
+          reason: 'no imageUrl found',
+          hasImageUrl: !!item.imageUrl,
+          hasUrl: !!item.url,
+        });
+        return null;
+      }
+
+      if (!isValidImageLocation(imageUrl)) {
+        rejectedImages.push({
+          index,
+          reason: 'failed isValidImageLocation check',
+          url: imageUrl.substring(0, 100),
+          urlLength: imageUrl.length,
+          startsWithHttp: imageUrl.toLowerCase().startsWith('http'),
+          startsWithUploads: imageUrl.startsWith('/uploads/'),
+        });
         return null;
       }
 
@@ -420,6 +450,14 @@ const normaliseSubmittedPropertyImages = (input) => {
       };
     })
     .filter(Boolean);
+
+  // Log rejected images if any
+  if (rejectedImages.length > 0 && process.env.NODE_ENV !== 'test') {
+    console.warn('\n⚠️  [Normalization] Some images were rejected during validation:');
+    rejectedImages.forEach((rejected) => {
+      console.warn(`  - Image ${rejected.index}: ${rejected.reason}`, rejected);
+    });
+  }
 
   if (!collected.length) {
     return [];
@@ -1378,6 +1416,18 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
           }));
 
           if (records.length) {
+            // Debug logging before save
+            if (process.env.NODE_ENV !== 'test') {
+              console.log('\n[Step 3] Saving images to database:');
+              console.log(`  - Records to save: ${records.length}`);
+              console.log(`  - Record details:`, records.map((r, i) => ({
+                index: i,
+                url: r.imageUrl.substring(0, 80) + '...',
+                isPrimary: r.isPrimary,
+                displayOrder: r.displayOrder,
+              })));
+            }
+
             // Bug Fix #11: Use createMany for efficient batch insert
             await tx.propertyImage.createMany({ data: records });
 
@@ -1427,6 +1477,21 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     await invalidatePropertyCaches(cacheUserIds);
 
     const responsePayload = propertyWithImages ? toPublicProperty(propertyWithImages) : toPublicProperty(property);
+
+    // Debug logging for response
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('\n[Step 5] Final response:');
+      console.log(`  - Images in response: ${responsePayload?.images?.length || 0}`);
+      if (responsePayload?.images && responsePayload.images.length > 0) {
+        console.log(`  - Response images:`, responsePayload.images.map((img, i) => ({
+          index: i,
+          id: img.id,
+          url: img.imageUrl.substring(0, 80) + '...',
+          isPrimary: img.isPrimary,
+        })));
+      }
+      console.log('========== End Image Processing Debug ==========\n');
+    }
 
     res.status(201).json({ success: true, property: responsePayload });
   } catch (error) {

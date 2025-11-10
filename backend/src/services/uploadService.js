@@ -104,18 +104,58 @@ export const createUploadMiddleware = (options = {}) => {
  * For local: returns /uploads/filename
  */
 export const getUploadedFileUrl = (file) => {
-  if (!file) return null;
+  if (!file) {
+    console.warn('[Upload] getUploadedFileUrl called with null/undefined file');
+    return null;
+  }
 
-  // Cloudinary file
-  if (file.path && file.path.startsWith('http')) {
-    return file.path; // Cloudinary returns full URL in file.path
+  // Cloudinary file - check multiple properties for robustness
+  // multer-storage-cloudinary can set these properties:
+  // - file.path (should be secure_url)
+  // - file.url or file.secure_url (from Cloudinary response)
+  if (isCloudinaryConfigured) {
+    // First try file.path (standard multer-storage-cloudinary)
+    if (file.path && typeof file.path === 'string' && file.path.startsWith('http')) {
+      console.log(`[Upload] Cloudinary URL from file.path: ${file.path.substring(0, 100)}...`);
+      return file.path;
+    }
+
+    // Fallback to secure_url if available
+    if (file.secure_url && typeof file.secure_url === 'string') {
+      console.log(`[Upload] Cloudinary URL from file.secure_url: ${file.secure_url.substring(0, 100)}...`);
+      return file.secure_url;
+    }
+
+    // Fallback to url if available
+    if (file.url && typeof file.url === 'string' && file.url.startsWith('http')) {
+      console.log(`[Upload] Cloudinary URL from file.url: ${file.url.substring(0, 100)}...`);
+      return file.url;
+    }
+
+    // If we got here with Cloudinary configured, something is wrong
+    console.error('[Upload] Cloudinary is configured but no URL found in file object:', {
+      hasPath: !!file.path,
+      pathValue: file.path,
+      hasSecureUrl: !!file.secure_url,
+      hasUrl: !!file.url,
+      filename: file.filename,
+      fieldname: file.fieldname,
+    });
+    return null;
   }
 
   // Local file
   if (file.filename) {
-    return `/uploads/${file.filename}`;
+    const localUrl = `/uploads/${file.filename}`;
+    console.log(`[Upload] Local file URL: ${localUrl}`);
+    return localUrl;
   }
 
+  console.warn('[Upload] Could not extract URL from file object:', {
+    hasPath: !!file.path,
+    hasFilename: !!file.filename,
+    keys: Object.keys(file),
+  });
   return null;
 };
 
