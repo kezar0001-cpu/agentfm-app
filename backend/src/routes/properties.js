@@ -1278,7 +1278,28 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
 
     const rawImages = legacyImages;
 
+    // Enhanced logging for debugging image upload issues
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[PropertyCreate] Image debugging:');
+      console.log('  - Raw images received:', rawImages ? `${rawImages.length} images` : 'none');
+      if (rawImages && rawImages.length > 0) {
+        console.log('  - First image sample:', JSON.stringify(rawImages[0]).substring(0, 200));
+      }
+    }
+
     const initialImages = normaliseSubmittedPropertyImages(rawImages);
+
+    // Enhanced logging after normalization
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('  - Normalized images:', `${initialImages.length} images`);
+      if (initialImages.length > 0) {
+        console.log('  - Images to be saved:', initialImages.map((img, i) => ({
+          index: i,
+          url: img.imageUrl.substring(0, 80) + '...',
+          isPrimary: img.isPrimary,
+        })));
+      }
+    }
 
     const primaryImageCandidate = initialImages.find((image) => image.isPrimary) || initialImages[0] || null;
     const coverImageUrl = data.imageUrl ?? primaryImageCandidate?.imageUrl ?? null;
@@ -1313,9 +1334,20 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
             // Bug Fix #11: Use createMany for efficient batch insert
             await tx.propertyImage.createMany({ data: records });
 
+            // Enhanced logging after save
+            if (process.env.NODE_ENV !== 'test') {
+              console.log(`  - ✅ Saved ${records.length} PropertyImage records to database`);
+            }
+
             // Bug Fix #12: Ensure property.imageUrl is synced after creating images
             // This guarantees the cover image is always set correctly
             await syncPropertyCoverImage(tx, newProperty.id);
+          }
+        } else if (!includeImages) {
+          console.warn('  - ⚠️  PropertyImage table not available, falling back to single imageUrl');
+        } else if (!initialImages.length) {
+          if (process.env.NODE_ENV !== 'test') {
+            console.log('  - No images to save (empty array)');
           }
         }
 
@@ -1334,6 +1366,11 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         where: { id: createdProperty.id },
         include: buildPropertyImagesInclude(true),
       });
+
+      // Enhanced logging for final result
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`  - Property created with ${withImages?.propertyImages?.length || 0} images in response`);
+      }
 
       return { property: createdProperty, propertyWithImages: withImages };
     });
