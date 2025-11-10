@@ -643,7 +643,7 @@ const basePropertySchema = z.object({
     description: optionalString(),
     imageUrl: optionalImageLocation(),
     managerId: optionalString(),
-    amenities: amenitiesSchema, // Bug Fix: Add validated amenities field
+    // Note: amenities field removed - not yet in database schema
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
@@ -1398,7 +1398,6 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       coverImage,
       imageMetadata,
       images: legacyImages,
-      amenities: amenitiesUpdate,
       ...data
     } = parsed;
 
@@ -1409,11 +1408,6 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
-    // Bug Fix: Deep merge amenities to preserve existing data during partial updates
-    const mergedAmenities = amenitiesUpdate !== undefined
-      ? deepMergeAmenities(property.amenities, amenitiesUpdate)
-      : undefined;
-
     // Ensure converted fields are included in the data
     const updateData = {
       ...data,
@@ -1422,8 +1416,6 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
       ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
       ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
-      // Include merged amenities if amenities were updated
-      ...(mergedAmenities !== undefined && { amenities: mergedAmenities }),
     };
 
     if (imageUpdates !== undefined) {
