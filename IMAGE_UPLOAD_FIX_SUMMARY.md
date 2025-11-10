@@ -1,6 +1,7 @@
 # Image Upload System Redesign - Summary
 
 ## Date: 2025-11-10
+## Updated: 2025-11-10 (Added Migration Fix)
 
 ## Problem Statement
 The image upload system for properties had multiple critical issues:
@@ -8,6 +9,28 @@ The image upload system for properties had multiple critical issues:
 2. **Images uploaded successfully to Cloudinary** but weren't displayed in the PropertyDetailPage carousel
 3. **Lack of user feedback** during upload process
 4. **State management issues** that could lose images during form submission
+
+## 🔴 CRITICAL DISCOVERY: Database Migration Issue
+
+**The root cause was discovered after deploying to production:**
+
+The `PropertyImage` table doesn't exist in production because the migration file was dated **2025-12-15** (future date)! Prisma migrations run in chronological order, so it was waiting until December 15 to create the table.
+
+### Evidence from Production Logs:
+```
+Invalid `prisma.propertyImage.createMany()` invocation:
+The column `createdAt` does not exist in the current database.
+Property images table not found. Falling back to legacy property.imageUrl field.
+```
+
+### The Fix:
+Renamed migrations to use current date (2025-11-10) so they apply immediately:
+- `20251215000000_add_property_images` → `20251110000001_add_property_images`
+- `20251216000000_add_unit_images` → `20251110000002_add_unit_images`
+- `20251110000000_add_uploadedbid` → `20251110000003_add_uploadedbid`
+
+### After Deployment:
+When this code is deployed, Render will automatically run `npx prisma migrate deploy` which will create the `PropertyImage` table and enable multiple image uploads.
 
 ## Root Causes Identified
 
