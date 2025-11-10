@@ -643,7 +643,28 @@ const basePropertySchema = z.object({
     description: optionalString(),
     imageUrl: optionalImageLocation(),
     managerId: optionalString(),
-    // Note: amenities field removed - not yet in database schema
+
+    // Enhanced property details
+    lotSize: optionalFloat(),
+    buildingSize: optionalFloat(),
+    numberOfFloors: optionalInt({ min: 1, minMessage: 'Number of floors must be at least 1' }),
+    constructionType: optionalString(),
+    heatingSystem: optionalString(),
+    coolingSystem: optionalString(),
+    amenities: amenitiesSchema,
+
+    // Financial information
+    purchasePrice: optionalFloat(),
+    purchaseDate: z.union([z.string(), z.date()]).optional().nullable().transform((val) => {
+      if (!val) return null;
+      if (val instanceof Date) return val;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    currentMarketValue: optionalFloat(),
+    annualPropertyTax: optionalFloat(),
+    annualInsurance: optionalFloat(),
+    monthlyHOA: optionalFloat(),
 
     // Legacy aliases – accepted but converted internally
     coverImage: optionalString(),
@@ -1242,7 +1263,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
     const parsed = applyLegacyAliases(propertySchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    // Also remove enhanced fields that don't exist in the database schema yet
     const {
       managerId: managerIdInput,
       postcode,
@@ -1250,20 +1270,6 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       coverImage,
       imageMetadata,
       images: legacyImages,
-      // Enhanced fields not yet in database schema - destructure to exclude from create
-      lotSize,
-      buildingSize,
-      numberOfFloors,
-      constructionType,
-      heatingSystem,
-      coolingSystem,
-      amenities,
-      purchasePrice,
-      purchaseDate,
-      currentMarketValue,
-      annualPropertyTax,
-      annualInsurance,
-      monthlyHOA,
       ...data
     } = parsed;
 
@@ -1406,7 +1412,6 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     const parsed = applyLegacyAliases(propertyUpdateSchema.parse(req.body ?? {}));
     // Remove legacy alias fields (they've been converted to standard fields)
     // Keep the converted fields: zipCode, propertyType, imageUrl
-    // Also remove enhanced fields that don't exist in the database schema yet
     const {
       managerId: managerIdInput,
       postcode,
@@ -1414,20 +1419,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       coverImage,
       imageMetadata,
       images: legacyImages,
-      // Enhanced fields not yet in database schema - destructure to exclude from update
-      lotSize,
-      buildingSize,
-      numberOfFloors,
-      constructionType,
-      heatingSystem,
-      coolingSystem,
-      amenities,
-      purchasePrice,
-      purchaseDate,
-      currentMarketValue,
-      annualPropertyTax,
-      annualInsurance,
-      monthlyHOA,
+      amenities: amenitiesUpdate,
       ...data
     } = parsed;
 
@@ -1438,6 +1430,11 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
+    // Deep merge amenities to preserve existing data during partial updates
+    const mergedAmenities = amenitiesUpdate !== undefined
+      ? deepMergeAmenities(property.amenities, amenitiesUpdate)
+      : undefined;
+
     // Ensure converted fields are included in the data
     const updateData = {
       ...data,
@@ -1446,6 +1443,8 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
       ...(parsed.zipCode !== undefined && { zipCode: parsed.zipCode }),
       ...(parsed.propertyType !== undefined && { propertyType: parsed.propertyType }),
       ...(parsed.imageUrl !== undefined && { imageUrl: parsed.imageUrl }),
+      // Include merged amenities if amenities were updated
+      ...(mergedAmenities !== undefined && { amenities: mergedAmenities }),
     };
 
     if (imageUpdates !== undefined) {
