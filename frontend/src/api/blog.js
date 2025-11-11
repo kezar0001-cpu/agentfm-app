@@ -148,3 +148,30 @@ export const updateBlogTag = (id, data) => {
 export const deleteBlogTag = (id) => {
   return api.delete(`/blog/admin/tags/${id}`);
 };
+
+// ==================== BLOG AUTOMATION ENDPOINTS ====================
+
+/**
+ * Get blog automation status and statistics (admin only)
+ * @returns {Promise} - Automation status and stats
+ */
+export const getBlogAutomationStatus = () => {
+  return api.get('/blog/admin/automation/status');
+};
+
+/**
+ * Manually trigger blog post generation (admin only)
+ * @returns {Promise} - Success response
+ */
+export const triggerBlogAutomation = () => {
+  return api.post('/blog/admin/automation/generate');
+};
+
+/**
+ * Update blog automation settings (admin only)
+ * @param {Object} settings - Automation settings
+ * @returns {Promise} - Updated settings
+ */
+export const updateBlogAutomationSettings = (settings) => {
+  return api.put('/blog/admin/automation/settings', settings);
+};

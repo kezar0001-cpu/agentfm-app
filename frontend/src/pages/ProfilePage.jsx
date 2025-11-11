@@ -12,8 +12,9 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { Person, Lock, Save, Edit } from '@mui/icons-material';
+import { Person, Lock, Save, Edit, Article as ArticleIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCurrentUser } from '../context/UserContext';
 import { apiClient } from '../api/client.js';
@@ -23,6 +24,7 @@ import { formatDate } from '../utils/date';
 export default function ProfilePage() {
   const { user: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
 
@@ -346,6 +348,36 @@ export default function ProfilePage() {
               </Grid>
             )}
           </Grid>
+        </Paper>
+      )}
+
+      {/* Blog Admin Link (only for ADMIN users) */}
+      {profile?.role === 'ADMIN' && (
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Blog Administration
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Manage blog posts, categories, tags, and AI automation
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<ArticleIcon />}
+              onClick={() => navigate('/admin/blog')}
+              sx={{
+                textTransform: 'none',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5568d3 0%, #6941a0 100%)',
+                },
+              }}
+            >
+              Go to Blog Admin
+            </Button>
+          </Box>
         </Paper>
       )}
     </Container>
