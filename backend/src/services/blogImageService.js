@@ -1,6 +1,6 @@
 import axios from 'axios';
 import logger from '../utils/logger.js';
-import { cloudinary } from './uploadService.js';
+import { cloudinary, isUsingCloudStorage } from './uploadService.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -149,7 +149,7 @@ class BlogImageService {
 
       // Upload using existing upload service
       let uploadedUrl;
-      if (cloudinary) {
+      if (isUsingCloudStorage()) {
         // Upload to Cloudinary
         const result = await cloudinary.uploader.upload(tempFilePath, {
           folder: 'agentfm/blog',
