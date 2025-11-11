@@ -28,6 +28,7 @@
     "@tiptap/react": "^3.10.2",
     "@tiptap/starter-kit": "^3.10.2",
     "axios": "^1.5.0",
+    "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
     "highlight.js": "^11.11.1",
     "i18next": "^23.0.0",
