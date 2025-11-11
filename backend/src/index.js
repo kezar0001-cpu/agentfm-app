@@ -13,7 +13,6 @@ import compression from 'compression';
 import prisma, { prisma as prismaInstance } from './config/prismaClient.js';
 import logger from './utils/logger.js';
 import scheduleMaintenancePlanCron from './cron/maintenancePlans.js';
-import scheduleBlogAutomationCron from './cron/blogAutomation.js';
 
 // ---- Load env
 dotenv.config();
@@ -29,7 +28,6 @@ const PORT = process.env.PORT || 3000;
 
 // ---- Cron Jobs
 const maintenancePlanCronTask = scheduleMaintenancePlanCron();
-const blogAutomationCronTask = scheduleBlogAutomationCron();
 
 // Trust proxy so secure cookies & redirects work behind Render/CF
 app.set('trust proxy', 1);

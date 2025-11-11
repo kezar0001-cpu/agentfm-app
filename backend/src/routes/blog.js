@@ -2,8 +2,6 @@ import express from 'express';
 import prisma from '../config/prismaClient.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
-import blogAutomationService from '../services/blogAutomationService.js';
-import { processDailyBlogPost } from '../cron/blogAutomation.js';
 
 const router = express.Router();
 
@@ -828,68 +826,6 @@ router.delete('/admin/tags/:id', requireAuth, requireRole('ADMIN'), async (req, 
       return sendError(res, 404, 'Tag not found', ErrorCodes.RES_NOT_FOUND);
     }
     return sendError(res, 500, 'Failed to delete tag', ErrorCodes.ERR_INTERNAL_SERVER);
-  }
-});
-
-// ==================== BLOG AUTOMATION ADMIN ROUTES ====================
-
-/**
- * GET /api/blog/admin/automation/status
- * Get automation statistics and status (admin only)
- */
-router.get('/admin/automation/status', requireAuth, requireRole('ADMIN'), async (req, res) => {
-  try {
-    const stats = await blogAutomationService.getStatistics();
-    res.json(stats);
-  } catch (error) {
-    console.error('Error getting automation status:', error);
-    return sendError(res, 500, 'Failed to get automation status', ErrorCodes.ERR_INTERNAL_SERVER);
-  }
-});
-
-/**
- * POST /api/blog/admin/automation/generate
- * Manually trigger blog post generation (admin only)
- */
-router.post('/admin/automation/generate', requireAuth, requireRole('ADMIN'), async (req, res) => {
-  try {
-    // Run the blog post generation asynchronously
-    processDailyBlogPost().catch(error => {
-      console.error('Background blog generation failed:', error);
-    });
-
-    res.json({
-      success: true,
-      message: 'Blog post generation started. Check status in a few moments.'
-    });
-  } catch (error) {
-    console.error('Error triggering blog generation:', error);
-    return sendError(res, 500, 'Failed to trigger blog generation', ErrorCodes.ERR_INTERNAL_SERVER);
-  }
-});
-
-/**
- * PUT /api/blog/admin/automation/settings
- * Update automation settings (admin only)
- */
-router.put('/admin/automation/settings', requireAuth, requireRole('ADMIN'), async (req, res) => {
-  try {
-    const { enabled } = req.body;
-
-    if (typeof enabled !== 'boolean') {
-      return sendError(res, 400, 'Enabled must be a boolean', ErrorCodes.VAL_INVALID_FORMAT);
-    }
-
-    blogAutomationService.setEnabled(enabled);
-
-    res.json({
-      success: true,
-      message: `Blog automation ${enabled ? 'enabled' : 'disabled'}`,
-      enabled
-    });
-  } catch (error) {
-    console.error('Error updating automation settings:', error);
-    return sendError(res, 500, 'Failed to update settings', ErrorCodes.ERR_INTERNAL_SERVER);
   }
 });
 

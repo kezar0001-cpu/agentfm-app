@@ -756,10 +756,6 @@ model BlogPost {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  // Automation fields
-  isAutomated        Boolean             @default(false)
-  automationMetadata Json?
-
   author          User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
   categories      BlogPostCategory[]
   tags            BlogPostTag[]
@@ -770,7 +766,6 @@ model BlogPost {
   @@index([status])
   @@index([publishedAt])
   @@index([featured])
-  @@index([isAutomated])
 }
 
 model BlogCategory {
