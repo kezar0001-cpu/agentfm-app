@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { Box, Divider, Alert } from '@mui/material';
 import { useImageUpload } from '../hooks';
 import { ImageUploadZone } from './ImageUploadZone';
@@ -24,6 +24,19 @@ export function PropertyImageManager({
   disabled = false,
   propertyName = '',
 }) {
+  // Prepare initial images with cover image info
+  const preparedInitialImages = React.useMemo(() => {
+    if (!initialImages || initialImages.length === 0) return [];
+
+    return initialImages.map((img, index) => {
+      const imageUrl = img.url || img.imageUrl;
+      return {
+        ...img,
+        isPrimary: imageUrl === coverImageUrl,
+      };
+    });
+  }, [initialImages, coverImageUrl]);
+
   const {
     images,
     isUploading,
@@ -42,6 +55,7 @@ export function PropertyImageManager({
     endpoint: '/uploads/multiple',
     compressImages: true,
     maxConcurrent: 3,
+    initialImages: preparedInitialImages,
     onSuccess: (completedImages) => {
       console.log('[PropertyImageManager] All uploads complete:', completedImages.length);
     },
@@ -50,37 +64,21 @@ export function PropertyImageManager({
     },
   });
 
-  /**
-   * Initialize with existing images
-   */
-  useEffect(() => {
-    if (initialImages && initialImages.length > 0 && images.length === 0) {
-      // Convert existing images to our format
-      const converted = initialImages.map((img, index) => ({
-        id: img.id || `existing-${index}`,
-        localPreview: null,
-        remoteUrl: img.url || img.imageUrl,
-        file: null,
-        status: 'complete',
-        progress: 100,
-        error: null,
-        isPrimary: img.url === coverImageUrl || img.imageUrl === coverImageUrl || index === 0,
-        caption: img.altText || img.caption || '',
-        order: index,
-        dimensions: null,
-      }));
-
-      console.log('[PropertyImageManager] Initialized with', converted.length, 'existing images');
-      // This would require extending useImageUpload to support this
-      // For now, we'll handle this in PropertyForm
-    }
-  }, [initialImages, coverImageUrl, images.length]);
+  // Track if this is the initial mount to avoid spurious onChange calls
+  const isInitialMount = useRef(true);
 
   /**
    * Notify parent of changes
    */
   useEffect(() => {
     if (!onChange) return;
+
+    // Skip the initial mount to prevent clearing existing images
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      console.log('[PropertyImageManager] Skipping initial onChange - preserving existing images');
+      return;
+    }
 
     const completedImages = getCompletedImages();
 
