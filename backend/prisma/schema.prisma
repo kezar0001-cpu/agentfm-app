@@ -8,67 +8,67 @@ datasource db {
 }
 
 model User {
-  id                       String                  @id @default(cuid())
-  email                    String                  @unique
-  passwordHash             String
-  firstName                String
-  lastName                 String
-  phone                    String?
-  role                     Role
-  isActive                 Boolean                 @default(true)
-  lastLoginAt              DateTime?
-  createdAt                DateTime                @default(now())
-  updatedAt                DateTime                @updatedAt
-  orgId                    String?
-  company                  String?
-  subscriptionPlan         SubscriptionPlan        @default(FREE_TRIAL)
-  subscriptionStatus       SubscriptionStatus      @default(TRIAL)
-  trialEndDate             DateTime?
-  emailVerified            Boolean                 @default(false)
-  assignedInspections      Inspection[]            @relation("AssignedTechnician")
-  completedInspections     Inspection[]            @relation("CompletedBy")
-  inspectionAuditLogs      InspectionAuditLog[]
-  inspectionReminders      InspectionReminder[]
-  uploadedAttachments      InspectionAttachment[]  @relation("InspectionAttachmentUploadedBy")
-  sentInvites              Invite[]                @relation("InvitedBy")
-  receivedInvite           Invite?                 @relation("InvitedUser")
-  assignedJobs             Job[]                   @relation("AssignedTechnician")
-  createdJobs              Job[]                   @relation("CreatedJobs")
-  jobComments              JobComment[]
-  notifications            Notification[]
-  OwnerProfile             OwnerProfile?
-  managedProperties        Property[]              @relation("PropertyManager")
-  PropertyManagerProfile   PropertyManagerProfile?
-  ownedProperties          PropertyOwner[]
-  approvedRecommendations  Recommendation[]        @relation("ApprovedBy")
-  createdRecommendations   Recommendation[]        @relation("CreatedBy")
-  requestedServiceRequests ServiceRequest[]        @relation("RequestedBy")
-  approvedServiceRequests  ServiceRequest[]        @relation("ApprovedRequests")
-  rejectedServiceRequests  ServiceRequest[]        @relation("RejectedRequests")
-  reviewedServiceRequests  ServiceRequest[]        @relation("ReviewedRequests")
-  subscriptions            Subscription[]
-  TechnicianProfile        TechnicianProfile?
-  TenantProfile            TenantProfile?
-  tenantUnits              UnitTenant[]
-  reportRequests           ReportRequest[]         @relation("ReportRequestsCreated")
-  passwordResets           PasswordReset[]
-  auditLogs                AuditLog[]
-  Org                      Org?                    @relation(fields: [orgId], references: [id])
-  blogPosts                BlogPost[]
+  id                      String                  @id @default(cuid())
+  email                   String                  @unique
+  passwordHash            String
+  firstName               String
+  lastName                String
+  phone                   String?
+  role                    Role
+  isActive                Boolean                 @default(true)
+  lastLoginAt             DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  orgId                   String?
+  company                 String?
+  subscriptionPlan        SubscriptionPlan        @default(FREE_TRIAL)
+  subscriptionStatus      SubscriptionStatus      @default(TRIAL)
+  trialEndDate            DateTime?
+  emailVerified           Boolean                 @default(false)
+  assignedInspections     Inspection[]            @relation("AssignedTechnician")
+  completedInspections    Inspection[]            @relation("CompletedBy")
+  inspectionAuditLogs     InspectionAuditLog[]
+  inspectionReminders     InspectionReminder[]
+  uploadedAttachments     InspectionAttachment[] @relation("InspectionAttachmentUploadedBy")
+  sentInvites             Invite[]                @relation("InvitedBy")
+  receivedInvite          Invite?                 @relation("InvitedUser")
+  assignedJobs            Job[]                   @relation("AssignedTechnician")
+  createdJobs             Job[]                   @relation("CreatedJobs")
+  jobComments             JobComment[]
+  notifications           Notification[]
+  OwnerProfile            OwnerProfile?
+  managedProperties       Property[]              @relation("PropertyManager")
+  PropertyManagerProfile  PropertyManagerProfile?
+  ownedProperties         PropertyOwner[]
+  approvedRecommendations Recommendation[]        @relation("ApprovedBy")
+  createdRecommendations  Recommendation[]        @relation("CreatedBy")
+  requestedServiceRequests ServiceRequest[]       @relation("RequestedBy")
+  approvedServiceRequests  ServiceRequest[]       @relation("ApprovedRequests")
+  rejectedServiceRequests  ServiceRequest[]       @relation("RejectedRequests")
+  reviewedServiceRequests  ServiceRequest[]       @relation("ReviewedRequests")
+  subscriptions           Subscription[]
+  TechnicianProfile       TechnicianProfile?
+  TenantProfile           TenantProfile?
+  tenantUnits             UnitTenant[]
+  reportRequests          ReportRequest[]         @relation("ReportRequestsCreated")
+  passwordResets          PasswordReset[]
+  auditLogs               AuditLog[]
+  Org                     Org?                    @relation(fields: [orgId], references: [id])
+  blogPosts               BlogPost[]
 
   @@index([email])
   @@index([role])
 }
 
 model PasswordReset {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
-  selector  String    @unique
+  selector  String   @unique
   verifier  String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([selector])
@@ -269,31 +269,31 @@ model UnitTenant {
 }
 
 model Inspection {
-  id            String                 @id @default(cuid())
-  title         String
-  type          InspectionType
-  scheduledDate DateTime
-  completedDate DateTime?
-  propertyId    String
-  unitId        String?
-  assignedToId  String?
-  completedById String?
-  status        InspectionStatus       @default(SCHEDULED)
-  notes         String?
-  findings      String?
-  tags          String[]               @default([])
-  photos        String[]               @default([])
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  assignedTo    User?                  @relation("AssignedTechnician", fields: [assignedToId], references: [id])
-  completedBy   User?                  @relation("CompletedBy", fields: [completedById], references: [id])
-  property      Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unit          Unit?                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  attachments   InspectionAttachment[]
-  auditLogs     InspectionAuditLog[]
-  reminders     InspectionReminder[]
-  jobs          Job[]
-  report        Report?
+  id              String            @id @default(cuid())
+  title           String
+  type            InspectionType
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  propertyId      String
+  unitId          String?
+  assignedToId    String?
+  completedById   String?
+  status          InspectionStatus  @default(SCHEDULED)
+  notes           String?
+  findings        String?
+  tags            String[]          @default([])
+  photos          String[]          @default([])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  assignedTo      User?             @relation("AssignedTechnician", fields: [assignedToId], references: [id])
+  completedBy     User?             @relation("CompletedBy", fields: [completedById], references: [id])
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  attachments     InspectionAttachment[]
+  auditLogs       InspectionAuditLog[]
+  reminders       InspectionReminder[]
+  jobs            Job[]
+  report          Report?
 
   @@index([propertyId])
   @@index([unitId])
@@ -365,44 +365,44 @@ model MaintenancePlan {
 }
 
 model ServiceRequest {
-  id            String                 @id @default(cuid())
-  title         String
-  description   String
-  category      ServiceRequestCategory
-  priority      JobPriority            @default(MEDIUM)
-  status        ServiceRequestStatus   @default(SUBMITTED)
-  propertyId    String
-  unitId        String?
-  requestedById String
-  photos        String[]               @default([])
-  reviewNotes   String?
-  reviewedAt    DateTime?
+  id                     String                 @id @default(cuid())
+  title                  String
+  description            String
+  category               ServiceRequestCategory
+  priority               JobPriority            @default(MEDIUM)
+  status                 ServiceRequestStatus   @default(SUBMITTED)
+  propertyId             String
+  unitId                 String?
+  requestedById          String
+  photos                 String[]               @default([])
+  reviewNotes            String?
+  reviewedAt             DateTime?
 
   // New fields for budget and approval workflow
-  ownerEstimatedBudget Float?
-  managerEstimatedCost Float?
-  approvedBudget       Float?
-  costBreakdownNotes   String?
+  ownerEstimatedBudget   Float?
+  managerEstimatedCost   Float?
+  approvedBudget         Float?
+  costBreakdownNotes     String?
 
-  approvedById    String?
-  approvedAt      DateTime?
-  rejectedById    String?
-  rejectedAt      DateTime?
-  rejectionReason String?
+  approvedById           String?
+  approvedAt             DateTime?
+  rejectedById           String?
+  rejectedAt             DateTime?
+  rejectionReason        String?
 
-  lastReviewedById String?
-  lastReviewedAt   DateTime?
+  lastReviewedById       String?
+  lastReviewedAt         DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
-  jobs           Job[]
-  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  requestedBy    User     @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
-  approvedBy     User?    @relation("ApprovedRequests", fields: [approvedById], references: [id])
-  rejectedBy     User?    @relation("RejectedRequests", fields: [rejectedById], references: [id])
-  lastReviewedBy User?    @relation("ReviewedRequests", fields: [lastReviewedById], references: [id])
-  unit           Unit?    @relation(fields: [unitId], references: [id])
+  jobs                   Job[]
+  property               Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestedBy            User                   @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy             User?                  @relation("ApprovedRequests", fields: [approvedById], references: [id])
+  rejectedBy             User?                  @relation("RejectedRequests", fields: [rejectedById], references: [id])
+  lastReviewedBy         User?                  @relation("ReviewedRequests", fields: [lastReviewedById], references: [id])
+  unit                   Unit?                  @relation(fields: [unitId], references: [id])
 
   @@index([propertyId])
   @@index([unitId])
@@ -432,21 +432,21 @@ model Report {
 }
 
 model ReportRequest {
-  id            String   @id @default(cuid())
-  reportType    String
-  parameters    Json?
-  propertyId    String
-  unitId        String?
-  requestedById String
-  status        String   @default("PENDING")
-  fileUrl       String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  unit        Unit?    @relation(fields: [unitId], references: [id])
-  requestedBy User     @relation("ReportRequestsCreated", fields: [requestedById], references: [id])
-
+  id              String   @id @default(cuid())
+  reportType      String
+  parameters      Json?
+  propertyId      String
+  unitId          String?
+  requestedById   String
+  status          String   @default("PENDING")
+  fileUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit            Unit?    @relation(fields: [unitId], references: [id])
+  requestedBy     User     @relation("ReportRequestsCreated", fields: [requestedById], references: [id])
+  
   @@index([propertyId])
   @@index([unitId])
   @@index([requestedById])
@@ -496,17 +496,17 @@ model Notification {
 }
 
 model InspectionAttachment {
-  id           String     @id @default(cuid())
-  inspectionId String
-  name         String     @map("fileName")
-  mimeType     String     @map("fileType")
-  url          String     @map("fileUrl")
-  size         Int?
-  annotations  Json?
-  uploadedById String?
-  createdAt    DateTime   @default(now()) @map("uploadedAt")
-  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  uploadedBy   User?      @relation("InspectionAttachmentUploadedBy", fields: [uploadedById], references: [id])
+  id            String      @id @default(cuid())
+  inspectionId  String
+  name          String      @map("fileName")
+  mimeType      String      @map("fileType")
+  url           String      @map("fileUrl")
+  size          Int?
+  annotations   Json?
+  uploadedById  String?
+  createdAt     DateTime    @default(now()) @map("uploadedAt")
+  inspection    Inspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  uploadedBy    User?       @relation("InspectionAttachmentUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([inspectionId])
 }
@@ -705,8 +705,8 @@ model JobComment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([jobId])
   @@index([userId])
@@ -725,7 +725,7 @@ model AuditLog {
   userAgent  String?
   createdAt  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([entityType, entityId])
   @@index([userId])
@@ -734,73 +734,78 @@ model AuditLog {
 }
 
 model BlogPost {
-  id          String         @id @default(cuid())
-  title       String
-  slug        String         @unique
-  excerpt     String?        @db.Text
-  content     String         @db.Text
-  htmlContent String?        @db.Text
-  coverImage  String?
-  authorId    String
-  status      BlogPostStatus @default(DRAFT)
-  featured    Boolean        @default(false)
-  viewCount   Int            @default(0)
+  id              String              @id @default(cuid())
+  title           String
+  slug            String              @unique
+  excerpt         String?             @db.Text
+  content         String              @db.Text
+  htmlContent     String?             @db.Text
+  coverImage      String?
+  authorId        String
+  status          BlogPostStatus      @default(DRAFT)
+  featured        Boolean             @default(false)
+  viewCount       Int                 @default(0)
 
   // SEO fields
   metaTitle       String?
-  metaDescription String?  @db.Text
-  metaKeywords    String[] @default([])
+  metaDescription String?             @db.Text
+  metaKeywords    String[]            @default([])
   ogImage         String?
 
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  publishedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  author     User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  categories BlogPostCategory[]
-  tags       BlogPostTag[]
-  media      BlogMedia[]
+  // Automation fields
+  isAutomated        Boolean             @default(false)
+  automationMetadata Json?
+
+  author          User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categories      BlogPostCategory[]
+  tags            BlogPostTag[]
+  media           BlogMedia[]
 
   @@index([slug])
   @@index([authorId])
   @@index([status])
   @@index([publishedAt])
   @@index([featured])
+  @@index([isAutomated])
 }
 
 model BlogCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  description String?  @db.Text
+  id          String              @id @default(cuid())
+  name        String              @unique
+  slug        String              @unique
+  description String?             @db.Text
   color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  posts BlogPostCategory[]
+  posts       BlogPostCategory[]
 
   @@index([slug])
 }
 
 model BlogTag {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String              @id @default(cuid())
+  name        String              @unique
+  slug        String              @unique
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  posts BlogPostTag[]
+  posts       BlogPostTag[]
 
   @@index([slug])
 }
 
 model BlogPostCategory {
-  id         String @id @default(cuid())
+  id         String        @id @default(cuid())
   postId     String
   categoryId String
 
-  post     BlogPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  category BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  post       BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   BlogCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([postId, categoryId])
   @@index([postId])
@@ -808,12 +813,12 @@ model BlogPostCategory {
 }
 
 model BlogPostTag {
-  id     String @id @default(cuid())
+  id     String   @id @default(cuid())
   postId String
   tagId  String
 
-  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag  BlogTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  post   BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    BlogTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([postId, tagId])
   @@index([postId])
@@ -821,7 +826,7 @@ model BlogPostTag {
 }
 
 model BlogMedia {
-  id        String    @id @default(cuid())
+  id        String      @id @default(cuid())
   postId    String
   url       String
   type      MediaType
@@ -829,10 +834,10 @@ model BlogMedia {
   altText   String?
   size      Int?
   mimeType  String?
-  order     Int       @default(0)
-  createdAt DateTime  @default(now())
+  order     Int         @default(0)
+  createdAt DateTime    @default(now())
 
-  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post      BlogPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([order])
