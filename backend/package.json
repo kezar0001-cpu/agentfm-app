@@ -12,7 +12,9 @@
     "node": "25.x"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@prisma/client": "^6.18.0",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
     "compression": "^1.8.1",
