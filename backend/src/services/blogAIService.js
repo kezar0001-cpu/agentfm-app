@@ -6,7 +6,10 @@ class BlogAIService {
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
-    this.model = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
+    // Using Claude 3 Opus for best content quality
+    // Alternative models: claude-3-sonnet-20240229, claude-3-haiku-20240307
+    // If you have access to Claude 3.5: claude-3-5-sonnet-20241022
+    this.model = process.env.ANTHROPIC_MODEL || 'claude-3-opus-20240229';
   }
 
   /**
