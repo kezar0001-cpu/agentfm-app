@@ -6,7 +6,7 @@ class BlogAIService {
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
-    this.model = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022';
+    this.model = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
   }
 
   /**

@@ -2344,15 +2344,15 @@ router.get('/:id/activity', async (req, res) => {
       }
     }
 
-    const rows = await prisma.propertyActivity.findMany({
-      where: {
-        propertyId: req.params.id,
-      },
-      take: limit,
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    // Query the PropertyActivity view using raw SQL since it's a database view
+    // Note: Using parameterized query to prevent SQL injection
+    const rows = await prisma.$queryRaw`
+      SELECT *
+      FROM "PropertyActivity"
+      WHERE "propertyId" = ${req.params.id}
+      ORDER BY "date" DESC
+      LIMIT ${limit}
+    `;
 
     const activities = rows.map((row) => {
       switch (row.type) {

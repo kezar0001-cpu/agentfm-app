@@ -82,7 +82,7 @@ BLOG_AUTOMATION_ENABLED=true
 
 # Anthropic Claude API
 ANTHROPIC_API_KEY=your-anthropic-api-key
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+ANTHROPIC_MODEL=claude-3-5-sonnet-20240620
 
 # Unsplash API (optional)
 UNSPLASH_ACCESS_KEY=your-unsplash-access-key
@@ -208,7 +208,7 @@ Content-Type: application/json
 |----------|---------|-------------|
 | `BLOG_AUTOMATION_ENABLED` | `false` | Enable/disable the automation bot |
 | `ANTHROPIC_API_KEY` | - | **Required** Claude API key |
-| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20241022` | Claude model to use |
+| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20240620` | Claude model to use |
 | `UNSPLASH_ACCESS_KEY` | - | Optional Unsplash API key |
 | `BLOG_INDUSTRY` | `facilities and property management` | Industry focus for content |
 | `BLOG_TARGET_WORD_COUNT` | `1500` | Target word count for posts |
@@ -275,7 +275,7 @@ model BlogPost {
     "alt": "...",
     "source": "unsplash"
   },
-  "aiModel": "claude-3-5-sonnet-20241022",
+  "aiModel": "claude-3-5-sonnet-20240620",
   "targetWordCount": 1500,
   "actualWordCount": 1543
 }
@@ -417,7 +417,7 @@ Logs are stored in:
 ### Content Quality Issues
 
 1. **Adjust model**:
-   - Use `claude-3-5-sonnet-20241022` for best quality (default)
+   - Use `claude-3-5-sonnet-20240620` for best quality (default)
    - Or try `claude-3-opus-20240229` for even higher quality
 
 2. **Customize industry**:
