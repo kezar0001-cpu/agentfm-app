@@ -1,6 +1,6 @@
 import axios from 'axios';
 import logger from '../utils/logger.js';
-import uploadService from './uploadService.js';
+import { cloudinary } from './uploadService.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -149,9 +149,9 @@ class BlogImageService {
 
       // Upload using existing upload service
       let uploadedUrl;
-      if (uploadService.cloudinary) {
+      if (cloudinary) {
         // Upload to Cloudinary
-        const result = await uploadService.cloudinary.uploader.upload(tempFilePath, {
+        const result = await cloudinary.uploader.upload(tempFilePath, {
           folder: 'agentfm/blog',
           public_id: `blog-${imageId}-${uuidv4()}`,
           overwrite: true,
