@@ -31,7 +31,7 @@ import PropertyAmenitiesForm from './PropertyAmenitiesForm';
 import PropertyFinancials from './PropertyFinancials';
 import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
 import { queryKeys } from '../utils/queryKeys';
-import PropertyPhotoUploader from './PropertyPhotoUploader.jsx';
+import { PropertyImageManager } from '../features/images';
 import { normaliseUploadedImages } from '../utils/uploadPropertyImages.js';
 
 const PROPERTY_STATUSES = [
@@ -212,29 +212,61 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
   }, [imageUrlValue]);
 
   const handleImagesChange = (nextImages = [], nextCover = '') => {
+    console.log('[PropertyForm] handleImagesChange called:', {
+      imageCount: nextImages.length,
+      nextCover: nextCover ? nextCover.substring(0, 50) + '...' : 'none',
+    });
+
+    // Transform PropertyImageManager format to internal format
+    // PropertyImageManager returns: {imageUrl, caption, isPrimary, order}
+    // We need: {url, altText}
+    const transformedImages = nextImages.map(img => ({
+      url: img.imageUrl || img.url, // Support both formats for backward compatibility
+      altText: img.caption || img.altText || '',
+    }));
+
     // Bug Fix #9: Remove duplicate images by URL to prevent database bloat
     const uniqueImages = [];
     const seenUrls = new Set();
 
-    for (const image of nextImages) {
+    for (const image of transformedImages) {
       if (image && image.url && !seenUrls.has(image.url)) {
         seenUrls.add(image.url);
         uniqueImages.push(image);
       }
     }
 
+    console.log('[PropertyForm] After transformation and deduplication:', {
+      uniqueCount: uniqueImages.length,
+      removed: transformedImages.length - uniqueImages.length,
+    });
+
     setPhotoSelections(uniqueImages);
     const resolvedCover = nextCover || uniqueImages[0]?.url || '';
     setCoverImage(resolvedCover);
     setValue('imageUrl', resolvedCover || '', { shouldDirty: true, shouldValidate: true });
+
+    console.log('[PropertyForm] State updated:', {
+      photoSelections: uniqueImages.length,
+      coverImage: resolvedCover ? resolvedCover.substring(0, 50) + '...' : 'none',
+    });
   };
 
   const onSubmit = async (data) => {
     try {
+      console.log('[PropertyForm] onSubmit - photoSelections:', {
+        count: photoSelections.length,
+        samples: photoSelections.slice(0, 3).map(img => ({
+          url: img.url ? img.url.substring(0, 60) + '...' : 'no-url',
+          altText: img.altText || 'none',
+        })),
+      });
+
       const coverFromForm = typeof data.imageUrl === 'string' ? data.imageUrl.trim() : '';
       const imagePayload = photoSelections
         .map((image, index) => {
           if (!image || !image.url) {
+            console.warn('[PropertyForm] Skipping invalid image at index', index, image);
             return null;
           }
 
@@ -247,6 +279,12 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
           };
         })
         .filter(Boolean);
+
+      console.log('[PropertyForm] Submitting with images:', {
+        imagePayloadCount: imagePayload.length,
+        coverFromForm: coverFromForm ? coverFromForm.substring(0, 60) + '...' : 'none',
+        primaryImageIndex: imagePayload.findIndex(img => img.isPrimary),
+      });
 
       await mutation.mutateAsync({
         data: {
@@ -327,12 +365,13 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                       <PropertyLocation control={control} />
                     </Grid>
                     <Grid item xs={12}>
-                      <PropertyPhotoUploader
+                      <PropertyImageManager
                         images={photoSelections}
                         coverImageUrl={coverImage}
                         onChange={handleImagesChange}
                         propertyName={propertyName}
-                        allowAltText
+                        allowCaptions={true}
+                        disabled={isSubmitting || mutation.isPending}
                       />
                     </Grid>
                     <Grid item xs={12}>

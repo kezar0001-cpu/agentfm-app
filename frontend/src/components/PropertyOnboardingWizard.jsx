@@ -35,7 +35,7 @@ import toast from 'react-hot-toast';
 import useApiMutation from '../hooks/useApiMutation.js';
 import { COUNTRIES } from '../lib/countries.js';
 import { queryKeys } from '../utils/queryKeys.js';
-import PropertyPhotoUploader from './PropertyPhotoUploader.jsx';
+import { PropertyImageManager } from '../features/images';
 import { inviteOwnersToProperty } from '../utils/inviteOwners.js';
 
 const PROPERTY_TYPES = [
@@ -161,13 +161,21 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   };
 
   const handleUploadedImagesChange = (nextImages = [], nextCover = '') => {
+    // Transform PropertyImageManager format to internal format
+    // PropertyImageManager returns: {imageUrl, caption, isPrimary, order}
+    // We need: {url, altText}
+    const transformedImages = nextImages.map(img => ({
+      url: img.imageUrl || img.url, // Support both formats for backward compatibility
+      altText: img.caption || img.altText || '',
+    }));
+
     setFormState((prev) => ({
       ...prev,
       basicInfo: {
         ...prev.basicInfo,
-        imageUrl: nextCover || nextImages[0]?.url || '',
+        imageUrl: nextCover || transformedImages[0]?.url || '',
       },
-      images: nextImages,
+      images: transformedImages,
     }));
   };
 
@@ -603,12 +611,12 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         onChange={handleBasicInfoChange('description')}
       />
 
-      <PropertyPhotoUploader
+      <PropertyImageManager
         images={uploadedImages}
         coverImageUrl={basicInfo.imageUrl}
         propertyName={basicInfo.name}
         onChange={handleUploadedImagesChange}
-        allowAltText
+        allowCaptions={true}
       />
     </Stack>
   );

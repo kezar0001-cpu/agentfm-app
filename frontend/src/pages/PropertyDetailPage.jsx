@@ -245,11 +245,33 @@ export default function PropertyDetailPage() {
   const canInviteOwners = user?.role === 'PROPERTY_MANAGER';
   const propertyStatus = property?.status ?? 'UNKNOWN';
   const propertyImages = Array.isArray(property?.images) ? property.images : [];
+
+  // Bug Fix: Ensure carouselImages is always an array of objects, never strings
+  // This prevents rendering issues in the carousel component
   const carouselImages = propertyImages.length
     ? propertyImages
     : property?.imageUrl
-      ? [property.imageUrl]
+      ? [{
+          id: 'primary',
+          imageUrl: property.imageUrl,
+          caption: null,
+          isPrimary: true,
+        }]
       : [];
+
+  // Debug logging for image display
+  if (process.env.NODE_ENV !== 'production' && property) {
+    console.log('[PropertyDetail] Image display:', {
+      propertyId: property.id,
+      propertyImages: propertyImages.length,
+      carouselImages: carouselImages.length,
+      hasImageUrl: !!property.imageUrl,
+      sampleUrls: carouselImages.slice(0, 3).map(img =>
+        typeof img === 'string' ? img : img.imageUrl || 'no-url'
+      ),
+    });
+  }
+
   const hasMultipleCarouselImages = carouselImages.length > 1;
   const propertyManager = property?.manager ?? null;
   const propertyManagerName = propertyManager
@@ -396,12 +418,25 @@ export default function PropertyDetailPage() {
   // Bug Fix #1: Helper function to safely get and resolve image URL
   // Handles both string URLs and image objects, resolves relative paths
   const getImageUrl = useCallback((image, index = 0) => {
-    if (!image) return '';
+    if (!image) {
+      console.warn('[PropertyDetail] getImageUrl: No image provided at index', index);
+      return '';
+    }
 
     const rawUrl = typeof image === 'string' ? image : image.imageUrl;
-    if (!rawUrl) return '';
+    if (!rawUrl) {
+      console.warn('[PropertyDetail] getImageUrl: No URL found for image at index', index, image);
+      return '';
+    }
 
-    return resolvePropertyImageUrl(rawUrl, property?.name);
+    const resolved = resolvePropertyImageUrl(rawUrl, property?.name);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[PropertyDetail] Resolved image ${index}:`, {
+        raw: rawUrl.substring(0, 80),
+        resolved: resolved.substring(0, 80),
+      });
+    }
+    return resolved;
   }, [property?.name]);
 
   // Bug Fix #2: Helper function to safely get image caption
