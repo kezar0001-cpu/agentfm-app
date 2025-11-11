@@ -41,6 +41,27 @@ function MyForm() {
 }
 ```
 
+### Editing Existing Properties
+
+The component automatically handles existing images when editing:
+
+```jsx
+function EditPropertyForm({ property }) {
+  // Component will display existing images on mount
+  // and preserve them until user makes changes
+  return (
+    <PropertyImageManager
+      images={property.images}        // Existing images
+      coverImageUrl={property.imageUrl}  // Current cover photo
+      onChange={handleImagesChange}
+      allowCaptions={true}
+    />
+  );
+}
+```
+
+**Important:** The component skips the initial `onChange` call on mount to prevent clearing existing images. Changes are only notified when the user actually modifies the images (add, delete, reorder, etc.).
+
 ### Integration with PropertyForm
 
 Replace the old `PropertyPhotoUploader` with `PropertyImageManager`:
