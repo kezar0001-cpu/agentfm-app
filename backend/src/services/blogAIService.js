@@ -6,10 +6,29 @@ class BlogAIService {
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
-    // Using Claude 3 Opus for best content quality
-    // Alternative models: claude-3-sonnet-20240229, claude-3-haiku-20240307
-    // If you have access to Claude 3.5: claude-3-5-sonnet-20241022
-    this.model = process.env.ANTHROPIC_MODEL || 'claude-3-opus-20240229';
+
+    // List of known problematic models that return 404 errors
+    const deprecatedModels = [
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-sonnet-20240620'
+    ];
+
+    // Default to Claude 3 Opus for best content quality
+    const defaultModel = 'claude-3-opus-20240229';
+    const envModel = process.env.ANTHROPIC_MODEL;
+
+    // Check if environment variable has a deprecated/non-working model
+    if (envModel && deprecatedModels.includes(envModel)) {
+      logger.warn(`Environment variable ANTHROPIC_MODEL is set to "${envModel}" which is not available.`);
+      logger.warn(`Falling back to working model: ${defaultModel}`);
+      logger.warn('Please update the ANTHROPIC_MODEL environment variable in your deployment platform.');
+      this.model = defaultModel;
+    } else {
+      // Use environment variable if set and valid, otherwise use default
+      this.model = envModel || defaultModel;
+    }
+
+    logger.info(`Blog AI Service initialized with model: ${this.model}`);
   }
 
   /**
