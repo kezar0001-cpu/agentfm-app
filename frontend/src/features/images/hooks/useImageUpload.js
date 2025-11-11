@@ -12,6 +12,7 @@ import apiClient from '../../../api/client';
  * @param {string} options.endpoint - Upload endpoint URL
  * @param {boolean} options.compressImages - Enable client-side compression
  * @param {number} options.maxConcurrent - Max concurrent uploads
+ * @param {Array} options.initialImages - Initial images to display (for edit mode)
  * @returns {Object} Upload state and methods
  */
 export function useImageUpload(options = {}) {
@@ -21,10 +22,29 @@ export function useImageUpload(options = {}) {
     endpoint = '/uploads/multiple',
     compressImages = true,
     maxConcurrent = 3,
+    initialImages = [],
   } = options;
 
-  // State
-  const [images, setImages] = useState([]);
+  // State - Initialize with existing images if provided
+  const [images, setImages] = useState(() => {
+    // Convert initialImages to internal format
+    if (initialImages && initialImages.length > 0) {
+      return initialImages.map((img, index) => ({
+        id: img.id || `existing-${Date.now()}-${index}`,
+        file: null,
+        localPreview: null,
+        remoteUrl: img.url || img.imageUrl || img.remoteUrl,
+        status: 'complete',
+        progress: 100,
+        error: null,
+        isPrimary: img.isPrimary || false,
+        caption: img.altText || img.caption || '',
+        order: img.order !== undefined ? img.order : index,
+        dimensions: img.dimensions || null,
+      }));
+    }
+    return [];
+  });
   const [queue, setQueue] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
