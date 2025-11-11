@@ -39,6 +39,7 @@ import {
   getBlogTags,
 } from '../../api/blog';
 import toast from 'react-hot-toast';
+import BlogAutomationTab from '../../components/BlogAutomationTab';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -134,6 +135,7 @@ function BlogAdminPage() {
           <Tab label="Posts" />
           <Tab label="Categories" />
           <Tab label="Tags" />
+          <Tab label="Automation" />
         </Tabs>
       </Box>
 
@@ -358,6 +360,11 @@ function BlogAdminPage() {
             </TableBody>
           </Table>
         </TableContainer>
+      </TabPanel>
+
+      {/* Automation Tab */}
+      <TabPanel value={tabValue} index={3}>
+        <BlogAutomationTab />
       </TabPanel>
 
       {/* Delete Confirmation Dialog */}

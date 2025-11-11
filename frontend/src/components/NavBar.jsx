@@ -20,6 +20,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
 import SearchIcon from '@mui/icons-material/Search';
+import ArticleIcon from '@mui/icons-material/Article';
 import { useCurrentUser } from '../context/UserContext';
 
 function NavBar() {
@@ -293,7 +294,14 @@ function NavBar() {
                 Team Management
               </MenuItem>
             )}
-            
+
+            {user?.role === 'ADMIN' && (
+              <MenuItem onClick={() => handleUserMenuNavigation('/admin/blog')}>
+                <ArticleIcon fontSize="small" sx={{ mr: 1.5 }} />
+                Blog Admin
+              </MenuItem>
+            )}
+
             <Divider sx={{ my: 1 }} />
             
             <Box sx={{ px: 2, pb: 1 }}>
