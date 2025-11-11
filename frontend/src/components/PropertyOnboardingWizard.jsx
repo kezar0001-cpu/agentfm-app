@@ -335,6 +335,12 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   };
 
   const handleFinish = async () => {
+    // Bug Fix: Prevent double-submission from rapid clicks or network delays
+    if (createPropertyMutation.isPending || isSendingOwnerInvites) {
+      console.warn('[PropertyWizard] Submission already in progress, ignoring duplicate click');
+      return;
+    }
+
     if (!validateBasicInfo()) {
       setActiveStep(0);
       return;
@@ -396,9 +402,15 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
           url: img.imageUrl?.substring(0, 60) + '...',
           isPrimary: img.isPrimary,
         })) || [],
+        timestamp: new Date().toISOString(),
       });
 
+      console.log('[PropertyWizard] Calling mutation...');
       const response = await createPropertyMutation.mutateAsync({ data: payload });
+      console.log('[PropertyWizard] Mutation completed successfully:', {
+        propertyId: response?.data?.property?.id || response?.data?.id,
+        imagesReturned: response?.data?.property?.images?.length || response?.data?.images?.length || 0,
+      });
       const savedProperty = response?.data?.property || response?.data || null;
 
       let inviteResult = null;
