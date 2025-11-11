@@ -82,7 +82,7 @@ BLOG_AUTOMATION_ENABLED=true
 
 # Anthropic Claude API
 ANTHROPIC_API_KEY=your-anthropic-api-key
-ANTHROPIC_MODEL=claude-3-opus-20240229
+ANTHROPIC_MODEL=claude-3-5-haiku-20241022
 
 # Unsplash API (optional)
 UNSPLASH_ACCESS_KEY=your-unsplash-access-key
@@ -208,7 +208,7 @@ Content-Type: application/json
 |----------|---------|-------------|
 | `BLOG_AUTOMATION_ENABLED` | `false` | Enable/disable the automation bot |
 | `ANTHROPIC_API_KEY` | - | **Required** Claude API key |
-| `ANTHROPIC_MODEL` | `claude-3-opus-20240229` | Claude model to use (alternatives: claude-3-sonnet-20240229, claude-3-haiku-20240307) |
+| `ANTHROPIC_MODEL` | `claude-3-5-haiku-20241022` | Claude model (auto-fallbacks: `claude-haiku-4-5-20251001`, `claude-sonnet-4-20250514`, `claude-sonnet-4-5-20250929`) |
 | `UNSPLASH_ACCESS_KEY` | - | Optional Unsplash API key |
 | `BLOG_INDUSTRY` | `facilities and property management` | Industry focus for content |
 | `BLOG_TARGET_WORD_COUNT` | `1500` | Target word count for posts |
@@ -416,10 +416,12 @@ Logs are stored in:
 
 ### Content Quality Issues
 
-1. **Adjust model**:
-   - Uses `claude-3-opus-20240229` for best quality (default)
-   - Or try `claude-3-sonnet-20240229` for faster/cheaper generation
-   - Or use `claude-3-haiku-20240307` for quickest generation
+1. **Model selection** (automatic fallback enabled):
+   - Default: `claude-3-5-haiku-20241022` (fast, cost-effective)
+   - Auto-fallback to: `claude-haiku-4-5-20251001` (Claude 4.5 Haiku)
+   - Auto-fallback to: `claude-sonnet-4-20250514` (balanced quality/cost)
+   - Auto-fallback to: `claude-sonnet-4-5-20250929` (highest quality)
+   - The system automatically tries fallback models if primary model returns 404
 
 2. **Customize industry**:
    ```bash

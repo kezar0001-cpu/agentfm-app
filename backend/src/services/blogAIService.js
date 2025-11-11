@@ -7,28 +7,96 @@ class BlogAIService {
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
-    // List of known problematic models that return 404 errors
+    // List of deprecated/unavailable Claude 3.x models that return 404 errors
+    // These models are deprecated as of 2025 and being retired
     const deprecatedModels = [
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-sonnet-20240620'
+      'claude-3-opus-20240229',      // Deprecated June 30, 2025, retiring January 5, 2026
+      'claude-3-sonnet-20240229',    // Retired July 21, 2025
+      'claude-3-haiku-20240307',     // Retired July 21, 2025
+      'claude-3-5-sonnet-20241022',  // Being phased out
+      'claude-3-5-sonnet-20240620'   // Being phased out
     ];
 
-    // Default to Claude 3 Opus for best content quality
-    const defaultModel = 'claude-3-opus-20240229';
+    // Priority list of working models (current as of November 2025)
+    // Ordered by: cost-effectiveness, availability, and quality for blog content
+    const workingModels = [
+      'claude-3-5-haiku-20241022',   // Claude 3.5 Haiku - fastest, cheapest, widely available
+      'claude-haiku-4-5-20251001',   // Claude 4.5 Haiku - available to all users
+      'claude-sonnet-4-20250514',    // Claude 4 Sonnet - balanced, recommended by Anthropic
+      'claude-sonnet-4-5-20250929'   // Claude 4.5 Sonnet - most powerful (more expensive)
+    ];
+
     const envModel = process.env.ANTHROPIC_MODEL;
 
     // Check if environment variable has a deprecated/non-working model
     if (envModel && deprecatedModels.includes(envModel)) {
-      logger.warn(`Environment variable ANTHROPIC_MODEL is set to "${envModel}" which is not available.`);
-      logger.warn(`Falling back to working model: ${defaultModel}`);
-      logger.warn('Please update the ANTHROPIC_MODEL environment variable in your deployment platform.');
-      this.model = defaultModel;
+      logger.warn(`Environment variable ANTHROPIC_MODEL is set to "${envModel}" which is deprecated/unavailable.`);
+      logger.warn(`Falling back to: ${workingModels[0]}`);
+      logger.warn('Please update ANTHROPIC_MODEL environment variable to one of:');
+      workingModels.forEach(m => logger.warn(`  - ${m}`));
+      this.model = workingModels[0];
+    } else if (envModel) {
+      // Use environment variable if set and not deprecated
+      this.model = envModel;
+      logger.info(`Using environment variable ANTHROPIC_MODEL: ${this.model}`);
     } else {
-      // Use environment variable if set and valid, otherwise use default
-      this.model = envModel || defaultModel;
+      // Use default working model
+      this.model = workingModels[0];
+      logger.info(`No ANTHROPIC_MODEL set, using default: ${this.model}`);
     }
 
+    // Store fallback models for retry logic
+    this.fallbackModels = workingModels.filter(m => m !== this.model);
+
     logger.info(`Blog AI Service initialized with model: ${this.model}`);
+    if (this.fallbackModels.length > 0) {
+      logger.info(`Fallback models available: ${this.fallbackModels.join(', ')}`);
+    }
+  }
+
+  /**
+   * Make an API call with automatic retry on model 404 errors
+   * @param {Function} apiCall - The API call function to execute
+   * @param {string} operationName - Name of the operation for logging
+   * @returns {Promise<any>} The API response
+   */
+  async _callWithRetry(apiCall, operationName) {
+    const modelsToTry = [this.model, ...this.fallbackModels];
+
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const model = modelsToTry[i];
+
+      try {
+        logger.info(`${operationName}: Attempting with model: ${model}`);
+        const result = await apiCall(model);
+
+        // Success! Update the current model if we had to use a fallback
+        if (model !== this.model) {
+          logger.info(`${operationName}: Success with fallback model ${model}. Updating default model.`);
+          this.model = model;
+          // Update fallback list
+          this.fallbackModels = modelsToTry.filter(m => m !== model);
+        }
+
+        return result;
+      } catch (error) {
+        const is404 = error.status === 404 || error.message?.includes('404') || error.message?.includes('not_found_error');
+        const isLastModel = i === modelsToTry.length - 1;
+
+        if (is404 && !isLastModel) {
+          logger.warn(`${operationName}: Model ${model} returned 404. Trying next fallback model...`);
+          continue;
+        }
+
+        // Either not a 404, or we've exhausted all models
+        if (is404 && isLastModel) {
+          logger.error(`${operationName}: All models failed with 404. This API key may have limited model access.`);
+          logger.error('Please check your Anthropic API key tier and available models at https://console.anthropic.com/');
+        }
+
+        throw error;
+      }
+    }
   }
 
   /**
@@ -69,14 +137,19 @@ Provide your response in JSON format:
 }`;
 
     try {
-      const message = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      });
+      const message = await this._callWithRetry(
+        async (model) => {
+          return await this.client.messages.create({
+            model: model,
+            max_tokens: 1024,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          });
+        },
+        'generateTopic'
+      );
 
       const responseText = message.content[0].text;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -130,14 +203,19 @@ Format your response in JSON:
 }`;
 
     try {
-      const message = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      });
+      const message = await this._callWithRetry(
+        async (model) => {
+          return await this.client.messages.create({
+            model: model,
+            max_tokens: 4096,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          });
+        },
+        'generateContent'
+      );
 
       const responseText = message.content[0].text;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
