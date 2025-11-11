@@ -31,7 +31,7 @@ import PropertyAmenitiesForm from './PropertyAmenitiesForm';
 import PropertyFinancials from './PropertyFinancials';
 import { propertySchema, propertyDefaultValues } from '../schemas/propertySchema';
 import { queryKeys } from '../utils/queryKeys';
-import PropertyPhotoUploader from './PropertyPhotoUploader.jsx';
+import { PropertyImageManager } from '../features/images';
 import { normaliseUploadedImages } from '../utils/uploadPropertyImages.js';
 
 const PROPERTY_STATUSES = [
@@ -217,20 +217,28 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
       nextCover: nextCover ? nextCover.substring(0, 50) + '...' : 'none',
     });
 
+    // Transform PropertyImageManager format to internal format
+    // PropertyImageManager returns: {imageUrl, caption, isPrimary, order}
+    // We need: {url, altText}
+    const transformedImages = nextImages.map(img => ({
+      url: img.imageUrl || img.url, // Support both formats for backward compatibility
+      altText: img.caption || img.altText || '',
+    }));
+
     // Bug Fix #9: Remove duplicate images by URL to prevent database bloat
     const uniqueImages = [];
     const seenUrls = new Set();
 
-    for (const image of nextImages) {
+    for (const image of transformedImages) {
       if (image && image.url && !seenUrls.has(image.url)) {
         seenUrls.add(image.url);
         uniqueImages.push(image);
       }
     }
 
-    console.log('[PropertyForm] After deduplication:', {
+    console.log('[PropertyForm] After transformation and deduplication:', {
       uniqueCount: uniqueImages.length,
-      removed: nextImages.length - uniqueImages.length,
+      removed: transformedImages.length - uniqueImages.length,
     });
 
     setPhotoSelections(uniqueImages);
@@ -357,12 +365,13 @@ export default function PropertyForm({ open, onClose, property, onSuccess }) {
                       <PropertyLocation control={control} />
                     </Grid>
                     <Grid item xs={12}>
-                      <PropertyPhotoUploader
+                      <PropertyImageManager
                         images={photoSelections}
                         coverImageUrl={coverImage}
                         onChange={handleImagesChange}
                         propertyName={propertyName}
-                        allowAltText
+                        allowCaptions={true}
+                        disabled={isSubmitting || mutation.isPending}
                       />
                     </Grid>
                     <Grid item xs={12}>
