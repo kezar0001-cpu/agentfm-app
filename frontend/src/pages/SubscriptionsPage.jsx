@@ -278,8 +278,8 @@ export default function SubscriptionsPage() {
           cancelUrl: `${window.location.origin}/subscriptions?canceled=1`,
         },
       });
-      if (res?.url) {
-        window.location.href = res.url; // Redirect to Stripe checkout
+      if (res?.data?.url) {
+        window.location.href = res.data.url; // Redirect to Stripe checkout
       } else {
         throw new Error('No checkout URL returned');
       }
@@ -296,8 +296,8 @@ export default function SubscriptionsPage() {
   const handleUpdatePaymentMethod = async () => {
     try {
       const res = await updatePaymentMutation.mutateAsync({});
-      if (res?.url) {
-        window.location.href = res.url; // Redirect to Stripe billing portal
+      if (res?.data?.url) {
+        window.location.href = res.data.url; // Redirect to Stripe billing portal
       }
     } catch (err) {
       console.error('Update payment method failed:', err);
@@ -517,7 +517,7 @@ export default function SubscriptionsPage() {
           )}
           {checkoutMutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {checkoutMutation.error?.body?.message || checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
+              {checkoutMutation.error?.response?.data?.message || checkoutMutation.error?.message || 'Checkout failed. Please try again.'}
             </Alert>
           )}
 
@@ -990,7 +990,7 @@ export default function SubscriptionsPage() {
                             </Button>
                             {updatePaymentMutation.isError && (
                               <Alert severity="error" sx={{ mt: 1 }}>
-                                {updatePaymentMutation.error?.body?.message || 'Failed to update payment method'}
+                                {updatePaymentMutation.error?.response?.data?.message || updatePaymentMutation.error?.message || 'Failed to update payment method'}
                               </Alert>
                             )}
                           </Stack>
@@ -1022,7 +1022,7 @@ export default function SubscriptionsPage() {
                             </Button>
                             {cancelMutation.isError && (
                               <Alert severity="error" sx={{ mt: 1 }}>
-                                {cancelMutation.error?.body?.message || 'Failed to cancel subscription'}
+                                {cancelMutation.error?.response?.data?.message || cancelMutation.error?.message || 'Failed to cancel subscription'}
                               </Alert>
                             )}
                           </Stack>
