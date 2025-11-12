@@ -424,7 +424,9 @@ router.get(
       ];
     }
 
-    const include = {};
+    const include = {
+      unitImages: unitIncludeConfig.unitImages,
+    };
     if (includeTenants) {
       include.tenants = tenantListArgs;
     }
