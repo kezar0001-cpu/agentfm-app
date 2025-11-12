@@ -182,6 +182,11 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
     }));
   };
 
+  // Bug Fix: Track upload state to prevent navigation during uploads
+  const handleUploadingStateChange = (isUploading) => {
+    setIsUploadingImages(isUploading);
+  };
+
   const handleUnitChange = (index, field) => (event) => {
     const { value } = event.target;
     setFormState((prev) => {
@@ -318,6 +323,12 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
 
   const handleNext = () => {
     if (activeStep === 0 && !validateBasicInfo()) {
+      return;
+    }
+
+    // Bug Fix: Prevent navigation if images are still uploading
+    if (activeStep === 0 && isUploadingImages) {
+      toast.error('Please wait for images to finish uploading before continuing');
       return;
     }
 
@@ -638,8 +649,15 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
         coverImageUrl={basicInfo.imageUrl}
         propertyName={basicInfo.name}
         onChange={handleUploadedImagesChange}
+        onUploadingChange={handleUploadingStateChange}
         allowCaptions={true}
       />
+
+      {isUploadingImages && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Images are uploading... Please wait before continuing to the next step.
+        </Alert>
+      )}
     </Stack>
   );
 
@@ -1027,7 +1045,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
             onClick={handleNext}
             disabled={isUploadingImages || isSendingOwnerInvites}
           >
-            Save & Continue
+            {isUploadingImages ? 'Uploading images...' : 'Save & Continue'}
           </Button>
         )}
 

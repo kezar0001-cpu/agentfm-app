@@ -258,13 +258,30 @@ export function useImageUpload(options = {}) {
   }, [isUploading, images, queue, compressImages, endpoint, onSuccess, onError]);
 
   /**
-   * Upload files immediately (adds and processes)
+   * Auto-process queue when items are added
+   * Bug Fix: Use useEffect instead of setTimeout to avoid stale closure issues
+   */
+  useEffect(() => {
+    // Only process if there are pending items and not already uploading
+    if (queue.length > 0 && !isUploading) {
+      const hasPendingImages = images.some(img =>
+        queue.includes(img.id) && img.status === 'pending'
+      );
+
+      if (hasPendingImages) {
+        console.log('[useImageUpload] Auto-processing queue with', queue.length, 'items');
+        processQueue();
+      }
+    }
+  }, [queue, isUploading, images, processQueue]);
+
+  /**
+   * Upload files immediately (adds to queue, then auto-processes via useEffect)
    */
   const uploadFiles = useCallback(async (files) => {
     await addFiles(files);
-    // Process queue in next tick
-    setTimeout(() => processQueue(), 0);
-  }, [addFiles, processQueue]);
+    // Queue will auto-process via useEffect above
+  }, [addFiles]);
 
   /**
    * Cancel upload

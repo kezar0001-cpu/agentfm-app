@@ -20,6 +20,7 @@ export function PropertyImageManager({
   images: initialImages = [],
   coverImageUrl = '',
   onChange,
+  onUploadingChange,
   allowCaptions = true,
   disabled = false,
   propertyName = '',
@@ -51,6 +52,7 @@ export function PropertyImageManager({
     getCompletedImages,
     completedCount,
     errorCount,
+    pendingCount,
   } = useImageUpload({
     endpoint: '/uploads/multiple',
     compressImages: true,
@@ -64,40 +66,60 @@ export function PropertyImageManager({
     },
   });
 
-  // Track if this is the initial mount to avoid spurious onChange calls
+  // Bug Fix: Track initial mount and previous images to prevent spurious onChange calls
   const isInitialMount = useRef(true);
+  const previousImageCountRef = useRef(0);
+
+  /**
+   * Notify parent of upload state changes
+   * Bug Fix: Track uploading and pending state to prevent navigation during uploads
+   */
+  useEffect(() => {
+    if (!onUploadingChange) return;
+
+    const hasActiveUploads = isUploading || pendingCount > 0;
+    onUploadingChange(hasActiveUploads);
+  }, [isUploading, pendingCount, onUploadingChange]);
 
   /**
    * Notify parent of changes
+   * Bug Fix: Only notify when images actually complete, not on every state change
+   * This prevents file dialog interruption and preserves pending uploads
    */
   useEffect(() => {
     if (!onChange) return;
 
-    // Bug Fix: Only skip initial onChange if we started with images (edit mode)
-    // In create mode (no initial images), we need to notify parent of first upload
+    // Bug Fix: Always skip the very first render to avoid interrupting file selection
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      const hasInitialImages = preparedInitialImages.length > 0;
-      if (hasInitialImages) {
-        console.log('[PropertyImageManager] Skipping initial onChange - preserving existing images');
-        return;
-      }
+      previousImageCountRef.current = images.length;
+      console.log('[PropertyImageManager] Initial mount - not calling onChange yet');
+      return;
     }
 
     const completedImages = getCompletedImages();
+    const currentCompletedCount = completedImages.length;
+
+    // Bug Fix: Only call onChange if completed count actually changed
+    // This prevents unnecessary parent re-renders during upload progress
+    if (currentCompletedCount === previousImageCountRef.current) {
+      return;
+    }
+
+    previousImageCountRef.current = currentCompletedCount;
 
     // Get cover image URL
-    const coverImage = images.find(img => img.isPrimary);
-    const coverUrl = coverImage?.remoteUrl || '';
+    const coverImage = completedImages.find(img => img.isPrimary);
+    const coverUrl = coverImage?.imageUrl || '';
 
-    console.log('[PropertyImageManager] Notifying parent:', {
+    console.log('[PropertyImageManager] Notifying parent of completed images:', {
       imageCount: completedImages.length,
       coverUrl: coverUrl ? coverUrl.substring(0, 60) + '...' : 'none',
     });
 
-    // Call onChange with images and cover URL
+    // Call onChange with completed images and cover URL
     onChange(completedImages, coverUrl);
-  }, [images, onChange, getCompletedImages, preparedInitialImages.length]);
+  }, [images, onChange, getCompletedImages]);
 
   /**
    * Handle file selection
