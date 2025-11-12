@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -11,10 +11,12 @@ import {
   Alert,
   Box,
 } from '@mui/material';
+import toast from 'react-hot-toast';
 import useApiMutation from '../hooks/useApiMutation';
 import { queryKeys } from '../utils/queryKeys.js';
 import { unitSchema, unitDefaultValues } from '../schemas/unitSchema';
 import { FormTextField, FormSelect } from './form';
+import { UnitImageManager } from '../features/images';
 
 const UNIT_STATUSES = [
   { value: 'AVAILABLE', label: 'Available' },
@@ -25,6 +27,9 @@ const UNIT_STATUSES = [
 
 export default function UnitForm({ open, onClose, propertyId, unit, onSuccess }) {
   const isEdit = !!unit;
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const {
     control,
@@ -59,8 +64,23 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
         description: unit.description || '',
         imageUrl: unit.imageUrl || '',
       });
+
+      // Initialize images from unit data
+      if (unit.images && Array.isArray(unit.images)) {
+        const formattedImages = unit.images.map(img => ({
+          url: img.imageUrl || img.url,
+          altText: img.caption || img.altText || '',
+        }));
+        setUploadedImages(formattedImages);
+        setCoverImageUrl(unit.imageUrl || '');
+      } else {
+        setUploadedImages([]);
+        setCoverImageUrl(unit.imageUrl || '');
+      }
     } else {
       reset(unitDefaultValues);
+      setUploadedImages([]);
+      setCoverImageUrl('');
     }
   }, [unit, open, reset]);
 
@@ -72,7 +92,29 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
     }
   }, [errors, setFocus]);
 
+  // Handle image upload changes
+  const handleUploadedImagesChange = (nextImages = [], nextCover = '') => {
+    const transformedImages = nextImages.map(img => ({
+      url: img.imageUrl || img.url,
+      altText: img.caption || img.altText || '',
+    }));
+
+    setUploadedImages(transformedImages);
+    setCoverImageUrl(nextCover || transformedImages[0]?.url || '');
+  };
+
+  // Handle upload state changes
+  const handleUploadingStateChange = (isUploading) => {
+    setIsUploadingImages(isUploading);
+  };
+
   const onSubmit = async (data) => {
+    // Prevent submission if images are still uploading
+    if (isUploadingImages) {
+      toast.error('Please wait for images to finish uploading');
+      return;
+    }
+
     const payload = {
       unitNumber: data.unitNumber,
       floor: data.floor,
@@ -82,8 +124,17 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
       rentAmount: data.rentAmount,
       status: data.status,
       description: data.description || null,
-      imageUrl: data.imageUrl || null,
+      imageUrl: coverImageUrl || null,
     };
+
+    // Add images array if there are uploaded images
+    if (uploadedImages.length > 0) {
+      payload.images = uploadedImages.map((image, index) => ({
+        imageUrl: image.url,
+        caption: image.altText || null,
+        isPrimary: coverImageUrl ? image.url === coverImageUrl : index === 0,
+      }));
+    }
 
     // Add propertyId only for creation
     if (!isEdit) {
@@ -166,7 +217,7 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             </Grid>
 
             {/* Area */}
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm=6}>
               <FormTextField
                 name="area"
                 control={control}
@@ -197,30 +248,40 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
               />
             </Grid>
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <Grid item xs={12}>
-              <FormTextField
-                name="imageUrl"
-                control={control}
-                label="Image URL (optional)"
-                helperText="Enter a URL to an image of the unit"
+              <UnitImageManager
+                images={uploadedImages}
+                coverImageUrl={coverImageUrl}
+                unitName={\`Unit \${unit?.unitNumber || 'New'}\`}
+                onChange={handleUploadedImagesChange}
+                onUploadingChange={handleUploadingStateChange}
+                allowCaptions={true}
               />
+
+              {isUploadingImages && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Images are uploading... Please wait before saving.
+                </Alert>
+              )}
             </Grid>
           </Grid>
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={isSubmitting || mutation.isPending}>
+        <Button onClick={onClose} disabled={isSubmitting || mutation.isPending || isUploadingImages}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={handleSubmit(onSubmit)}
-          disabled={isSubmitting || mutation.isPending}
+          disabled={isSubmitting || mutation.isPending || isUploadingImages}
         >
           {mutation.isPending
             ? 'Saving...'
+            : isUploadingImages
+            ? 'Uploading images...'
             : isEdit
             ? 'Update Unit'
             : 'Create Unit'}
