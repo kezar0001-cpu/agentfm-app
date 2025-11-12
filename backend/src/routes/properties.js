@@ -234,6 +234,10 @@ router.use('/:propertyId/units', unitsRouter);
 const propertyImagesRouter = Router({ mergeParams: true });
 router.use('/:id/images', propertyImagesRouter);
 
+// Nested property document routes (defined later)
+const propertyDocumentsRouter = Router({ mergeParams: true });
+router.use('/:id/documents', propertyDocumentsRouter);
+
 // ---------------------------------------------------------------------------
 // Zod helpers
 // ---------------------------------------------------------------------------
@@ -2413,6 +2417,303 @@ router.get('/:id/activity', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Property document routes
+// ---------------------------------------------------------------------------
+
+// Zod schemas for property documents
+const propertyDocumentCreateSchema = z.object({
+  category: z.enum(['LEASE_AGREEMENT', 'INSURANCE', 'PERMIT', 'INSPECTION_REPORT', 'MAINTENANCE_RECORD', 'FINANCIAL', 'LEGAL', 'PHOTOS', 'OTHER']),
+  description: optionalString(),
+  accessLevel: z.enum(['PUBLIC', 'TENANT', 'OWNER', 'PROPERTY_MANAGER']),
+});
+
+// Multer middleware for document uploads - accepts various document types
+const documentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '');
+      const sanitizedName = path.basename(file.originalname || 'document', ext)
+        .replace(/[\/\\.\x00]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, '-')
+        .slice(0, 40) || 'document';
+      const unique = randomUUID();
+      cb(null, `${sanitizedName}-${unique}${ext}`);
+    },
+  }),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit for documents
+  },
+  fileFilter: (_req, file, cb) => {
+    // Accept common document types
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/csv',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
+
+    if (!file.mimetype || !allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'file'));
+    }
+
+    cb(null, true);
+  },
+});
+
+// GET /properties/:id/documents - List all documents for a property
+propertyDocumentsRouter.get('/', async (req, res) => {
+  const propertyId = req.params.id;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const documents = await prisma.propertyDocument.findMany({
+      where: { propertyId },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      documents,
+    });
+  } catch (error) {
+    console.error('Get property documents error:', error);
+    return sendError(res, 500, 'Failed to fetch property documents', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// GET /properties/:id/documents/:documentId - Get a single document
+propertyDocumentsRouter.get('/:documentId', async (req, res) => {
+  const propertyId = req.params.id;
+  const documentId = req.params.documentId;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user);
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const document = await prisma.propertyDocument.findFirst({
+      where: {
+        id: documentId,
+        propertyId,
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!document) {
+      return sendError(res, 404, 'Document not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
+    }
+
+    res.json({
+      success: true,
+      document,
+    });
+  } catch (error) {
+    console.error('Get property document error:', error);
+    return sendError(res, 500, 'Failed to fetch property document', ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// POST /properties/:id/documents - Upload and create a new document
+propertyDocumentsRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUpload, documentUpload.single('file'), async (req, res) => {
+  const propertyId = req.params.id;
+
+  const cleanupUploadedFile = () => {
+    if (req.file?.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Failed to remove uploaded file after error:', cleanupError);
+      }
+    }
+  };
+
+  try {
+    if (!req.file) {
+      return sendError(res, 400, 'No file uploaded', ErrorCodes.FILE_NO_FILE_UPLOADED);
+    }
+
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      cleanupUploadedFile();
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const parsed = propertyDocumentCreateSchema.parse(req.body);
+
+    const document = await prisma.propertyDocument.create({
+      data: {
+        propertyId,
+        fileName: req.file.originalname,
+        fileUrl: `/uploads/${req.file.filename}`,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        category: parsed.category,
+        description: parsed.description || null,
+        accessLevel: parsed.accessLevel,
+        uploaderId: req.user.id,
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.status(201).json({
+      success: true,
+      document,
+    });
+  } catch (error) {
+    cleanupUploadedFile();
+
+    if (error instanceof z.ZodError) {
+      return sendError(res, 400, 'Validation error', ErrorCodes.VAL_VALIDATION_ERROR, error.flatten());
+    }
+
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return sendError(res, 400, 'File too large. Maximum size is 50MB.', ErrorCodes.FILE_TOO_LARGE);
+      }
+      if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+        return sendError(res, 400, 'Invalid file type. Allowed types: PDF, Word, Excel, images, text files.', ErrorCodes.FILE_INVALID_TYPE);
+      }
+    }
+
+    console.error('Upload property document error:', error);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to upload document. Please try again.'
+      : `Failed to upload document: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
+// DELETE /properties/:id/documents/:documentId - Delete a document
+propertyDocumentsRouter.delete('/:documentId', requireRole('PROPERTY_MANAGER'), async (req, res) => {
+  const propertyId = req.params.id;
+  const documentId = req.params.documentId;
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        owners: { select: { ownerId: true } },
+      },
+    });
+
+    const access = ensurePropertyAccess(property, req.user, { requireWrite: true });
+    if (!access.allowed) {
+      const errorCode = access.status === 404 ? ErrorCodes.RES_PROPERTY_NOT_FOUND : ErrorCodes.ACC_PROPERTY_ACCESS_DENIED;
+      return sendError(res, access.status, access.reason, errorCode);
+    }
+
+    const document = await prisma.propertyDocument.findFirst({
+      where: {
+        id: documentId,
+        propertyId,
+      },
+    });
+
+    if (!document) {
+      return sendError(res, 404, 'Document not found', ErrorCodes.RES_PROPERTY_NOT_FOUND);
+    }
+
+    await prisma.propertyDocument.delete({
+      where: { id: documentId },
+    });
+
+    // Clean up physical file from disk
+    if (document.fileUrl && document.fileUrl.startsWith('/uploads/')) {
+      const filename = document.fileUrl.replace('/uploads/', '');
+      const filePath = path.join(UPLOAD_DIR, filename);
+
+      fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') {
+          console.error('Failed to delete document file:', filePath, err);
+        } else if (!err) {
+          console.log('✅ Deleted document file:', filePath);
+        }
+      });
+    }
+
+    const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
+    await invalidatePropertyCaches(cacheUserIds);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete property document error:', error);
+    const userMessage = process.env.NODE_ENV === 'production'
+      ? 'Failed to delete document. Please try again.'
+      : `Failed to delete document: ${error.message}`;
+    return sendError(res, 500, userMessage, ErrorCodes.ERR_INTERNAL_SERVER);
+  }
+});
+
 router._test = {
   propertySchema,
   propertyUpdateSchema,
@@ -2432,6 +2733,7 @@ router._test = {
   propertyListSelect,
   collectPropertyCacheUserIds,
   propertyImagesRouter,
+  propertyDocumentsRouter,
   maybeHandleImageUpload,
   isMultipartRequest,
 };

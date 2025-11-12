@@ -55,6 +55,7 @@ model User {
   auditLogs               AuditLog[]
   Org                     Org?                    @relation(fields: [orgId], references: [id])
   blogPosts               BlogPost[]
+  uploadedPropertyDocuments PropertyDocument[]  @relation("PropertyDocumentUploader")
 
   @@index([email])
   @@index([role])
@@ -152,6 +153,7 @@ model Property {
   monthlyHOA           Float?
 
   propertyImages  PropertyImage[]
+  propertyDocuments PropertyDocument[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   managerId       String
@@ -185,6 +187,29 @@ model PropertyImage {
 
   @@index([propertyId])
   @@index([displayOrder])
+}
+
+model PropertyDocument {
+  id          String                 @id @default(cuid())
+  propertyId  String
+  fileName    String
+  fileUrl     String
+  fileSize    Int
+  mimeType    String
+  category    PropertyDocumentCategory
+  description String?
+  accessLevel PropertyDocumentAccessLevel
+  uploaderId  String
+  uploadedAt  DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploader User     @relation("PropertyDocumentUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([uploaderId])
+  @@index([category])
+  @@index([accessLevel])
 }
 
 model UnitImage {
@@ -853,4 +878,23 @@ enum MediaType {
   IMAGE
   VIDEO
   EMBED
+}
+
+enum PropertyDocumentCategory {
+  LEASE_AGREEMENT
+  INSURANCE
+  PERMIT
+  INSPECTION_REPORT
+  MAINTENANCE_RECORD
+  FINANCIAL
+  LEGAL
+  PHOTOS
+  OTHER
+}
+
+enum PropertyDocumentAccessLevel {
+  PUBLIC
+  TENANT
+  OWNER
+  PROPERTY_MANAGER
 }
