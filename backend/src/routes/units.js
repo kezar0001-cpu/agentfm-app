@@ -573,20 +573,43 @@ router.patch(
 
     const data = parsed.data;
 
-    const unit = await prisma.unit.update({
-      where: { id: unitId },
-      data: {
-        ...(data.unitNumber !== undefined && { unitNumber: data.unitNumber }),
-        ...(data.floor !== undefined && { floor: data.floor ?? null }),
-        ...(data.bedrooms !== undefined && { bedrooms: data.bedrooms ?? null }),
-        ...(data.bathrooms !== undefined && { bathrooms: data.bathrooms ?? null }),
-        ...(data.area !== undefined && { area: data.area ?? null }),
-        ...(data.rentAmount !== undefined && { rentAmount: data.rentAmount ?? null }),
-        ...(data.status !== undefined && { status: data.status }),
-        ...(data.description !== undefined && { description: data.description ?? null }),
-        ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl ?? null }),
-      },
-      include: unitIncludeConfig,
+    const unit = await prisma.$transaction(async (tx) => {
+      const updatedUnit = await tx.unit.update({
+        where: { id: unitId },
+        data: {
+          ...(data.unitNumber !== undefined && { unitNumber: data.unitNumber }),
+          ...(data.floor !== undefined && { floor: data.floor ?? null }),
+          ...(data.bedrooms !== undefined && { bedrooms: data.bedrooms ?? null }),
+          ...(data.bathrooms !== undefined && { bathrooms: data.bathrooms ?? null }),
+          ...(data.area !== undefined && { area: data.area ?? null }),
+          ...(data.rentAmount !== undefined && { rentAmount: data.rentAmount ?? null }),
+          ...(data.status !== undefined && { status: data.status }),
+          ...(data.description !== undefined && { description: data.description ?? null }),
+          ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl ?? null }),
+        },
+        include: unitIncludeConfig,
+      });
+
+      if (data.images !== undefined) {
+        await tx.unitImage.deleteMany({ where: { unitId } });
+
+        if (Array.isArray(data.images) && data.images.length > 0) {
+          const imageRecords = data.images.map((image, index) => ({
+            unitId,
+            imageUrl: image.imageUrl,
+            caption: image.caption ?? null,
+            isPrimary: image.isPrimary ?? index === 0,
+            displayOrder: index,
+            uploadedById: req.user.id,
+          }));
+
+          await tx.unitImage.createMany({ data: imageRecords });
+        }
+
+        await syncUnitCoverImage(tx, unitId);
+      }
+
+      return updatedUnit;
     });
 
     res.json({ unit: toPublicUnit(unit) });
