@@ -296,8 +296,8 @@ const isValidImageLocation = (value) => {
   // Allow HTTPS/HTTP URLs
   if (/^https?:\/\//i.test(value)) return true;
 
-  // Allow relative /uploads/ paths
-  if (value.startsWith('/uploads/')) return true;
+  // Allow relative /uploads/ and /api/uploads/ paths
+  if (value.startsWith('/uploads/') || value.startsWith('/api/uploads/')) return true;
 
   return false;
 };
@@ -1996,7 +1996,7 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUpload,
 
     const body = { ...(req.body ?? {}) };
     if (req.file?.filename) {
-      body.imageUrl = `/uploads/${req.file.filename}`;
+      body.imageUrl = `/api/uploads/${req.file.filename}`;
     }
 
     const parsed = propertyImageCreateSchema.parse(body);
@@ -2209,8 +2209,8 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
 
     // Bug Fix #2: Clean up physical file from disk when deleting image from database
     // This prevents orphaned files from accumulating and wasting disk space
-    if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
-      const filename = deleted.imageUrl.replace('/uploads/', '');
+    if (deleted.imageUrl && (deleted.imageUrl.startsWith('/uploads/') || deleted.imageUrl.startsWith('/api/uploads/'))) {
+      const filename = deleted.imageUrl.replace('/uploads/', '').replace('/api/uploads/', '');
       const filePath = path.join(UPLOAD_DIR, filename);
 
       // Asynchronously delete file without blocking response
@@ -2602,7 +2602,7 @@ propertyDocumentsRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUplo
       data: {
         propertyId,
         fileName: req.file.originalname,
-        fileUrl: `/uploads/${req.file.filename}`,
+        fileUrl: `/api/uploads/${req.file.filename}`,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         category: parsed.category,
@@ -2688,8 +2688,8 @@ propertyDocumentsRouter.delete('/:documentId', requireRole('PROPERTY_MANAGER'), 
     });
 
     // Clean up physical file from disk
-    if (document.fileUrl && document.fileUrl.startsWith('/uploads/')) {
-      const filename = document.fileUrl.replace('/uploads/', '');
+    if (document.fileUrl && (document.fileUrl.startsWith('/uploads/') || document.fileUrl.startsWith('/api/uploads/'))) {
+      const filename = document.fileUrl.replace('/uploads/', '').replace('/api/uploads/', '');
       const filePath = path.join(UPLOAD_DIR, filename);
 
       fs.unlink(filePath, (err) => {
