@@ -264,7 +264,8 @@ export default function SubscriptionsPage() {
   const isTrialActive = subscriptionStatus === 'TRIAL';
   const userHasActiveSubscription = hasActiveSubscription; // Keep for consistency with existing code
   const trialDaysRemaining = calculateDaysRemaining(currentUser?.trialEndDate);
-  const planForCheckout = subscriptionPlan || 'STARTER'; // Default to STARTER if no plan
+  // Default to STARTER if no plan or if plan is FREE_TRIAL (which isn't a paid plan)
+  const planForCheckout = (subscriptionPlan && subscriptionPlan !== 'FREE_TRIAL') ? subscriptionPlan : 'STARTER';
 
   // Existing data fetching and processing logic
   const subscriptions = normaliseArray(query.data);
