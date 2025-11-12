@@ -517,7 +517,6 @@ router.post(
           description: data.description ?? null,
           imageUrl: data.imageUrl ?? null,
         },
-        include: unitIncludeConfig,
       });
 
       // Handle images array if provided
@@ -537,7 +536,13 @@ router.post(
         await syncUnitCoverImage(tx, createdUnit.id);
       }
 
-      return createdUnit;
+      // Re-fetch unit with all relations including images
+      const unitWithImages = await tx.unit.findUnique({
+        where: { id: createdUnit.id },
+        include: unitIncludeConfig,
+      });
+
+      return unitWithImages;
     });
 
     res.status(201).json({ unit: toPublicUnit(unit) });
