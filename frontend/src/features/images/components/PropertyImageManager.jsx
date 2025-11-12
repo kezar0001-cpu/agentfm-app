@@ -68,7 +68,7 @@ export function PropertyImageManager({
 
   // Bug Fix: Track initial mount and previous images to prevent spurious onChange calls
   const isInitialMount = useRef(true);
-  const previousImageCountRef = useRef(0);
+  const previousCompletedSnapshotRef = useRef('');
 
   /**
    * Notify parent of upload state changes
@@ -90,23 +90,34 @@ export function PropertyImageManager({
     if (!onChange) return;
 
     // Bug Fix: Always skip the very first render to avoid interrupting file selection
+    const completedImages = getCompletedImages();
+
+    const serializeCompletedImages = (list) =>
+      JSON.stringify(
+        list.map((img) => ({
+          id: img.id ?? img.imageId ?? null,
+          imageId: img.imageId ?? null,
+          imageUrl: img.imageUrl ?? '',
+          caption: img.caption ?? '',
+          isPrimary: Boolean(img.isPrimary),
+          position: img.position ?? null,
+        }))
+      );
+
+    const serializedCompleted = serializeCompletedImages(completedImages);
+
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      previousImageCountRef.current = images.length;
+      previousCompletedSnapshotRef.current = serializedCompleted;
       console.log('[PropertyImageManager] Initial mount - not calling onChange yet');
       return;
     }
 
-    const completedImages = getCompletedImages();
-    const currentCompletedCount = completedImages.length;
-
-    // Bug Fix: Only call onChange if completed count actually changed
-    // This prevents unnecessary parent re-renders during upload progress
-    if (currentCompletedCount === previousImageCountRef.current) {
+    if (serializedCompleted === previousCompletedSnapshotRef.current) {
       return;
     }
 
-    previousImageCountRef.current = currentCompletedCount;
+    previousCompletedSnapshotRef.current = serializedCompleted;
 
     // Get cover image URL
     const coverImage = completedImages.find(img => img.isPrimary);

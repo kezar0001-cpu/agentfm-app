@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { compressImage, createPreview } from '../utils/imageCompression';
 import { validateFiles } from '../utils/imageValidation';
 import apiClient from '../../../api/client';
