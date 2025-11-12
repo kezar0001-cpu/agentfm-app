@@ -80,16 +80,14 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [formData, setFormData] = useState({
-    fileName: '',
-    fileUrl: '',
-    fileSize: 0,
-    mimeType: '',
     category: 'OTHER',
     description: '',
     accessLevel: 'PROPERTY_MANAGER',
   });
   const [uploadError, setUploadError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const documents = documentsData?.documents || [];
 
@@ -97,60 +95,87 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file size (50MB limit)
+      if (file.size > 50 * 1024 * 1024) {
+        setUploadError('File too large. Maximum size is 50MB.');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/csv',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError('Invalid file type. Allowed: PDF, Word, Excel, images, text files.');
+        return;
+      }
+
+      setSelectedFile(file);
+      setUploadError('');
+    }
+  };
+
   const handleAddDocument = async () => {
-    if (!formData.fileName.trim() || !formData.fileUrl.trim()) {
-      setUploadError('File name and URL are required');
-      return;
-    }
-
-    // Bug Fix: Add URL validation to prevent invalid URLs
-    try {
-      new URL(formData.fileUrl.trim());
-    } catch (error) {
-      setUploadError('Please enter a valid URL');
-      return;
-    }
-
-    // Bug Fix: Validate file size is a non-negative number
-    const fileSizeNumber = parseInt(formData.fileSize, 10);
-    if (isNaN(fileSizeNumber) || fileSizeNumber < 0) {
-      setUploadError('File size must be a non-negative number');
-      return;
-    }
-
-    // Bug Fix: Validate MIME type format (basic validation)
-    const mimeTypeValue = formData.mimeType.trim();
-    if (mimeTypeValue && !/^[\w\-]+\/[\w\-+.]+$/.test(mimeTypeValue)) {
-      setUploadError('Please enter a valid MIME type (e.g., application/pdf, image/jpeg)');
+    if (!selectedFile) {
+      setUploadError('Please select a file to upload');
       return;
     }
 
     try {
       setUploadError('');
+      setUploadProgress(0);
+
+      // Create FormData for file upload
+      const uploadData = new FormData();
+      uploadData.append('file', selectedFile);
+      uploadData.append('category', formData.category);
+      uploadData.append('accessLevel', formData.accessLevel);
+      if (formData.description.trim()) {
+        uploadData.append('description', formData.description.trim());
+      }
+
       await addDocumentMutation.mutateAsync({
-        data: {
-          fileName: formData.fileName.trim(),
-          fileUrl: formData.fileUrl.trim(),
-          fileSize: fileSizeNumber,
-          mimeType: mimeTypeValue || 'application/octet-stream',
-          category: formData.category,
-          description: formData.description.trim() || null,
-          accessLevel: formData.accessLevel,
-        },
+        data: uploadData,
       });
+
       setUploadDialogOpen(false);
+      setSelectedFile(null);
       setFormData({
-        fileName: '',
-        fileUrl: '',
-        fileSize: 0,
-        mimeType: '',
         category: 'OTHER',
         description: '',
         accessLevel: 'PROPERTY_MANAGER',
       });
+      setUploadProgress(0);
     } catch (error) {
-      setUploadError(error.response?.data?.message || 'Failed to add document');
+      setUploadError(error.response?.data?.message || 'Failed to upload document');
+      setUploadProgress(0);
     }
+  };
+
+  const handleCloseDialog = () => {
+    setUploadDialogOpen(false);
+    setSelectedFile(null);
+    setUploadError('');
+    setUploadProgress(0);
+    setFormData({
+      category: 'OTHER',
+      description: '',
+      accessLevel: 'PROPERTY_MANAGER',
+    });
   };
 
   const handleDeleteDocument = async () => {
@@ -287,11 +312,11 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
       )}
 
       {/* Upload Dialog */}
-      <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={uploadDialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           Add Property Document
           <IconButton
-            onClick={() => setUploadDialogOpen(false)}
+            onClick={handleCloseDialog}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
             <CloseIcon />
@@ -303,26 +328,39 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
               {uploadError}
             </Alert>
           )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="File Name"
-            type="text"
-            fullWidth
-            value={formData.fileName}
-            onChange={(e) => handleFormChange('fileName', e.target.value)}
-            required
-          />
-          <TextField
-            margin="dense"
-            label="File URL"
-            type="url"
-            fullWidth
-            value={formData.fileUrl}
-            onChange={(e) => handleFormChange('fileUrl', e.target.value)}
-            helperText="Upload files via the Uploads page first, then paste the URL here"
-            required
-          />
+
+          {/* File Upload Section */}
+          <Box sx={{ mt: 2, mb: 2 }}>
+            <input
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp"
+              style={{ display: 'none' }}
+              id="document-file-upload"
+              type="file"
+              onChange={handleFileSelect}
+            />
+            <label htmlFor="document-file-upload">
+              <Button
+                variant="outlined"
+                component="span"
+                startIcon={<CloudUploadIcon />}
+                fullWidth
+                sx={{ py: 2 }}
+              >
+                {selectedFile ? selectedFile.name : 'Choose File to Upload'}
+              </Button>
+            </label>
+            {selectedFile && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  File: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+                </Typography>
+              </Box>
+            )}
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              Allowed: PDF, Word, Excel, images, text files (Max 50MB)
+            </Typography>
+          </Box>
+
           <FormControl fullWidth margin="dense">
             <InputLabel>Category</InputLabel>
             <Select
@@ -361,32 +399,25 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
             value={formData.description}
             onChange={(e) => handleFormChange('description', e.target.value)}
           />
-          <TextField
-            margin="dense"
-            label="File Size (bytes)"
-            type="number"
-            fullWidth
-            value={formData.fileSize}
-            onChange={(e) => handleFormChange('fileSize', parseInt(e.target.value) || 0)}
-          />
-          <TextField
-            margin="dense"
-            label="MIME Type"
-            type="text"
-            fullWidth
-            value={formData.mimeType}
-            onChange={(e) => handleFormChange('mimeType', e.target.value)}
-            helperText="e.g., application/pdf, image/jpeg"
-          />
+
+          {/* Upload Progress */}
+          {addDocumentMutation.isPending && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                Uploading...
+              </Typography>
+              <CircularProgress size={20} sx={{ ml: 1 }} />
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
             onClick={handleAddDocument}
             variant="contained"
-            disabled={addDocumentMutation.isPending}
+            disabled={addDocumentMutation.isPending || !selectedFile}
           >
-            {addDocumentMutation.isPending ? 'Adding...' : 'Add Document'}
+            {addDocumentMutation.isPending ? 'Uploading...' : 'Upload Document'}
           </Button>
         </DialogActions>
       </Dialog>
