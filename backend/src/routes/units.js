@@ -23,7 +23,7 @@ const UNIT_STATUSES = [
 
 // Nested unit image routes
 const unitImagesRouter = Router({ mergeParams: true });
-router.use(':id/images', unitImagesRouter);
+router.use('/:id/images', unitImagesRouter);
 
 // Multer configuration for image uploads
 const uploadsDir = path.join(process.cwd(), 'uploads');
