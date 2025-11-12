@@ -1,22 +1,25 @@
 // backend/src/config/redisClient.js
-import { createClient } from 'redis';
+import { createClient as createRedisClientDefault } from 'redis';
 
 const DEFAULT_REDIS_URL = process.env.REDIS_URL || process.env.REDIS_TLS_URL || process.env.REDIS_HOST;
 
-function createNoopClient() {
-  return {
-    isOpen: false,
-    async connect() {},
-    async get() { return null; },
-    async set() {},
-    async setEx() {},
-    async del() {},
-  };
+const noopClient = {
+  isOpen: false,
+  async connect() {},
+  async get() { return null; },
+  async set() {},
+  async setEx() {},
+  async del() {},
+};
+
+function getNoopClient() {
+  return noopClient;
 }
 
 let redisClient = null;
-let connectAttempted = false;
 let connectionFailed = false;
+let connectPromise = null;
+let createRedisClient = (...args) => createRedisClientDefault(...args);
 
 function initialiseRedis() {
   if (redisClient) {
@@ -27,7 +30,7 @@ function initialiseRedis() {
     if (process.env.NODE_ENV !== 'test') {
       console.info('[Redis] Disabled via REDIS_DISABLED environment variable');
     }
-    redisClient = createNoopClient();
+    redisClient = getNoopClient();
     return redisClient;
   }
 
@@ -38,12 +41,12 @@ function initialiseRedis() {
     if (process.env.NODE_ENV !== 'test') {
       console.info('[Redis] No Redis URL configured, using noop client. Set REDIS_URL to enable Redis caching.');
     }
-    redisClient = createNoopClient();
+    redisClient = getNoopClient();
     return redisClient;
   }
 
   try {
-    redisClient = createClient({
+    redisClient = createRedisClient({
       url,
       socket: {
         reconnectStrategy: (retries) => {
@@ -72,55 +75,67 @@ function initialiseRedis() {
     });
   } catch (error) {
     console.error('[Redis] Failed to initialise client:', error.message);
-    redisClient = createNoopClient();
+    redisClient = getNoopClient();
   }
 
   return redisClient;
 }
 
-function ensureConnected() {
+async function ensureConnected() {
   const client = initialiseRedis();
 
-  // If it's a noop client or already connected, return it
-  if (client.isOpen || connectAttempted || connectionFailed) {
+  if (!client || typeof client.connect !== 'function') {
     return client;
   }
 
-  // If the client doesn't have a connect method (noop client), return it
-  if (typeof client.connect !== 'function' || client === createNoopClient()) {
+  if (connectionFailed) {
+    return redisClient;
+  }
+
+  if (client.isOpen) {
     return client;
   }
 
-  connectAttempted = true;
-  client
-    .connect()
-    .then(() => {
-      if (process.env.NODE_ENV !== 'test') {
-        console.info('[Redis] Connection established successfully');
-      }
-    })
-    .catch((error) => {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('[Redis] Connection failed:', error.message);
-        console.info('[Redis] Falling back to noop client (caching disabled)');
-      }
-      connectionFailed = true;
-      // Replace with noop client on connection failure
-      redisClient = createNoopClient();
-    })
-    .finally(() => {
-      connectAttempted = false;
-    });
+  if (!connectPromise) {
+    connectPromise = client
+      .connect()
+      .then(() => {
+        if (process.env.NODE_ENV !== 'test') {
+          console.info('[Redis] Connection established successfully');
+        }
+      })
+      .catch((error) => {
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('[Redis] Connection failed:', error.message);
+          console.info('[Redis] Falling back to noop client (caching disabled)');
+        }
+        connectionFailed = true;
+        redisClient = getNoopClient();
+        return redisClient;
+      })
+      .finally(() => {
+        connectPromise = null;
+      });
+  }
 
-  return client;
+  try {
+    await connectPromise;
+  } catch (_error) {
+    // connectPromise handles logging and fallback on failure
+  }
+
+  return redisClient;
 }
 
 export function getRedisClient() {
-  return ensureConnected();
+  const client = initialiseRedis();
+  // Kick off connection in the background so callers get the live client instance
+  ensureConnected().catch(() => {});
+  return client;
 }
 
 export async function redisGet(key) {
-  const client = ensureConnected();
+  const client = await ensureConnected();
   if (!client?.isOpen) return null;
   try {
     return await client.get(key);
@@ -131,7 +146,7 @@ export async function redisGet(key) {
 }
 
 export async function redisSet(key, value, ttlSeconds = 300) {
-  const client = ensureConnected();
+  const client = await ensureConnected();
   if (!client?.isOpen) return;
   try {
     const payload = typeof value === 'string' ? value : JSON.stringify(value);
@@ -144,7 +159,7 @@ export async function redisSet(key, value, ttlSeconds = 300) {
 }
 
 export async function redisDel(key) {
-  const client = ensureConnected();
+  const client = await ensureConnected();
   if (!client?.isOpen) return;
   try {
     await client.del(key);
@@ -154,7 +169,7 @@ export async function redisDel(key) {
 }
 
 export async function redisDelPattern(pattern) {
-  const client = ensureConnected();
+  const client = await ensureConnected();
   if (!client?.isOpen) return;
 
   try {
@@ -186,3 +201,17 @@ export default {
   del: redisDel,
   delPattern: redisDelPattern,
 };
+
+export function __setRedisClientFactoryForTests(factory) {
+  createRedisClient = factory;
+  redisClient = null;
+  connectionFailed = false;
+  connectPromise = null;
+}
+
+export function __resetRedisClientForTests() {
+  createRedisClient = (...args) => createRedisClientDefault(...args);
+  redisClient = null;
+  connectionFailed = false;
+  connectPromise = null;
+}
