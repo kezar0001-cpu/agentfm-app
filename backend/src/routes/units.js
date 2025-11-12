@@ -176,6 +176,9 @@ const unitIncludeConfig = {
       },
     },
   },
+  unitImages: {
+    orderBy: { displayOrder: 'asc' },
+  },
   tenants: tenantListArgs,
 };
 
@@ -252,7 +255,7 @@ const toPublicTenant = (tenant) => {
 const toPublicUnit = (unit) => {
   if (!unit) return unit;
 
-  const { property, tenants, ...rest } = unit;
+  const { property, tenants, unitImages, ...rest } = unit;
 
   return {
     ...rest,
@@ -263,6 +266,7 @@ const toPublicUnit = (unit) => {
     rentAmount: unit.rentAmount ?? null,
     description: unit.description ?? null,
     imageUrl: unit.imageUrl ?? null,
+    images: normalizeUnitImages({ ...unit, unitImages }),
     property: property
       ? {
           id: property.id,
