@@ -146,7 +146,7 @@ export const getUploadedFileUrl = (file) => {
 
   // Local file
   if (file.filename) {
-    const localUrl = `/uploads/${file.filename}`;
+    const localUrl = `/api/uploads/${file.filename}`;
     console.log(`[Upload] Local file URL: ${localUrl}`);
     return localUrl;
   }
@@ -184,9 +184,9 @@ export const deleteImage = async (imageUrl) => {
         console.log(`Deleted image from Cloudinary: ${publicId}`);
       }
     }
-    // Local file
-    else if (imageUrl.startsWith('/uploads/')) {
-      const filename = imageUrl.replace('/uploads/', '');
+    // Local file (support both /uploads/ and /api/uploads/ paths)
+    else if (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('/api/uploads/')) {
+      const filename = imageUrl.replace('/uploads/', '').replace('/api/uploads/', '');
       const filePath = path.join(UPLOAD_DIR, filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);

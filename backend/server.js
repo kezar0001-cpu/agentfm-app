@@ -178,7 +178,8 @@ const uploadPath = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
-app.use('/uploads', express.static(uploadPath));
+// Mount at /api/uploads to match API route pattern (frontend API client prepends /api)
+app.use('/api/uploads', express.static(uploadPath));
 
 // ---- Session
 app.use(
