@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { getRedisClient } from '../config/redisClient.js';
+import { getRedisClient, getConnectedRedisClient } from '../config/redisClient.js';
 import logger from './logger.js';
 
 let resendClient;
@@ -47,6 +47,16 @@ class EmailRetryQueue {
     this.redis = getRedisClient();
   }
 
+  async ensureRedisClient() {
+    if (this.redis?.isOpen) {
+      return this.redis;
+    }
+
+    const client = await getConnectedRedisClient();
+    this.redis = client;
+    return client;
+  }
+
   /**
    * Generate unique key for email retry tracking
    */
@@ -58,7 +68,9 @@ class EmailRetryQueue {
    * Store retry attempt information
    */
   async storeRetryAttempt(emailId, attemptNumber, emailData, error) {
-    if (!this.redis?.isOpen) {
+    const redisClient = await this.ensureRedisClient();
+
+    if (!redisClient?.isOpen) {
       logger.warn('[EmailRetry] Redis not available, cannot store retry attempt', {
         emailId,
         attemptNumber,
@@ -84,7 +96,7 @@ class EmailRetryQueue {
         timestamp: new Date().toISOString(),
       };
 
-      await this.redis.set(key, JSON.stringify(retryData), {
+      await redisClient.set(key, JSON.stringify(retryData), {
         EX: RETRY_CONFIG.RETRY_QUEUE_TTL,
       });
 
@@ -105,13 +117,15 @@ class EmailRetryQueue {
    * Get retry attempt information
    */
   async getRetryAttempt(emailId) {
-    if (!this.redis?.isOpen) {
+    const redisClient = await this.ensureRedisClient();
+
+    if (!redisClient?.isOpen) {
       return null;
     }
 
     try {
       const key = this.getRetryKey(emailId);
-      const data = await this.redis.get(key);
+      const data = await redisClient.get(key);
       return data ? JSON.parse(data) : null;
     } catch (err) {
       logger.error('[EmailRetry] Failed to get retry attempt', {
@@ -126,13 +140,15 @@ class EmailRetryQueue {
    * Remove retry attempt from queue (on success)
    */
   async removeRetryAttempt(emailId) {
-    if (!this.redis?.isOpen) {
+    const redisClient = await this.ensureRedisClient();
+
+    if (!redisClient?.isOpen) {
       return;
     }
 
     try {
       const key = this.getRetryKey(emailId);
-      await this.redis.del(key);
+      await redisClient.del(key);
       logger.info('[EmailRetry] Removed retry attempt', { emailId });
     } catch (err) {
       logger.error('[EmailRetry] Failed to remove retry attempt', {
