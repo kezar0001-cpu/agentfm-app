@@ -73,11 +73,15 @@ export function PropertyImageManager({
   useEffect(() => {
     if (!onChange) return;
 
-    // Skip the initial mount to prevent clearing existing images
+    // Bug Fix: Only skip initial onChange if we started with images (edit mode)
+    // In create mode (no initial images), we need to notify parent of first upload
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      console.log('[PropertyImageManager] Skipping initial onChange - preserving existing images');
-      return;
+      const hasInitialImages = preparedInitialImages.length > 0;
+      if (hasInitialImages) {
+        console.log('[PropertyImageManager] Skipping initial onChange - preserving existing images');
+        return;
+      }
     }
 
     const completedImages = getCompletedImages();
@@ -93,7 +97,7 @@ export function PropertyImageManager({
 
     // Call onChange with images and cover URL
     onChange(completedImages, coverUrl);
-  }, [images, onChange, getCompletedImages]);
+  }, [images, onChange, getCompletedImages, preparedInitialImages.length]);
 
   /**
    * Handle file selection
