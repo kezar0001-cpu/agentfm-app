@@ -34,6 +34,7 @@ import {
   PictureAsPdf as PdfIcon,
   Image as ImageIcon,
   Article as ArticleIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import {
   usePropertyDocuments,
@@ -68,18 +69,23 @@ const getAccessLevelColor = (level) => {
 
 const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
   const { showSuccess, showError } = useNotification();
-  const { data: documentsData, isLoading } = usePropertyDocuments(propertyId);
-  // Bug Fix: Removed manual refetch() calls - mutations now auto-invalidate via invalidateKeys
+  const { data: documentsData, isLoading, refetch } = usePropertyDocuments(propertyId);
+
+  // Add success callbacks that refetch the document list
   const addDocumentMutation = useAddPropertyDocument(propertyId, () => {
     showSuccess('Document added successfully');
+    refetch(); // Manually refetch to update the list
   });
   const deleteDocumentMutation = useDeletePropertyDocument(propertyId, () => {
     showSuccess('Document deleted successfully');
+    refetch(); // Manually refetch to update the list
   });
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [previewDocument, setPreviewDocument] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [formData, setFormData] = useState({
     category: 'OTHER',
@@ -196,9 +202,104 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
     window.open(document.fileUrl, '_blank');
   };
 
+  const handlePreview = (document) => {
+    setPreviewDocument(document);
+    setPreviewDialogOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewDialogOpen(false);
+    setPreviewDocument(null);
+  };
+
   const openDeleteDialog = (document) => {
     setSelectedDocument(document);
     setDeleteDialogOpen(true);
+  };
+
+  const canPreviewInline = (mimeType) => {
+    return (
+      mimeType?.includes('pdf') ||
+      mimeType?.includes('image') ||
+      mimeType?.includes('text/plain')
+    );
+  };
+
+  const getPreviewContent = (document) => {
+    if (!document) return null;
+
+    const { fileUrl, mimeType, fileName } = document;
+
+    // PDF preview
+    if (mimeType?.includes('pdf')) {
+      return (
+        <Box sx={{ width: '100%', height: '70vh' }}>
+          <iframe
+            src={fileUrl}
+            title={fileName}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+            }}
+          />
+        </Box>
+      );
+    }
+
+    // Image preview
+    if (mimeType?.includes('image')) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2 }}>
+          <img
+            src={fileUrl}
+            alt={fileName}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '70vh',
+              objectFit: 'contain',
+            }}
+          />
+        </Box>
+      );
+    }
+
+    // Text file preview
+    if (mimeType?.includes('text/plain')) {
+      return (
+        <Box sx={{ p: 2, maxHeight: '70vh', overflow: 'auto' }}>
+          <iframe
+            src={fileUrl}
+            title={fileName}
+            style={{
+              width: '100%',
+              minHeight: '60vh',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+            }}
+          />
+        </Box>
+      );
+    }
+
+    // For other file types, show download message
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h6" gutterBottom>
+          Preview not available
+        </Typography>
+        <Typography variant="body2" color="text.secondary" paragraph>
+          This file type cannot be previewed in the browser.
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<DownloadIcon />}
+          onClick={() => handleDownload(document)}
+        >
+          Download to View
+        </Button>
+      </Box>
+    );
   };
 
   const formatFileSize = (bytes) => {
@@ -288,6 +389,14 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
                 }
               />
               <ListItemSecondaryAction>
+                <IconButton
+                  edge="end"
+                  onClick={() => handlePreview(document)}
+                  title="View/Preview"
+                  color="primary"
+                >
+                  <VisibilityIcon />
+                </IconButton>
                 <IconButton
                   edge="end"
                   onClick={() => handleDownload(document)}
@@ -440,6 +549,75 @@ const PropertyDocumentManager = ({ propertyId, canEdit = false }) => {
           >
             {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Document Preview Dialog */}
+      <Dialog
+        open={previewDialogOpen}
+        onClose={handleClosePreview}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            minHeight: '80vh',
+          },
+        }}
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            {previewDocument && getDocumentIcon(previewDocument.mimeType)}
+            <Typography variant="h6" component="span" sx={{ flexGrow: 1 }}>
+              {previewDocument?.fileName}
+            </Typography>
+            <IconButton onClick={handleClosePreview} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {previewDocument && (
+            <Box>
+              {/* Document metadata */}
+              <Box sx={{ mb: 2, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+                  <Chip
+                    label={getCategoryLabel(previewDocument.category)}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={getAccessLevelLabel(previewDocument.accessLevel)}
+                    size="small"
+                    color={getAccessLevelColor(previewDocument.accessLevel)}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {formatFileSize(previewDocument.fileSize)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Uploaded {new Date(previewDocument.uploadedAt).toLocaleDateString()}
+                  </Typography>
+                </Box>
+                {previewDocument.description && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {previewDocument.description}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Preview content */}
+              {getPreviewContent(previewDocument)}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            startIcon={<DownloadIcon />}
+            onClick={() => previewDocument && handleDownload(previewDocument)}
+          >
+            Download
+          </Button>
+          <Button onClick={handleClosePreview}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
