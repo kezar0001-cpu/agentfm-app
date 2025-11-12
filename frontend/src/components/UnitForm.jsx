@@ -261,7 +261,7 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
               <UnitImageManager
                 images={uploadedImages}
                 coverImageUrl={coverImageUrl}
-                unitName={`Unit ${unit?.unitNumber || 'New'}`}
+                unitName={'Unit ' + (unit?.unitNumber || 'New')}
                 onChange={handleUploadedImagesChange}
                 onUploadingChange={handleUploadingStateChange}
                 allowCaptions={true}
