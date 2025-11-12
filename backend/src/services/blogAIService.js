@@ -100,6 +100,85 @@ class BlogAIService {
   }
 
   /**
+   * Safely extract and parse JSON from AI response
+   * Handles control characters and malformed JSON that AI models sometimes produce
+   * @param {string} responseText - Raw response text from AI
+   * @param {string} operationName - Name of operation for logging
+   * @returns {Object} Parsed JSON object
+   */
+  _parseAIJsonResponse(responseText, operationName = 'parseJSON') {
+    try {
+      // Extract JSON from response (may have markdown code blocks or other text)
+      let jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+      if (!jsonMatch) {
+        logger.error(`${operationName}: No JSON object found in response`);
+        throw new Error('Failed to find JSON object in AI response');
+      }
+
+      let jsonString = jsonMatch[0];
+
+      // Clean common control characters that break JSON parsing
+      // Replace unescaped newlines, tabs, and other control chars in string values
+      jsonString = jsonString
+        .replace(/\\n/g, '\\n')  // Ensure \n is escaped
+        .replace(/\\t/g, '\\t')  // Ensure \t is escaped
+        .replace(/\\r/g, '\\r')  // Ensure \r is escaped
+        // Fix unescaped control characters within JSON string values
+        .replace(/("(?:[^"\\]|\\.)*")|[\x00-\x1F]/g, (match, stringMatch) => {
+          // If it's a quoted string, keep it as is
+          if (stringMatch) return stringMatch;
+          // Otherwise, escape the control character
+          return '\\u' + ('0000' + match.charCodeAt(0).toString(16)).slice(-4);
+        });
+
+      // Try to parse the cleaned JSON
+      const parsed = JSON.parse(jsonString);
+      return parsed;
+
+    } catch (error) {
+      // Provide detailed error logging
+      logger.error(`${operationName}: JSON parsing failed`, {
+        error: error.message,
+        responsePreview: responseText.substring(0, 500) + '...'
+      });
+
+      // Try more aggressive cleaning for markdown content
+      try {
+        let jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('No JSON found');
+
+        let jsonString = jsonMatch[0];
+
+        // More aggressive cleaning: replace actual newlines/tabs in strings
+        jsonString = jsonString.replace(
+          /"([^"]*(?:\\.[^"]*)*)"/g,
+          (match, content) => {
+            // This is a quoted string - escape any literal control chars
+            const cleaned = content
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t')
+              .replace(/[\x00-\x1F]/g, (ch) => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4));
+            return `"${cleaned}"`;
+          }
+        );
+
+        const parsed = JSON.parse(jsonString);
+        logger.warn(`${operationName}: JSON parsed after aggressive cleaning`);
+        return parsed;
+
+      } catch (secondError) {
+        logger.error(`${operationName}: Failed even after aggressive cleaning`, {
+          originalError: error.message,
+          secondError: secondError.message
+        });
+        throw new Error(`Failed to parse JSON from AI response: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * Generate a blog topic based on current trends and SEO considerations
    * @param {Object} options - Options for topic generation
    * @param {string[]} options.recentTopics - Recently used topics to avoid repetition
@@ -152,13 +231,7 @@ Provide your response in JSON format:
       );
 
       const responseText = message.content[0].text;
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error('Failed to parse JSON response from AI');
-      }
-
-      const topic = JSON.parse(jsonMatch[0]);
+      const topic = this._parseAIJsonResponse(responseText, 'generateTopic');
       logger.info('Generated blog topic', { topic });
 
       return topic;
@@ -218,13 +291,7 @@ Format your response in JSON:
       );
 
       const responseText = message.content[0].text;
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error('Failed to parse JSON response from AI');
-      }
-
-      const content = JSON.parse(jsonMatch[0]);
+      const content = this._parseAIJsonResponse(responseText, 'generateContent');
       logger.info('Generated blog content', {
         title: topic.title,
         wordCount: content.content.split(/\s+/).length
