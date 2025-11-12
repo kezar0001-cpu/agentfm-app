@@ -7,43 +7,58 @@ import { v4 as uuidv4 } from 'uuid';
 class BlogAutomationService {
   constructor() {
     this.isEnabled = process.env.BLOG_AUTOMATION_ENABLED === 'true';
-    this.defaultAuthorId = null;
+    this.authorIds = []; // Multiple author IDs for variety
     this.industry = process.env.BLOG_INDUSTRY || 'facilities and property management';
     this.targetWordCount = parseInt(process.env.BLOG_TARGET_WORD_COUNT) || 1500;
     this.autoPublish = process.env.BLOG_AUTO_PUBLISH === 'true';
+
+    // Define multiple author personas to rotate through
+    this.authorPersonas = [
+      { firstName: 'Sarah', lastName: 'Mitchell', email: 'sarah.mitchell@agentfm.com' },
+      { firstName: 'James', lastName: 'Chen', email: 'james.chen@agentfm.com' },
+      { firstName: 'Maria', lastName: 'Rodriguez', email: 'maria.rodriguez@agentfm.com' },
+      { firstName: 'David', lastName: 'Thompson', email: 'david.thompson@agentfm.com' },
+      { firstName: 'Emma', lastName: 'Williams', email: 'emma.williams@agentfm.com' }
+    ];
   }
 
   /**
-   * Initialize the service by finding or creating a bot user
+   * Initialize the service by finding or creating author users
    */
   async initialize() {
     try {
-      // Find or create a bot user for authoring automated posts
-      let botUser = await prisma.user.findFirst({
-        where: {
-          email: 'blog-bot@agentfm.com'
-        }
-      });
-
-      if (!botUser) {
-        // Create a bot user
-        botUser = await prisma.user.create({
-          data: {
-            email: 'blog-bot@agentfm.com',
-            firstName: 'AgentFM',
-            lastName: 'Blog Bot',
-            passwordHash: uuidv4(), // Random password, bot can't login
-            role: 'ADMIN',
-            isActive: false, // Bot user is not active for login
-            emailVerified: true
+      // Find or create all author personas
+      for (const persona of this.authorPersonas) {
+        let author = await prisma.user.findFirst({
+          where: {
+            email: persona.email
           }
         });
-        logger.info('Created blog bot user', { userId: botUser.id });
+
+        if (!author) {
+          // Create author user
+          author = await prisma.user.create({
+            data: {
+              email: persona.email,
+              firstName: persona.firstName,
+              lastName: persona.lastName,
+              passwordHash: uuidv4(), // Random password, bot can't login
+              role: 'ADMIN',
+              isActive: false, // Bot user is not active for login
+              emailVerified: true
+            }
+          });
+          logger.info('Created blog author user', {
+            userId: author.id,
+            name: `${persona.firstName} ${persona.lastName}`
+          });
+        }
+
+        this.authorIds.push(author.id);
       }
 
-      this.defaultAuthorId = botUser.id;
       logger.info('Blog automation service initialized', {
-        authorId: this.defaultAuthorId,
+        authorsCount: this.authorIds.length,
         enabled: this.isEnabled
       });
     } catch (error) {
@@ -52,6 +67,18 @@ class BlogAutomationService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Get a random author ID for variety
+   * @returns {string} Random author ID
+   */
+  getRandomAuthorId() {
+    if (this.authorIds.length === 0) {
+      throw new Error('No author IDs available. Service not initialized.');
+    }
+    const randomIndex = Math.floor(Math.random() * this.authorIds.length);
+    return this.authorIds[randomIndex];
   }
 
   /**
@@ -64,7 +91,7 @@ class BlogAutomationService {
       return null;
     }
 
-    if (!this.defaultAuthorId) {
+    if (this.authorIds.length === 0) {
       await this.initialize();
     }
 
@@ -93,6 +120,14 @@ class BlogAutomationService {
       logger.info('Generating blog content...', { topic: topic.title });
       const content = await blogAIService.generateContent(topic, this.targetWordCount);
 
+      // Debug logging for content
+      logger.info('Generated content details:', {
+        contentLength: content.content?.length || 0,
+        htmlContentLength: content.htmlContent?.length || 0,
+        contentPreview: content.content?.substring(0, 200) || 'NO CONTENT',
+        hasContent: !!content.content
+      });
+
       // Step 5: Generate image
       logger.info('Generating cover image...');
       const imagePrompt = await blogAIService.generateImagePrompt(topic, content.content);
@@ -108,8 +143,10 @@ class BlogAutomationService {
         ...(content.suggestedTags || [])
       ]);
 
-      // Step 8: Create the blog post
-      logger.info('Creating blog post in database...');
+      // Step 8: Create the blog post with random author
+      const selectedAuthorId = this.getRandomAuthorId();
+      logger.info('Creating blog post in database...', { authorId: selectedAuthorId });
+
       const blogPost = await prisma.blogPost.create({
         data: {
           title: topic.title,
@@ -119,7 +156,7 @@ class BlogAutomationService {
           htmlContent: content.htmlContent,
           coverImage: imageMetadata.url,
           ogImage: imageMetadata.url,
-          authorId: this.defaultAuthorId,
+          authorId: selectedAuthorId,
           status: this.autoPublish ? 'PUBLISHED' : 'DRAFT',
           publishedAt: this.autoPublish ? new Date() : null,
           featured: false,
