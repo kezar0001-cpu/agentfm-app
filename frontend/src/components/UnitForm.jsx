@@ -217,7 +217,7 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
             </Grid>
 
             {/* Area */}
-            <Grid item xs={12} sm=6}>
+            <Grid item xs={12} sm={6}>
               <FormTextField
                 name="area"
                 control={control}
