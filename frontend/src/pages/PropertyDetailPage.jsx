@@ -60,6 +60,7 @@ import UnitForm from '../components/UnitForm';
 import PropertyDocumentManager from '../components/PropertyDocumentManager';
 import PropertyNotesSection from '../components/PropertyNotesSection';
 import InviteOwnerDialog from '../components/InviteOwnerDialog.jsx';
+import PropertyImageCarousel from '../components/PropertyImageCarousel';
 import { normaliseArray } from '../utils/error';
 import {
   formatPropertyAddressLine,
@@ -1497,7 +1498,19 @@ export default function PropertyDetailPage() {
                 >
                   <Stack spacing={3}>
                     <Grid container spacing={2.5}>
-                      {units.map((unit) => (
+                      {units.map((unit) => {
+                        // Process unit images similar to property images
+                        const unitImages = (() => {
+                          if (Array.isArray(unit.images) && unit.images.length > 0) {
+                            return unit.images.map(img => img.imageUrl || img.url);
+                          }
+                          if (unit.imageUrl) {
+                            return [unit.imageUrl];
+                          }
+                          return [];
+                        })();
+
+                        return (
                         <Grid item xs={12} sm={6} md={4} key={unit.id}>
                           <Card
                             sx={{
@@ -1525,8 +1538,19 @@ export default function PropertyDetailPage() {
                             }}
                             tabIndex={0}
                             role="button"
-                            aria-label={`View details for unit ${unit.unitNumber}`}
+                            aria-label={`View details for unit ${unit.id}`}
                           >
+                            {/* Unit Image Carousel */}
+                            {unitImages.length > 0 && (
+                              <PropertyImageCarousel
+                                images={unitImages}
+                                sx={{
+                                  borderBottom: '1px solid',
+                                  borderColor: 'divider',
+                                }}
+                              />
+                            )}
+
                             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                               <Box
                                 sx={{
@@ -1589,7 +1613,8 @@ export default function PropertyDetailPage() {
                             </CardContent>
                           </Card>
                         </Grid>
-                      ))}
+                        );
+                      })}
                     </Grid>
 
                     {/* Load More Button */}
