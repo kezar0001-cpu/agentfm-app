@@ -200,6 +200,7 @@ const unitCreateSchema = z.object({
   status: z.enum(UNIT_STATUSES).optional().default('AVAILABLE'),
   description: z.string().nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
+  images: z.array(unitImageCreateSchema).optional(),
 });
 
 const unitUpdateSchema = unitCreateSchema.partial().omit({ propertyId: true }).extend({
@@ -498,20 +499,41 @@ router.post(
       );
     }
 
-    const unit = await prisma.unit.create({
-      data: {
-        propertyId: data.propertyId,
-        unitNumber: data.unitNumber,
-        floor: data.floor ?? null,
-        bedrooms: data.bedrooms ?? null,
-        bathrooms: data.bathrooms ?? null,
-        area: data.area ?? null,
-        rentAmount: data.rentAmount ?? null,
-        status: data.status ?? 'AVAILABLE',
-        description: data.description ?? null,
-        imageUrl: data.imageUrl ?? null,
-      },
-      include: unitIncludeConfig,
+    const unit = await prisma.$transaction(async (tx) => {
+      const createdUnit = await tx.unit.create({
+        data: {
+          propertyId: data.propertyId,
+          unitNumber: data.unitNumber,
+          floor: data.floor ?? null,
+          bedrooms: data.bedrooms ?? null,
+          bathrooms: data.bathrooms ?? null,
+          area: data.area ?? null,
+          rentAmount: data.rentAmount ?? null,
+          status: data.status ?? 'AVAILABLE',
+          description: data.description ?? null,
+          imageUrl: data.imageUrl ?? null,
+        },
+        include: unitIncludeConfig,
+      });
+
+      // Handle images array if provided
+      if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+        const imageRecords = data.images.map((image, index) => ({
+          unitId: createdUnit.id,
+          imageUrl: image.imageUrl,
+          caption: image.caption ?? null,
+          isPrimary: image.isPrimary ?? (index === 0),
+          displayOrder: index,
+          uploadedById: req.user.id,
+        }));
+
+        await tx.unitImage.createMany({ data: imageRecords });
+
+        // Sync cover image from primary image
+        await syncUnitCoverImage(tx, createdUnit.id);
+      }
+
+      return createdUnit;
     });
 
     res.status(201).json({ unit: toPublicUnit(unit) });
