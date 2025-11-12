@@ -260,20 +260,26 @@ Provide your response in JSON format:
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-    // Convert lists
-    html = html.replace(/^\* (.+)/gim, '<li>$1</li>');
-    html = html.replace(/^- (.+)/gim, '<li>$1</li>');
-
-    // Wrap consecutive list items in ul tags
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
     // Convert numbered lists
-    html = html.replace(/^\d+\. (.+)/gim, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?){2,}/g, (match) => {
-      if (!match.includes('<ul>')) {
-        return '<ol>' + match + '</ol>';
-      }
-      return match;
+    html = html.replace(/^(\s*\d+\. .+(?:\n\s*\d+\. .+)*)/gm, (match) => {
+      const items = match.split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.replace(/^\d+\.\s+/, ''))
+        .map(content => `<li>${content}</li>`)
+        .join('');
+      return `<ol>${items}</ol>`;
+    });
+
+    // Convert bullet lists
+    html = html.replace(/^(\s*[-\*] .+(?:\n\s*[-\*] .+)*)/gm, (match) => {
+      const items = match.split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.replace(/^[-\*]\s+/, ''))
+        .map(content => `<li>${content}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
     });
 
     // Convert line breaks to paragraphs
