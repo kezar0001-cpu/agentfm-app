@@ -242,64 +242,191 @@ Provide your response in JSON format:
   }
 
   /**
-   * Generate full blog post content
+   * Simple markdown to HTML converter
+   * Handles basic markdown formatting
+   * @param {string} markdown - Markdown content
+   * @returns {string} HTML content
+   */
+  _markdownToHtml(markdown) {
+    let html = markdown;
+
+    // Convert headers
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+    // Convert bold and italic
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Convert lists
+    html = html.replace(/^\* (.+)/gim, '<li>$1</li>');
+    html = html.replace(/^- (.+)/gim, '<li>$1</li>');
+
+    // Wrap consecutive list items in ul tags
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+    // Convert numbered lists
+    html = html.replace(/^\d+\. (.+)/gim, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?){2,}/g, (match) => {
+      if (!match.includes('<ul>')) {
+        return '<ol>' + match + '</ol>';
+      }
+      return match;
+    });
+
+    // Convert line breaks to paragraphs
+    const paragraphs = html.split('\n\n');
+    html = paragraphs.map(p => {
+      const trimmed = p.trim();
+      if (!trimmed) return '';
+      if (trimmed.startsWith('<h') || trimmed.startsWith('<ul') ||
+          trimmed.startsWith('<ol') || trimmed.startsWith('<li')) {
+        return trimmed;
+      }
+      return `<p>${trimmed}</p>`;
+    }).filter(Boolean).join('\n');
+
+    return html;
+  }
+
+  /**
+   * Generate full blog post content using multi-stage approach
+   * Stage 1: Generate markdown content
+   * Stage 2: Convert to HTML
+   * Stage 3: Generate metadata
    * @param {Object} topic - Topic details from generateTopic
    * @param {number} targetWordCount - Target word count for the article
    * @returns {Promise<Object>} Blog post content with HTML
    */
   async generateContent(topic, targetWordCount = 1500) {
-    const prompt = `Write a comprehensive, high-quality blog post about "${topic.title}".
+    try {
+      // STAGE 1: Generate the article content in markdown
+      logger.info('Stage 1: Generating article content in markdown...');
+
+      const contentPrompt = `Write a comprehensive, high-quality blog post about "${topic.title}".
 
 Target audience: ${topic.targetAudience}
-Keywords to include naturally: ${topic.keywords.join(', ')}
+Keywords to naturally include: ${topic.keywords.join(', ')}
 Target word count: ${targetWordCount} words
 
-Requirements:
-1. Write in a professional yet engaging tone
-2. Include practical, actionable advice
-3. Use headers (H2, H3) to structure the content
-4. Include bullet points and numbered lists where appropriate
-5. Incorporate the keywords naturally throughout
-6. Add a compelling introduction and conclusion
-7. Make it shareable and valuable
-8. Use real-world examples and case studies where relevant
+IMPORTANT: Write the entire article in clean Markdown format. DO NOT wrap it in JSON or code blocks.
 
-Format your response in JSON:
-{
-  "content": "Full markdown content of the blog post",
-  "htmlContent": "HTML version with proper formatting",
-  "metaTitle": "SEO-optimized title (60 chars max)",
-  "metaDescription": "Compelling meta description (155 chars max)",
-  "suggestedTags": ["tag1", "tag2", "tag3", "tag4"],
-  "readingTime": "Estimated reading time in minutes",
-  "keyTakeaways": ["takeaway1", "takeaway2", "takeaway3"]
-}`;
+Structure your article as follows:
+1. **Engaging Introduction** (2-3 paragraphs)
+   - Hook the reader with a compelling opening
+   - Present the problem or opportunity
+   - Preview what they'll learn
 
-    try {
-      const message = await this._callWithRetry(
+2. **Main Content** (5-7 sections with ## headers)
+   - Use clear section headers (##)
+   - Include practical examples and specific details
+   - Add bullet points or numbered lists where appropriate
+   - Incorporate keywords naturally
+   - Provide actionable insights
+
+3. **Strong Conclusion** (2-3 paragraphs)
+   - Summarize key points
+   - Call to action
+   - Leave reader with clear next steps
+
+Write in a professional yet conversational tone. Make it engaging, practical, and valuable. START WRITING THE ARTICLE NOW:`;
+
+      const contentMessage = await this._callWithRetry(
         async (model) => {
           return await this.client.messages.create({
             model: model,
             max_tokens: 4096,
             messages: [{
               role: 'user',
-              content: prompt
+              content: contentPrompt
             }]
           });
         },
-        'generateContent'
+        'generateContent-markdown'
       );
 
-      const responseText = message.content[0].text;
-      const content = this._parseAIJsonResponse(responseText, 'generateContent');
-      logger.info('Generated blog content', {
+      let markdownContent = contentMessage.content[0].text.trim();
+
+      // Remove any markdown code block wrapping if present
+      markdownContent = markdownContent.replace(/^```markdown?\n/i, '').replace(/\n```$/i, '');
+
+      logger.info('Generated markdown content', {
         title: topic.title,
-        wordCount: content.content.split(/\s+/).length
+        contentLength: markdownContent.length,
+        wordCount: markdownContent.split(/\s+/).length,
+        preview: markdownContent.substring(0, 300) + '...'
       });
 
-      return content;
+      // STAGE 2: Convert markdown to HTML
+      logger.info('Stage 2: Converting markdown to HTML...');
+      const htmlContent = this._markdownToHtml(markdownContent);
+
+      logger.info('Converted to HTML', {
+        htmlLength: htmlContent.length,
+        preview: htmlContent.substring(0, 300) + '...'
+      });
+
+      // STAGE 3: Generate metadata in small JSON
+      logger.info('Stage 3: Generating metadata...');
+
+      const metadataPrompt = `For this blog post titled "${topic.title}", generate SEO metadata and additional information.
+
+Respond ONLY with a valid JSON object (no markdown, no code blocks):
+{
+  "metaTitle": "SEO title 60 chars max",
+  "metaDescription": "Meta description 155 chars max",
+  "suggestedTags": ["tag1", "tag2", "tag3", "tag4"],
+  "readingTime": "5",
+  "keyTakeaways": ["takeaway1", "takeaway2", "takeaway3"]
+}`;
+
+      const metadataMessage = await this._callWithRetry(
+        async (model) => {
+          return await this.client.messages.create({
+            model: model,
+            max_tokens: 512,
+            messages: [{
+              role: 'user',
+              content: metadataPrompt
+            }]
+          });
+        },
+        'generateContent-metadata'
+      );
+
+      const metadataText = metadataMessage.content[0].text.trim();
+      const metadata = this._parseAIJsonResponse(metadataText, 'generateContent-metadata');
+
+      logger.info('Generated metadata', metadata);
+
+      // Combine everything
+      const result = {
+        content: markdownContent,
+        htmlContent: htmlContent,
+        metaTitle: metadata.metaTitle || topic.title,
+        metaDescription: metadata.metaDescription || topic.excerpt,
+        suggestedTags: metadata.suggestedTags || [],
+        readingTime: metadata.readingTime || '5',
+        keyTakeaways: metadata.keyTakeaways || []
+      };
+
+      logger.info('✅ Successfully generated complete blog content', {
+        title: topic.title,
+        markdownLength: result.content.length,
+        htmlLength: result.htmlContent.length,
+        wordCount: result.content.split(/\s+/).length,
+        hasAllFields: !!(result.content && result.htmlContent && result.metaTitle)
+      });
+
+      return result;
+
     } catch (error) {
-      logger.error('Error generating blog content', { error: error.message });
+      logger.error('Error generating blog content', {
+        error: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }
