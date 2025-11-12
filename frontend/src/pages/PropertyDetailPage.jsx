@@ -1510,6 +1510,8 @@ export default function PropertyDetailPage() {
                           return [];
                         })();
 
+                        const hasMultipleUnitImages = unitImages.length > 1;
+
                         return (
                         <Grid item xs={12} sm={6} md={4} key={unit.id}>
                           <Card
@@ -1544,7 +1546,12 @@ export default function PropertyDetailPage() {
                             {unitImages.length > 0 && (
                               <PropertyImageCarousel
                                 images={unitImages}
-                                sx={{
+                                fallbackText={`Unit ${unit.unitNumber}`}
+                                height={{ xs: 180, sm: 200 }}
+                                showDots={hasMultipleUnitImages}
+                                showArrows={hasMultipleUnitImages}
+                                showCounter={hasMultipleUnitImages}
+                                containerSx={{
                                   borderBottom: '1px solid',
                                   borderColor: 'divider',
                                 }}
