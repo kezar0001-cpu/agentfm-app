@@ -123,6 +123,8 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   const [isSendingOwnerInvites, setIsSendingOwnerInvites] = useState(false);
   const [ownerInviteResults, setOwnerInviteResults] = useState(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  // Bug Fix: Add local submission guard to prevent double-submission race condition
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const createPropertyMutation = useApiMutation({
     url: '/properties',
@@ -139,6 +141,7 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setIsSendingOwnerInvites(false);
       setOwnerInviteResults(null);
       setIsUploadingImages(false);
+      setIsSubmitting(false);
     }
   }, [open]);
 
@@ -335,8 +338,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
   };
 
   const handleFinish = async () => {
-    // Bug Fix: Prevent double-submission from rapid clicks or network delays
-    if (createPropertyMutation.isPending || isSendingOwnerInvites) {
+    // Bug Fix: Enhanced double-submission prevention using local state
+    // Check both mutation state AND local guard to prevent race conditions
+    if (isSubmitting || createPropertyMutation.isPending || isSendingOwnerInvites) {
       console.warn('[PropertyWizard] Submission already in progress, ignoring duplicate click');
       return;
     }
@@ -345,6 +349,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       setActiveStep(0);
       return;
     }
+
+    // Set local guard immediately to prevent any concurrent submissions
+    setIsSubmitting(true);
 
     try {
       const ownerEmails = formState.owners.emails
@@ -468,6 +475,9 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.properties.all() });
     } catch (error) {
       // handled by alert below
+    } finally {
+      // Bug Fix: Always clear submission guard, even on error
+      setIsSubmitting(false);
     }
   };
 
@@ -1026,10 +1036,10 @@ export default function PropertyOnboardingWizard({ open, onClose }) {
             variant="contained"
             onClick={handleFinish}
             disabled={
-              createPropertyMutation.isPending || isUploadingImages || isSendingOwnerInvites
+              isSubmitting || createPropertyMutation.isPending || isUploadingImages || isSendingOwnerInvites
             }
           >
-            {createPropertyMutation.isPending
+            {isSubmitting || createPropertyMutation.isPending
               ? 'Saving...'
               : isSendingOwnerInvites
               ? 'Sending invites...'

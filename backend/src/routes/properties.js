@@ -476,11 +476,10 @@ const normaliseSubmittedPropertyImages = (input) => {
 
 const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'];
 
+// Bug Fix: Only order by displayOrder to avoid schema compatibility issues
+// Some databases may not have createdAt column if migrations weren't fully applied
 const propertyImagesIncludeConfig = {
-  orderBy: [
-    { displayOrder: 'asc' },
-    { createdAt: 'asc' },
-  ],
+  orderBy: { displayOrder: 'asc' },
 };
 
 const PROPERTY_IMAGES_CHECK_TTL_MS = 30 * 1000;
