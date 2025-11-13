@@ -80,7 +80,7 @@ describe('apiClient request configuration', () => {
 
     expect(contentType).toBeTruthy();
     expect(contentType).not.toMatch(/application\/json/i);
-    expect(capturedConfig?.url).toBe('/api/uploads/multiple');
+    expect(capturedConfig?.url).toBe('/uploads/multiple');
   });
 
   it('does not double-prefix /api when base URL already includes it', async () => {
@@ -100,6 +100,26 @@ describe('apiClient request configuration', () => {
     apiClient.defaults.adapter = originalAdapter;
 
     expect(capturedConfig?.baseURL).toBe('https://api.example.com/api');
+    expect(capturedConfig?.url).toBe('/auth/login');
+  });
+
+  it('prefixes /api when base URL does not include it', async () => {
+    vi.resetModules();
+    process.env.VITE_API_BASE_URL = 'https://api.example.com';
+    const apiClient = await loadClient();
+    const originalAdapter = apiClient.defaults.adapter;
+
+    let capturedConfig;
+    apiClient.defaults.adapter = async (config) => {
+      capturedConfig = config;
+      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
+    };
+
+    await apiClient.get('/auth/login');
+
+    apiClient.defaults.adapter = originalAdapter;
+
+    expect(capturedConfig?.baseURL).toBe('https://api.example.com');
     expect(capturedConfig?.url).toBe('/api/auth/login');
   });
 });

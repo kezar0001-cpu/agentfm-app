@@ -34,13 +34,17 @@ const apiClient = axios.create({
   withCredentials: false,
 });
 
-function normalizeRelativeUrl(url) {
+function normalizeRelativeUrl(url, resolvedBaseURL = baseURL) {
   if (!url) return url;
 
   const stringUrl = `${url}`;
   if (/^https?:\/\//i.test(stringUrl) || stringUrl.startsWith('//')) {
     return stringUrl;
   }
+
+  const baseUrlString = typeof resolvedBaseURL === 'string' ? resolvedBaseURL : '';
+  const normalizedBaseUrl = baseUrlString.replace(/\/+$/, '');
+  const baseIncludesApiSuffix = normalizedBaseUrl.endsWith(API_PATH_PREFIX);
 
   const hashSegments = stringUrl.split('#');
   const basePart = hashSegments.shift() ?? '';
@@ -52,6 +56,7 @@ function normalizeRelativeUrl(url) {
   const cleanedPath = withLeadingSlash.replace(/\/{2,}/g, '/');
 
   const shouldPrefixApi =
+    !baseIncludesApiSuffix &&
     cleanedPath !== API_PATH_PREFIX &&
     !cleanedPath.startsWith(`${API_PATH_PREFIX}/`) &&
     !cleanedPath.startsWith('/socket.io');
@@ -146,7 +151,8 @@ async function requestNewAccessToken() {
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof config.url === 'string') {
-      config.url = normalizeRelativeUrl(config.url);
+      const requestBaseURL = config.baseURL ?? apiClient.defaults?.baseURL ?? baseURL;
+      config.url = normalizeRelativeUrl(config.url, requestBaseURL);
     }
 
     if (config.__isRefreshRequest || config._skipAuth) {
