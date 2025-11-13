@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import resolveDevProxyTarget from './config/resolveDevProxyTarget.js';
+
+const devProxyTarget = resolveDevProxyTarget();
 
 export default defineConfig({
   plugins: [react()],
@@ -7,7 +10,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL || 'https://api.buildstate.com.au',
+        // Default to the local backend during development so we never send
+        // local test traffic to the production API by accident.
+        target: devProxyTarget,
         changeOrigin: true,
       }
     }
