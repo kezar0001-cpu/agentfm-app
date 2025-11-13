@@ -3,10 +3,28 @@ import axios from 'axios';
 import { getAuthToken, removeAuthToken, saveAuthToken } from '../lib/auth.js';
 
 // Determine the base URL. Use the environment variable if it exists, otherwise use the current page's origin.
-const envBase = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE;
+const envCandidates = [
+  import.meta?.env?.VITE_API_BASE_URL,
+  import.meta?.env?.VITE_API_BASE,
+  typeof process !== 'undefined' ? process.env?.VITE_API_BASE_URL : undefined,
+  typeof process !== 'undefined' ? process.env?.VITE_API_BASE : undefined,
+];
+const rawEnvBase = envCandidates.find((value) => typeof value === 'string' && value.trim().length > 0) ?? '';
+const envBase = rawEnvBase.trim().length > 0 ? rawEnvBase.trim() : null;
+
+function getWindowOrigin() {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return '';
+  }
+  return window.location.origin;
+}
+
+const defaultOrigin = getWindowOrigin().replace(/\/$/, '');
 const baseURL = envBase
-  ? envBase.replace(/\/$/, '') // Use env variable and remove any trailing slash
-  : `${window.location.origin.replace(/\/$/, '')}`; // Default to the current host
+  ? envBase.replace(/\/$/, '')
+  : defaultOrigin
+    ? `${defaultOrigin}/api`
+    : '/api';
 
 const apiClient = axios.create({
   baseURL,
@@ -94,9 +112,9 @@ async function requestNewAccessToken() {
 // Request interceptor: Attach auth token to every request
 apiClient.interceptors.request.use(
   (config) => {
-    // If the URL is relative (doesn't start with http), ensure it's prefixed with /api.
-    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/api')) {
-      config.url = `/api${config.url}`;
+    // If the URL is relative (doesn't start with http), ensure it has a leading slash.
+    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/')) {
+      config.url = `/${config.url}`;
     }
 
     if (config.__isRefreshRequest || config._skipAuth) {
