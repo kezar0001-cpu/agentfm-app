@@ -2,7 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import propertiesRouter from '../routes/properties.js';
 
-const { applyLegacyAliases, resolvePrimaryImageUrl, buildPropertyImageRecords } = propertiesRouter._test;
+const {
+  applyLegacyAliases,
+  resolvePrimaryImageUrl,
+  buildPropertyImageRecords,
+  applyPreferredPrimaryImageSelection,
+} = propertiesRouter._test;
 
 describe('Property Legacy Aliases', () => {
   describe('applyLegacyAliases function', () => {
@@ -226,6 +231,40 @@ describe('resolvePrimaryImageUrl', () => {
   });
 });
 
+describe('applyPreferredPrimaryImageSelection', () => {
+  it('promotes the preferred URL even when not first', () => {
+    const images = [
+      { imageUrl: 'https://example.com/a.jpg', isPrimary: true },
+      { imageUrl: 'https://example.com/b.jpg', isPrimary: false },
+    ];
+
+    const result = applyPreferredPrimaryImageSelection(images, 'https://example.com/b.jpg');
+
+    assert.equal(result[0].isPrimary, false);
+    assert.equal(result[1].isPrimary, true);
+  });
+
+  it('falls back to existing primary then first when preferred is missing', () => {
+    const images = [
+      { imageUrl: 'https://example.com/a.jpg', isPrimary: false },
+      { imageUrl: 'https://example.com/b.jpg', isPrimary: true },
+    ];
+
+    const result = applyPreferredPrimaryImageSelection(images, 'https://example.com/missing.jpg');
+
+    assert.equal(result[0].isPrimary, false);
+    assert.equal(result[1].isPrimary, true);
+
+    const fallbackResult = applyPreferredPrimaryImageSelection([
+      { imageUrl: 'https://example.com/a.jpg' },
+      { imageUrl: 'https://example.com/b.jpg' },
+    ], 'https://example.com/missing.jpg');
+
+    assert.equal(fallbackResult[0].isPrimary, true);
+    assert.equal(fallbackResult[1].isPrimary, false);
+  });
+});
+
 describe('buildPropertyImageRecords', () => {
   it('marks the preferred image as primary even when not first', () => {
     const records = buildPropertyImageRecords({
@@ -268,5 +307,21 @@ describe('buildPropertyImageRecords', () => {
 
     assert.deepEqual(records.map((record) => record.caption), ['Front', 'Lobby']);
     assert.equal(records[0].isPrimary, true);
+  });
+
+  it('supports image objects with captions and preferred primary', () => {
+    const records = buildPropertyImageRecords({
+      propertyId: 'prop-2',
+      images: [
+        { imageUrl: 'https://example.com/a.jpg', caption: 'A', isPrimary: false },
+        { imageUrl: 'https://example.com/b.jpg', caption: 'B', isPrimary: false },
+      ],
+      preferredPrimaryUrl: 'https://example.com/b.jpg',
+      uploadedById: 'user-9',
+    });
+
+    assert.equal(records[0].isPrimary, false);
+    assert.equal(records[1].isPrimary, true);
+    assert.deepEqual(records.map((record) => record.caption), ['A', 'B']);
   });
 });
