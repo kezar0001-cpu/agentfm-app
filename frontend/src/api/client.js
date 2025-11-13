@@ -26,11 +26,44 @@ const baseURL = envBase
     ? `${defaultOrigin}/api`
     : '/api';
 
+const API_PATH_PREFIX = '/api';
+
 const apiClient = axios.create({
   baseURL,
   // Don't use withCredentials when using Bearer tokens - it can cause CORS issues
   withCredentials: false,
 });
+
+function normalizeRelativeUrl(url) {
+  if (!url) return url;
+
+  const stringUrl = `${url}`;
+  if (/^https?:\/\//i.test(stringUrl) || stringUrl.startsWith('//')) {
+    return stringUrl;
+  }
+
+  const hashSegments = stringUrl.split('#');
+  const basePart = hashSegments.shift() ?? '';
+  const hash = hashSegments.length > 0 ? `#${hashSegments.join('#')}` : '';
+
+  const [pathPart, ...queryParts] = basePart.split('?');
+
+  const withLeadingSlash = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
+  const cleanedPath = withLeadingSlash.replace(/\/{2,}/g, '/');
+
+  const shouldPrefixApi =
+    cleanedPath !== API_PATH_PREFIX &&
+    !cleanedPath.startsWith(`${API_PATH_PREFIX}/`) &&
+    !cleanedPath.startsWith('/socket.io');
+
+  const normalizedPath = shouldPrefixApi
+    ? `${API_PATH_PREFIX}${cleanedPath}`
+    : cleanedPath;
+
+  const query = queryParts.length > 0 ? `?${queryParts.join('?')}` : '';
+
+  return `${normalizedPath}${query}${hash}`;
+}
 
 let refreshRequest = null;
 
@@ -112,9 +145,8 @@ async function requestNewAccessToken() {
 // Request interceptor: Attach auth token to every request
 apiClient.interceptors.request.use(
   (config) => {
-    // If the URL is relative (doesn't start with http), ensure it has a leading slash.
-    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/')) {
-      config.url = `/${config.url}`;
+    if (typeof config.url === 'string') {
+      config.url = normalizeRelativeUrl(config.url);
     }
 
     if (config.__isRefreshRequest || config._skipAuth) {

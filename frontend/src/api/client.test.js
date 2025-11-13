@@ -80,6 +80,7 @@ describe('apiClient request configuration', () => {
 
     expect(contentType).toBeTruthy();
     expect(contentType).not.toMatch(/application\/json/i);
+    expect(capturedConfig?.url).toBe('/api/uploads/multiple');
   });
 
   it('does not double-prefix /api when base URL already includes it', async () => {
@@ -99,6 +100,6 @@ describe('apiClient request configuration', () => {
     apiClient.defaults.adapter = originalAdapter;
 
     expect(capturedConfig?.baseURL).toBe('https://api.example.com/api');
-    expect(capturedConfig?.url).toBe('/auth/login');
+    expect(capturedConfig?.url).toBe('/api/auth/login');
   });
 });
