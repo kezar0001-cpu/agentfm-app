@@ -180,6 +180,7 @@ if (!fs.existsSync(uploadPath)) {
 }
 // Mount at /api/uploads to match API route pattern (frontend API client prepends /api)
 app.use('/api/uploads', express.static(uploadPath));
+app.use('/uploads', express.static(uploadPath));
 
 // ---- Session
 app.use(

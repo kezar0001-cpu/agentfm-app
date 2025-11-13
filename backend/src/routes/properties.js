@@ -11,6 +11,12 @@ import { requireAuth, requireRole, requireActiveSubscription } from '../middlewa
 import unitsRouter from './units.js';
 import { cacheMiddleware, invalidate, invalidatePattern } from '../utils/cache.js';
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
+import {
+  getUploadedFileUrl,
+  isLocalUploadUrl,
+  extractLocalUploadFilename,
+  LOCAL_UPLOADS_PUBLIC_PATH,
+} from '../services/uploadService.js';
 
 const router = Router();
 
@@ -296,8 +302,8 @@ const isValidImageLocation = (value) => {
   // Allow HTTPS/HTTP URLs
   if (/^https?:\/\//i.test(value)) return true;
 
-  // Allow relative /uploads/ and /api/uploads/ paths
-  if (value.startsWith('/uploads/') || value.startsWith('/api/uploads/')) return true;
+  // Allow relative uploads served by the backend
+  if (isLocalUploadUrl(value)) return true;
 
   return false;
 };
@@ -436,7 +442,8 @@ const normaliseSubmittedPropertyImages = (input) => {
           url: imageUrl.substring(0, 100),
           urlLength: imageUrl.length,
           startsWithHttp: imageUrl.toLowerCase().startsWith('http'),
-          startsWithUploads: imageUrl.startsWith('/uploads/'),
+          localUploadDetected: isLocalUploadUrl(imageUrl),
+          localUploadBasePath: LOCAL_UPLOADS_PUBLIC_PATH,
         });
         return null;
       }
@@ -1995,8 +2002,11 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUpload,
     }
 
     const body = { ...(req.body ?? {}) };
-    if (req.file?.filename) {
-      body.imageUrl = `/api/uploads/${req.file.filename}`;
+    if (req.file) {
+      const derivedUrl = getUploadedFileUrl(req.file);
+      if (derivedUrl) {
+        body.imageUrl = derivedUrl;
+      }
     }
 
     const parsed = propertyImageCreateSchema.parse(body);
@@ -2209,19 +2219,21 @@ propertyImagesRouter.delete('/:imageId', requireRole('PROPERTY_MANAGER'), async 
 
     // Bug Fix #2: Clean up physical file from disk when deleting image from database
     // This prevents orphaned files from accumulating and wasting disk space
-    if (deleted.imageUrl && (deleted.imageUrl.startsWith('/uploads/') || deleted.imageUrl.startsWith('/api/uploads/'))) {
-      const filename = deleted.imageUrl.replace('/uploads/', '').replace('/api/uploads/', '');
-      const filePath = path.join(UPLOAD_DIR, filename);
+    if (deleted.imageUrl && isLocalUploadUrl(deleted.imageUrl)) {
+      const filename = extractLocalUploadFilename(deleted.imageUrl);
+      if (filename) {
+        const filePath = path.join(UPLOAD_DIR, filename);
 
-      // Asynchronously delete file without blocking response
-      // Errors are logged but don't fail the response since DB delete succeeded
-      fs.unlink(filePath, (err) => {
-        if (err && err.code !== 'ENOENT') {
-          console.error('Failed to delete image file:', filePath, err);
-        } else if (!err) {
-          console.log('✅ Deleted image file:', filePath);
-        }
-      });
+        // Asynchronously delete file without blocking response
+        // Errors are logged but don't fail the response since DB delete succeeded
+        fs.unlink(filePath, (err) => {
+          if (err && err.code !== 'ENOENT') {
+            console.error('Failed to delete image file:', filePath, err);
+          } else if (!err) {
+            console.log('✅ Deleted image file:', filePath);
+          }
+        });
+      }
     }
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
@@ -2598,11 +2610,22 @@ propertyDocumentsRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUplo
 
     const parsed = propertyDocumentCreateSchema.parse(req.body);
 
+    const uploadedFileUrl = getUploadedFileUrl(req.file);
+    if (!uploadedFileUrl) {
+      cleanupUploadedFile();
+      return sendError(
+        res,
+        500,
+        'Failed to determine uploaded file location',
+        ErrorCodes.FILE_UPLOAD_FAILED,
+      );
+    }
+
     const document = await prisma.propertyDocument.create({
       data: {
         propertyId,
         fileName: req.file.originalname,
-        fileUrl: `/api/uploads/${req.file.filename}`,
+        fileUrl: uploadedFileUrl,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         category: parsed.category,
@@ -2688,17 +2711,17 @@ propertyDocumentsRouter.delete('/:documentId', requireRole('PROPERTY_MANAGER'), 
     });
 
     // Clean up physical file from disk
-    if (document.fileUrl && (document.fileUrl.startsWith('/uploads/') || document.fileUrl.startsWith('/api/uploads/'))) {
-      const filename = document.fileUrl.replace('/uploads/', '').replace('/api/uploads/', '');
-      const filePath = path.join(UPLOAD_DIR, filename);
+    if (document.fileUrl && isLocalUploadUrl(document.fileUrl)) {
+      const filename = extractLocalUploadFilename(document.fileUrl);
+      if (filename) {
+        const filePath = path.join(UPLOAD_DIR, filename);
 
-      fs.unlink(filePath, (err) => {
-        if (err && err.code !== 'ENOENT') {
-          console.error('Failed to delete document file:', filePath, err);
-        } else if (!err) {
-          console.log('✅ Deleted document file:', filePath);
-        }
-      });
+        fs.unlink(filePath, (err) => {
+          if (err && err.code !== 'ENOENT') {
+            console.error('Failed to delete document file:', filePath, err);
+          }
+        });
+      }
     }
 
     const cacheUserIds = collectPropertyCacheUserIds(property, req.user.id);
