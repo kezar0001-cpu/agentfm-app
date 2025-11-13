@@ -27,6 +27,7 @@ export const getDashboardSummary = async (req, res) => {
     let jobFilter = {};
     let inspectionFilter = {};
     let serviceRequestWhere = {};
+    let tenantPropertyIds = null;
 
     if (role === 'PROPERTY_MANAGER') {
       propertyFilter = { managerId: userId };
@@ -44,8 +45,25 @@ export const getDashboardSummary = async (req, res) => {
         where: { tenantId: userId, isActive: true },
         select: { unit: { select: { propertyId: true } } },
       });
-      const propertyIds = [...new Set(tenantUnits.map(ut => ut.unit.propertyId))];
-      if (propertyIds.length > 0) propertyFilter = { id: { in: propertyIds } };
+      const propertyIds = [...new Set(
+        tenantUnits
+          .map((ut) => ut.unit?.propertyId)
+          .filter((value) => typeof value === 'string' && value.length > 0)
+      )];
+
+      tenantPropertyIds = propertyIds;
+
+      if (propertyIds.length > 0) {
+        propertyFilter = { id: { in: propertyIds } };
+        jobFilter = { propertyId: { in: propertyIds } };
+        inspectionFilter = { propertyId: { in: propertyIds } };
+      } else {
+        // Explicitly restrict filters when tenant has no linked properties to avoid falling back to global data
+        propertyFilter = { id: { in: [] } };
+        jobFilter = { propertyId: { in: [] } };
+        inspectionFilter = { propertyId: { in: [] } };
+      }
+
       // Service requests created by the tenant
       serviceRequestWhere = { requestedById: userId };
     } else if (role === 'TECHNICIAN') {
@@ -56,7 +74,8 @@ export const getDashboardSummary = async (req, res) => {
     }
 
     // ---------- Properties (not relevant for pure technician view)
-    if (role !== 'TECHNICIAN') {
+    const tenantHasAccessibleProperties = Array.isArray(tenantPropertyIds) && tenantPropertyIds.length > 0;
+    if (role !== 'TECHNICIAN' && (role !== 'TENANT' || tenantHasAccessibleProperties)) {
       const byStatus = await prisma.property.groupBy({
         by: ['status'],
         where: propertyFilter,
@@ -71,7 +90,7 @@ export const getDashboardSummary = async (req, res) => {
     }
 
     // ---------- Units (also scoped by properties)
-    if (role !== 'TECHNICIAN') {
+    if (role !== 'TECHNICIAN' && (role !== 'TENANT' || tenantHasAccessibleProperties)) {
       const props = await prisma.property.findMany({
         where: propertyFilter,
         select: { id: true },
@@ -93,7 +112,7 @@ export const getDashboardSummary = async (req, res) => {
     }
 
     // ---------- Jobs
-    {
+    if (role !== 'TENANT' || tenantHasAccessibleProperties) {
       const byStatus = await prisma.job.groupBy({
         by: ['status'],
         where: jobFilter,
@@ -118,7 +137,7 @@ export const getDashboardSummary = async (req, res) => {
     }
 
     // ---------- Inspections
-    {
+    if (role !== 'TENANT' || tenantHasAccessibleProperties) {
       const byStatus = await prisma.inspection.groupBy({
         by: ['status'],
         where: inspectionFilter,
