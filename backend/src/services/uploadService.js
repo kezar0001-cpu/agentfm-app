@@ -132,6 +132,18 @@ const cloudinaryStorage = new CloudinaryStorage({
 export const createUploadMiddleware = (options = {}) => {
   const storage = isCloudinaryConfigured ? cloudinaryStorage : localDiskStorage;
 
+  const allowedMimeTypes = (options.allowedMimeTypes ?? [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+  ]).map((type) => type.toLowerCase());
+
+  const allowedExtensions = options.allowedExtensions
+    ? options.allowedExtensions.map((ext) => ext.toLowerCase())
+    : null;
+
   return multer({
     storage: storage,
     limits: {
@@ -139,8 +151,8 @@ export const createUploadMiddleware = (options = {}) => {
       files: options.maxFiles || 50,
     },
     fileFilter: (_req, file, cb) => {
-      const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!file.mimetype || !allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
+      const mimetype = file.mimetype?.toLowerCase();
+      if (!mimetype || !allowedMimeTypes.includes(mimetype)) {
         return cb(
           new multer.MulterError(
             'LIMIT_UNEXPECTED_FILE',
@@ -148,6 +160,19 @@ export const createUploadMiddleware = (options = {}) => {
           )
         );
       }
+
+      if (allowedExtensions) {
+        const extension = path.extname(file.originalname || '').toLowerCase();
+        if (!extension || !allowedExtensions.includes(extension)) {
+          return cb(
+            new multer.MulterError(
+              'LIMIT_UNEXPECTED_FILE',
+              `Only files with extensions ${allowedExtensions.join(', ')} are allowed`
+            )
+          );
+        }
+      }
+
       cb(null, true);
     },
   });

@@ -12,10 +12,12 @@ import unitsRouter from './units.js';
 import { cacheMiddleware, invalidate, invalidatePattern } from '../utils/cache.js';
 import { sendError, ErrorCodes } from '../utils/errorHandler.js';
 import {
+  createUploadMiddleware,
   getUploadedFileUrl,
   isLocalUploadUrl,
   extractLocalUploadFilename,
   LOCAL_UPLOADS_PUBLIC_PATH,
+  isUsingCloudStorage,
 } from '../services/uploadService.js';
 
 const router = Router();
@@ -74,49 +76,13 @@ const rateLimitUpload = (req, res, next) => {
   next();
 };
 
-const imageStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || '');
-    // Bug Fix #10: Sanitize filename to prevent path traversal attacks
-    // Remove any path separators and null bytes that could be used maliciously
-    const sanitizedName = path.basename(file.originalname || 'image', ext)
-      .replace(/[\/\\.\x00]/g, '') // Remove slashes, dots, null bytes
-      .toLowerCase()
-      .replace(/[^a-z0-9-_]+/g, '-')
-      .slice(0, 40) || 'image';
-    const base = sanitizedName || 'image';
-    // Bug Fix #1: Use UUID instead of Date.now() + random to prevent filename collisions
-    // This eliminates race conditions when multiple images are uploaded simultaneously
-    const unique = randomUUID();
-    cb(null, `${base}-${unique}${ext}`);
-  },
+const propertyImageUpload = createUploadMiddleware({
+  maxFileSize: 10 * 1024 * 1024,
+  maxFiles: 1,
+  allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
 });
 
-const imageUpload = multer({
-  storage: imageStorage,
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-  },
-  fileFilter: (_req, file, cb) => {
-    // Bug Fix #3: Validate both MIME type AND file extension to prevent bypass
-    // Ensures .jpg.exe or similar malicious files are rejected
-    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
-      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'image'));
-    }
-
-    // Bug Fix #4: Validate file extension matches allowed image types
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    const ext = path.extname(file.originalname || '').toLowerCase();
-    if (!allowedExtensions.includes(ext)) {
-      return cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Invalid file extension. Only jpg, jpeg, png, gif, webp allowed'));
-    }
-
-    cb(null, true);
-  },
-});
-
-const imageUploadMiddleware = imageUpload.single('image');
+const imageUploadMiddleware = propertyImageUpload.single('image');
 
 const isMultipartRequest = (req) => {
   const header = req?.headers?.['content-type'];
@@ -1977,12 +1943,21 @@ propertyImagesRouter.post('/', requireRole('PROPERTY_MANAGER'), rateLimitUpload,
   const propertyId = req.params.id;
 
   const cleanupUploadedFile = () => {
-    if (req.file?.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Failed to remove uploaded file after error:', cleanupError);
+    if (!req.file || isUsingCloudStorage()) {
+      return;
+    }
+
+    const filePath = req.file.path;
+    if (!filePath) {
+      return;
+    }
+
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
+    } catch (cleanupError) {
+      console.error('Failed to remove uploaded file after error:', cleanupError);
     }
   };
 
