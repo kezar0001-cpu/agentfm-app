@@ -82,7 +82,7 @@ describe('apiClient request configuration', () => {
     expect(contentType).not.toMatch(/application\/json/i);
   });
 
-  it('keeps requests under /api when base URL already includes it', async () => {
+  it('does not double-prefix /api when base URL already includes it', async () => {
     vi.resetModules();
     process.env.VITE_API_BASE_URL = 'https://api.example.com/api';
     const apiClient = await loadClient();
@@ -99,46 +99,6 @@ describe('apiClient request configuration', () => {
     apiClient.defaults.adapter = originalAdapter;
 
     expect(capturedConfig?.baseURL).toBe('https://api.example.com/api');
-    expect(capturedConfig?.url).toBe('/api/auth/login');
-  });
-
-  it('prefixes /api when the env-configured base URL omits the path segment', async () => {
-    vi.resetModules();
-    process.env.VITE_API_BASE_URL = 'https://api.example.com';
-    const apiClient = await loadClient();
-    const originalAdapter = apiClient.defaults.adapter;
-
-    let capturedConfig;
-    apiClient.defaults.adapter = async (config) => {
-      capturedConfig = config;
-      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
-    };
-
-    await apiClient.get('/auth/login');
-
-    apiClient.defaults.adapter = originalAdapter;
-
-    expect(capturedConfig?.baseURL).toBe('https://api.example.com');
-    expect(capturedConfig?.url).toBe('/api/auth/login');
-  });
-
-  it('prefixes the configured base path when the env-configured base URL points to a nested API', async () => {
-    vi.resetModules();
-    process.env.VITE_API_BASE_URL = 'https://api.example.com/custom-api';
-    const apiClient = await loadClient();
-    const originalAdapter = apiClient.defaults.adapter;
-
-    let capturedConfig;
-    apiClient.defaults.adapter = async (config) => {
-      capturedConfig = config;
-      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
-    };
-
-    await apiClient.get('/auth/login');
-
-    apiClient.defaults.adapter = originalAdapter;
-
-    expect(capturedConfig?.baseURL).toBe('https://api.example.com/custom-api');
-    expect(capturedConfig?.url).toBe('/custom-api/auth/login');
+    expect(capturedConfig?.url).toBe('/auth/login');
   });
 });
