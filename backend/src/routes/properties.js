@@ -1010,21 +1010,97 @@ const determinePrimaryImageIndex = (imageUrls = [], preferredPrimaryUrl) => {
   return urls.length > 0 ? 0 : -1;
 };
 
+const sanitiseImageRecordEntry = (entry) => {
+  if (!entry) return null;
+
+  if (typeof entry === 'string') {
+    const url = normalizeImageRecordValue(entry);
+    if (!url) return null;
+    return { imageUrl: url, caption: null, captionProvided: false };
+  }
+
+  if (typeof entry === 'object') {
+    const url = normalizeImageRecordValue(entry.imageUrl ?? entry.url ?? '');
+    if (!url) return null;
+    const caption = typeof entry.caption === 'string' ? entry.caption : null;
+    const captionProvided = entry.captionProvided === true || entry.captionProvided === false
+      ? entry.captionProvided
+      : caption != null;
+
+    return {
+      imageUrl: url,
+      caption,
+      captionProvided,
+      isPrimary: entry.isPrimary === true,
+    };
+  }
+
+  return null;
+};
+
+const applyPreferredPrimaryImageSelection = (images, preferredPrimaryUrl) => {
+  const entries = Array.isArray(images) ? images.slice() : [];
+  if (!entries.length) {
+    return entries;
+  }
+
+  const preferred = normalizeImageRecordValue(preferredPrimaryUrl);
+  let targetIndex = preferred
+    ? entries.findIndex((image) => normalizeImageRecordValue(image?.imageUrl) === preferred)
+    : -1;
+
+  if (targetIndex === -1) {
+    targetIndex = entries.findIndex((image) => image?.isPrimary === true);
+  }
+
+  if (targetIndex === -1) {
+    targetIndex = 0;
+  }
+
+  return entries.map((image, index) => ({
+    ...image,
+    isPrimary: index === targetIndex,
+  }));
+};
+
 const buildPropertyImageRecords = ({
   propertyId,
   imageUrls = [],
+  images = undefined,
   preferredPrimaryUrl,
   getCaption,
   uploadedById,
 }) => {
-  const urls = Array.isArray(imageUrls) ? imageUrls : [];
-  const primaryIndex = determinePrimaryImageIndex(urls, preferredPrimaryUrl);
+  const rawEntries = Array.isArray(images) ? images : imageUrls;
+  const normalisedEntries = Array.isArray(rawEntries)
+    ? rawEntries.map(sanitiseImageRecordEntry).filter(Boolean)
+    : [];
 
-  return urls.map((imageUrl, index) => {
-    const caption = typeof getCaption === 'function' ? getCaption(imageUrl, index) : null;
+  if (!normalisedEntries.length) {
+    return [];
+  }
+
+  const urlsForSelection = normalisedEntries.map((entry) => entry.imageUrl);
+  const primaryIndex = determinePrimaryImageIndex(urlsForSelection, preferredPrimaryUrl);
+
+  const captions = typeof getCaption === 'function'
+    ? new Map(
+        normalisedEntries.map((entry, index) => [
+          entry.imageUrl,
+          getCaption(entry.imageUrl, index),
+        ]),
+      )
+    : null;
+
+  return normalisedEntries.map((entry, index) => {
+    const captionFromGetter = captions?.get(entry.imageUrl);
+    const caption = entry.captionProvided
+      ? entry.caption
+      : (entry.caption ?? captionFromGetter ?? null);
+
     return {
       propertyId,
-      imageUrl,
+      imageUrl: entry.imageUrl,
       caption: caption ?? null,
       isPrimary: index === primaryIndex,
       displayOrder: index,
@@ -1348,7 +1424,9 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
       }
     }
 
-    const initialImages = normaliseSubmittedPropertyImages(rawImages);
+    let initialImages = normaliseSubmittedPropertyImages(rawImages);
+    const preferredPrimaryUrl = data.imageUrl ?? initialImages.find((img) => img.isPrimary)?.imageUrl ?? initialImages[0]?.imageUrl ?? null;
+    initialImages = applyPreferredPrimaryImageSelection(initialImages, preferredPrimaryUrl);
 
     // Enhanced logging after normalization
     if (process.env.NODE_ENV !== 'test') {
@@ -1382,14 +1460,12 @@ router.post('/', requireRole('PROPERTY_MANAGER'), requireActiveSubscription, asy
         });
 
         if (includeImages && initialImages.length) {
-          const records = initialImages.map((image, index) => ({
+          const records = buildPropertyImageRecords({
             propertyId: newProperty.id,
-            imageUrl: image.imageUrl,
-            caption: image.caption ?? null,
-            isPrimary: image.isPrimary,
-            displayOrder: index,
+            images: initialImages,
+            preferredPrimaryUrl: coverImageUrl,
             uploadedById: req.user.id,
-          }));
+          });
 
           if (records.length) {
             // Debug logging before save
@@ -1593,7 +1669,7 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
 
     const rawImages = legacyImages;
 
-    const imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
+    let imageUpdates = rawImages === undefined ? undefined : normaliseSubmittedPropertyImages(rawImages);
 
     // Deep merge amenities to preserve existing data during partial updates
     const mergedAmenities = amenitiesUpdate !== undefined
@@ -1613,6 +1689,12 @@ router.patch('/:id', requireRole('PROPERTY_MANAGER'), async (req, res) => {
     };
 
     if (imageUpdates !== undefined) {
+      const preferredPrimaryUrl = parsed.imageUrl !== undefined
+        ? parsed.imageUrl
+        : property.imageUrl ?? null;
+
+      imageUpdates = applyPreferredPrimaryImageSelection(imageUpdates, preferredPrimaryUrl);
+
       if (imageUpdates.length > 0) {
         if (parsed.imageUrl === undefined) {
           const primaryImage = imageUpdates.find((image) => image.isPrimary) || imageUpdates[0];
@@ -2723,9 +2805,11 @@ router._test = {
   toPublicProperty,
   normalizePropertyImages,
   resolvePrimaryImageUrl,
+  applyPreferredPrimaryImageSelection,
   determineNewImagePrimaryFlag,
   extractImageUrlFromInput,
   normaliseSubmittedPropertyImages,
+  buildPropertyImageRecords,
   STATUS_VALUES,
   invalidatePropertyCaches,
   propertyListSelect,
