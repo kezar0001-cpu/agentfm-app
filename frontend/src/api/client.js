@@ -12,25 +12,6 @@ const envCandidates = [
 const rawEnvBase = envCandidates.find((value) => typeof value === 'string' && value.trim().length > 0) ?? '';
 const envBase = rawEnvBase.trim().length > 0 ? rawEnvBase.trim() : null;
 
-const getPathname = (value) => {
-  if (!value) return '';
-  try {
-    const hasScheme = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value);
-    const parsed = new URL(value, hasScheme ? undefined : 'http://placeholder.local');
-    return parsed.pathname || '';
-  } catch (error) {
-    return '';
-  }
-};
-
-const envBasePath = envBase ? getPathname(envBase).replace(/\/+$/, '') : '';
-const apiPathPrefix = (() => {
-  if (!envBasePath || envBasePath === '/') {
-    return '/api';
-  }
-  return envBasePath.startsWith('/') ? envBasePath : `/${envBasePath}`;
-})();
-
 function getWindowOrigin() {
   if (typeof window === 'undefined' || !window.location?.origin) {
     return '';
@@ -131,31 +112,9 @@ async function requestNewAccessToken() {
 // Request interceptor: Attach auth token to every request
 apiClient.interceptors.request.use(
   (config) => {
-    // If the URL is relative (doesn't start with http), normalise it so that it is rooted
-    // under the expected API path prefix.
-    if (config.url && !config.url.startsWith('http')) {
-      let localUrl = config.url;
-
-      if (!localUrl.startsWith('/')) {
-        localUrl = `/${localUrl}`;
-      }
-
-      const prefixWithoutTrailingSlash = apiPathPrefix.replace(/\/+$/, '') || '';
-      const prefixWithoutLeadingSlash = prefixWithoutTrailingSlash.replace(/^\/+/, '');
-      const pathWithoutLeadingSlash = localUrl.replace(/^\/+/, '');
-
-      if (prefixWithoutLeadingSlash && !pathWithoutLeadingSlash.startsWith(prefixWithoutLeadingSlash)) {
-        const combinedPath = [prefixWithoutLeadingSlash, pathWithoutLeadingSlash]
-          .filter((segment) => segment.length > 0)
-          .join('/');
-        localUrl = `/${combinedPath}`;
-      } else if (prefixWithoutLeadingSlash) {
-        localUrl = `/${pathWithoutLeadingSlash}`;
-      } else if (localUrl === '//') {
-        localUrl = '/';
-      }
-
-      config.url = localUrl;
+    // If the URL is relative (doesn't start with http), ensure it has a leading slash.
+    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/')) {
+      config.url = `/${config.url}`;
     }
 
     if (config.__isRefreshRequest || config._skipAuth) {
