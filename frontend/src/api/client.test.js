@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { Blob } from 'node:buffer';
 
 vi.mock('../lib/auth.js', () => ({
@@ -37,22 +37,26 @@ afterAll(() => {
 });
 
 describe('apiClient request configuration', () => {
-  let apiClient;
-  let originalAdapter;
-
-  beforeEach(async () => {
-    apiClient = (await import('./client.js')).default;
-    originalAdapter = apiClient.defaults.adapter;
-  });
+  const loadClient = async () => {
+    const module = await import('./client.js');
+    return module.default;
+  };
 
   afterEach(() => {
-    apiClient.defaults.adapter = originalAdapter;
     vi.resetModules();
+    vi.unstubAllEnvs();
+    delete process.env.VITE_API_BASE_URL;
+    delete process.env.VITE_API_BASE;
+    vi.clearAllMocks();
   });
 
   it('uses multipart content type when posting FormData', async () => {
     const formData = new FormData();
     formData.append('file', new Blob(['content'], { type: 'text/plain' }), 'test.txt');
+
+    vi.resetModules();
+    const apiClient = await loadClient();
+    const originalAdapter = apiClient.defaults.adapter;
 
     let capturedConfig;
     apiClient.defaults.adapter = async (config) => {
@@ -61,6 +65,8 @@ describe('apiClient request configuration', () => {
     };
 
     await apiClient.post('/uploads/multiple', formData);
+
+    apiClient.defaults.adapter = originalAdapter;
 
     const headers = capturedConfig?.headers;
     let contentType;
@@ -74,5 +80,25 @@ describe('apiClient request configuration', () => {
 
     expect(contentType).toBeTruthy();
     expect(contentType).not.toMatch(/application\/json/i);
+  });
+
+  it('does not double-prefix /api when base URL already includes it', async () => {
+    vi.resetModules();
+    process.env.VITE_API_BASE_URL = 'https://api.example.com/api';
+    const apiClient = await loadClient();
+    const originalAdapter = apiClient.defaults.adapter;
+
+    let capturedConfig;
+    apiClient.defaults.adapter = async (config) => {
+      capturedConfig = config;
+      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
+    };
+
+    await apiClient.get('/auth/login');
+
+    apiClient.defaults.adapter = originalAdapter;
+
+    expect(capturedConfig?.baseURL).toBe('https://api.example.com/api');
+    expect(capturedConfig?.url).toBe('/auth/login');
   });
 });
