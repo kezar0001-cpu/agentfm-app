@@ -30,6 +30,61 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+const DEFAULT_LOCAL_UPLOADS_PUBLIC_PATH = '/uploads';
+const LEGACY_LOCAL_UPLOAD_PREFIXES = ['/api/uploads'];
+
+function normalisePublicPath(pathValue) {
+  const value = typeof pathValue === 'string' ? pathValue.trim() : '';
+  if (!value) {
+    return DEFAULT_LOCAL_UPLOADS_PUBLIC_PATH;
+  }
+
+  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
+  const collapsed = withLeadingSlash.replace(/\/+/g, '/');
+  const withoutTrailingSlash = collapsed.replace(/\/+$/, '');
+  return withoutTrailingSlash || DEFAULT_LOCAL_UPLOADS_PUBLIC_PATH;
+}
+
+export const LOCAL_UPLOADS_PUBLIC_PATH = normalisePublicPath(process.env.UPLOADS_PUBLIC_PATH);
+const LOCAL_UPLOAD_PREFIXES = Array.from(new Set([
+  DEFAULT_LOCAL_UPLOADS_PUBLIC_PATH,
+  LOCAL_UPLOADS_PUBLIC_PATH,
+  ...LEGACY_LOCAL_UPLOAD_PREFIXES,
+]));
+
+function sanitiseFilename(value) {
+  if (!value) return null;
+  return String(value).replace(/^\/+/, '');
+}
+
+export function isLocalUploadUrl(url) {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+
+  return LOCAL_UPLOAD_PREFIXES.some((prefix) =>
+    trimmed === prefix || trimmed.startsWith(`${prefix}/`)
+  );
+}
+
+export function extractLocalUploadFilename(url) {
+  if (!isLocalUploadUrl(url)) return null;
+  const trimmed = url.trim();
+
+  for (const prefix of LOCAL_UPLOAD_PREFIXES) {
+    if (trimmed === prefix) {
+      return '';
+    }
+
+    const matchPrefix = `${prefix}/`;
+    if (trimmed.startsWith(matchPrefix)) {
+      return trimmed.slice(matchPrefix.length);
+    }
+  }
+
+  return null;
+}
+
 const localDiskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
@@ -146,7 +201,13 @@ export const getUploadedFileUrl = (file) => {
 
   // Local file
   if (file.filename) {
-    const localUrl = `/api/uploads/${file.filename}`;
+    const filename = sanitiseFilename(file.filename);
+    if (!filename) {
+      console.warn('[Upload] Local upload missing filename metadata:', file);
+      return null;
+    }
+
+    const localUrl = `${LOCAL_UPLOADS_PUBLIC_PATH}/${filename}`.replace(/\/+/g, '/');
     console.log(`[Upload] Local file URL: ${localUrl}`);
     return localUrl;
   }
@@ -184,13 +245,15 @@ export const deleteImage = async (imageUrl) => {
         console.log(`Deleted image from Cloudinary: ${publicId}`);
       }
     }
-    // Local file (support both /uploads/ and /api/uploads/ paths)
-    else if (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('/api/uploads/')) {
-      const filename = imageUrl.replace('/uploads/', '').replace('/api/uploads/', '');
-      const filePath = path.join(UPLOAD_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`Deleted local file: ${filename}`);
+    // Local file (support modern and legacy paths)
+    else if (isLocalUploadUrl(imageUrl)) {
+      const filename = extractLocalUploadFilename(imageUrl);
+      if (filename) {
+        const filePath = path.join(UPLOAD_DIR, filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Deleted local file: ${filename}`);
+        }
       }
     }
   } catch (error) {

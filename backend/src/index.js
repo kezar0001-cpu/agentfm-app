@@ -180,6 +180,7 @@ if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
 app.use('/uploads', express.static(uploadPath));
+app.use('/api/uploads', express.static(uploadPath));
 
 // ---- Session
 app.use(
