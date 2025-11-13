@@ -42,6 +42,21 @@ const ensureUniqueSlug = async (baseSlug, postId = null) => {
   }
 };
 
+/**
+ * Determine if the current requester can view the blog post.
+ * Draft/scheduled posts must remain private unless an admin is viewing them.
+ *
+ * @param {string} postStatus - The status of the blog post (e.g. PUBLISHED, DRAFT)
+ * @param {string | undefined} userRole - The role of the current user, if any
+ * @returns {boolean}
+ */
+export const canViewBlogPost = (postStatus, userRole) => {
+  if (postStatus === 'PUBLISHED') {
+    return true;
+  }
+  return userRole === 'ADMIN';
+};
+
 // ==================== PUBLIC ROUTES ====================
 
 /**
@@ -189,7 +204,7 @@ router.get('/posts/:slug', async (req, res) => {
     }
 
     // Only allow viewing published posts (unless authenticated as admin)
-    if (post.status !== 'PUBLISHED' && !req.user?.role === 'ADMIN') {
+    if (!canViewBlogPost(post.status, req.user?.role)) {
       return sendError(res, 404, 'Blog post not found', ErrorCodes.RES_NOT_FOUND);
     }
 
