@@ -52,17 +52,46 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
 
   // Initialize form with unit data if editing
   useEffect(() => {
+    // Only reset when dialog opens (not on every render)
+    if (!open) {
+      return;
+    }
+
     if (unit) {
-      reset({
+      console.log('[UnitForm] Resetting form with unit data:', {
+        id: unit.id,
+        unitNumber: unit.unitNumber,
+        floor: unit.floor,
+        bedrooms: unit.bedrooms,
+        bathrooms: unit.bathrooms,
+        area: unit.area,
+        rentAmount: unit.rentAmount,
+        status: unit.status,
+      });
+
+      const formValues = {
         unitNumber: unit.unitNumber || '',
-        floor: unit.floor?.toString() || '',
-        bedrooms: unit.bedrooms?.toString() || '',
-        bathrooms: unit.bathrooms?.toString() || '',
-        area: unit.area?.toString() || '',
-        rentAmount: unit.rentAmount?.toString() || '',
+        floor: unit.floor != null ? unit.floor.toString() : '',
+        bedrooms: unit.bedrooms != null ? unit.bedrooms.toString() : '',
+        bathrooms: unit.bathrooms != null ? unit.bathrooms.toString() : '',
+        area: unit.area != null ? unit.area.toString() : '',
+        rentAmount: unit.rentAmount != null ? unit.rentAmount.toString() : '',
         status: unit.status || 'AVAILABLE',
         description: unit.description || '',
         imageUrl: unit.imageUrl || '',
+      };
+
+      console.log('[UnitForm] Form values being set:', formValues);
+
+      // Reset with keepDefaultValues: false to ensure values are properly set
+      reset(formValues, {
+        keepDefaultValues: false,
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
       });
 
       // Initialize images from unit data
@@ -78,11 +107,14 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
         setCoverImageUrl(unit.imageUrl || '');
       }
     } else {
+      console.log('[UnitForm] Resetting form to default values (create mode)');
       reset(unitDefaultValues);
       setUploadedImages([]);
       setCoverImageUrl('');
     }
-  }, [unit, open, reset]);
+    // Note: reset function is stable and doesn't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unit, open]);
 
   // Auto-focus on first error field
   useEffect(() => {
