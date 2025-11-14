@@ -424,7 +424,12 @@ router.get(
       ];
     }
 
-    const include = {};
+    const include = {
+      // Always include unitImages so Edit Unit form can display existing images
+      unitImages: {
+        orderBy: { displayOrder: 'asc' },
+      },
+    };
     if (includeTenants) {
       include.tenants = tenantListArgs;
     }
