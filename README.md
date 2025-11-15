@@ -1,6 +1,6 @@
-# AgentFM - Facilities Management Platform
+# Buildstate FM - Facilities Management Platform
 
-AgentFM is a **full-stack facilities management platform** with role-based access control, subscription management, and real-time collaboration features.
+Buildstate FM is a **full-stack facilities management platform** with role-based access control, subscription management, and real-time collaboration features.
 
 **Tech Stack**: React + Vite + Material-UI | Node.js + Express + Prisma | PostgreSQL
 
