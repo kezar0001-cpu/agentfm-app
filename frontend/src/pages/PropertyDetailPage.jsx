@@ -1829,6 +1829,7 @@ export default function PropertyDetailPage() {
 
       {/* Unit Form Dialog */}
       <UnitForm
+        key={selectedUnit?.id || 'new-unit'}
         open={unitDialogOpen}
         onClose={() => {
           setUnitDialogOpen(false);
