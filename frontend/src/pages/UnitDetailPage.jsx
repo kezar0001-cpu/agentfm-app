@@ -911,25 +911,17 @@ export default function UnitDetailPage() {
             </Grid>
 
             {/* Edit Unit Dialog */}
-            <Dialog
+            <UnitForm
+              key={unit.id}
               open={editDialogOpen}
               onClose={() => setEditDialogOpen(false)}
-              maxWidth="md"
-              fullWidth
-            >
-              <DialogTitle>Edit Unit</DialogTitle>
-              <DialogContent>
-                <UnitForm
-                  unit={unit}
-                  propertyId={unit.propertyId}
-                  onSuccess={() => {
-                    setEditDialogOpen(false);
-                    unitQuery.refetch();
-                  }}
-                  onCancel={() => setEditDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+              propertyId={unit.propertyId}
+              unit={unit}
+              onSuccess={() => {
+                setEditDialogOpen(false);
+                unitQuery.refetch();
+              }}
+            />
 
             {/* Tenant Assignment Dialog */}
             <TenantAssignmentDialog
