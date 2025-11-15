@@ -67,6 +67,7 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
         area: unit.area,
         rentAmount: unit.rentAmount,
         status: unit.status,
+        images: unit.images,
       });
 
       const formValues = {
@@ -95,13 +96,34 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
       });
 
       // Initialize images from unit data
-      if (unit.images && Array.isArray(unit.images)) {
-        const formattedImages = unit.images.map(img => ({
+      if (unit.images && Array.isArray(unit.images) && unit.images.length > 0) {
+        // Format images to match what UnitImageManager/useImageUpload expects
+        const formattedImages = unit.images.map((img, index) => ({
+          id: img.id || `existing-${index}`,
           url: img.imageUrl || img.url,
+          imageUrl: img.imageUrl || img.url,
           altText: img.caption || img.altText || '',
+          caption: img.caption || img.altText || '',
+          isPrimary: img.isPrimary || false,
+          displayOrder: img.displayOrder ?? index,
         }));
+
+        // Find the primary image's URL, or use the first image as fallback
+        const primaryImage = formattedImages.find(img => img.isPrimary);
+        const primaryImageUrl = primaryImage?.imageUrl || formattedImages[0]?.imageUrl || '';
+
+        console.log('[UnitForm] Setting images:', {
+          count: formattedImages.length,
+          primaryImageUrl: primaryImageUrl ? primaryImageUrl.substring(0, 60) + '...' : 'none',
+          images: formattedImages.map(img => ({
+            id: img.id,
+            isPrimary: img.isPrimary,
+            url: img.imageUrl?.substring(0, 40) + '...'
+          }))
+        });
+
         setUploadedImages(formattedImages);
-        setCoverImageUrl(unit.imageUrl || '');
+        setCoverImageUrl(primaryImageUrl);
       } else {
         setUploadedImages([]);
         setCoverImageUrl(unit.imageUrl || '');
@@ -126,13 +148,24 @@ export default function UnitForm({ open, onClose, propertyId, unit, onSuccess })
 
   // Handle image upload changes
   const handleUploadedImagesChange = (nextImages = [], nextCover = '') => {
-    const transformedImages = nextImages.map(img => ({
-      url: img.imageUrl || img.url,
+    // Keep all properties from the image manager, ensuring consistent format
+    const transformedImages = nextImages.map((img, index) => ({
+      id: img.id || img.imageId || `img-${index}`,
+      url: img.imageUrl || img.url || img.remoteUrl,
+      imageUrl: img.imageUrl || img.url || img.remoteUrl,
       altText: img.caption || img.altText || '',
+      caption: img.caption || img.altText || '',
+      isPrimary: img.isPrimary || false,
+      displayOrder: img.displayOrder ?? img.order ?? index,
     }));
 
+    console.log('[UnitForm] handleUploadedImagesChange:', {
+      imageCount: transformedImages.length,
+      nextCover: nextCover ? nextCover.substring(0, 60) + '...' : 'none',
+    });
+
     setUploadedImages(transformedImages);
-    setCoverImageUrl(nextCover || transformedImages[0]?.url || '');
+    setCoverImageUrl(nextCover || transformedImages[0]?.imageUrl || '');
   };
 
   // Handle upload state changes
